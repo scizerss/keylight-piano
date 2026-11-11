@@ -1,5 +1,11 @@
+import { IS_IOS } from './platform.js'
 import { parseState, recordLaunch, recordShown, shouldOfferSupport, snooze, neverAgain, serialise } from './support-reminder.js'
 
+// The iPhone and iPad app does not ask for tips: Apple restricts apps that send people to outside payment pages, so the
+// support buttons are removed and the dialog and reminder card never open there (the other platforms are unchanged).
+if (IS_IOS) {
+  for (const el of document.querySelectorAll('[data-support], .support-card')) el.remove()
+}
 const dialog = document.getElementById('supportDialog')
 const card = document.getElementById('supportReminder')
 const seenKey = 'lumi.supportOfferSeen'
@@ -44,6 +50,7 @@ function hideCard() {
 }
 
 function openSupport() {
+  if (IS_IOS) return
   if (dialog.open) return
   rememberOffer()
   saveState(recordShown(loadState(), Date.now()))
@@ -61,6 +68,7 @@ dialog.addEventListener('click', (event) => {
 })
 
 window.addEventListener('keylight:first-run-complete', () => {
+  if (IS_IOS) return
   if (read(seenKey) === '1') return
   openSupport()
 })
@@ -82,6 +90,7 @@ function calmOk() {
 }
 
 window.addEventListener('keylight:calm-moment', () => {
+  if (IS_IOS) return
   if (!calmOk() || !card.classList.contains('hidden')) return
   if (shouldOfferSupport(loadState(), Date.now(), 'calm')) card.classList.remove('hidden')
 })

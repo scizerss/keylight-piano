@@ -8,7 +8,7 @@ Verified from Apple's public pages while preparing this: the screenshot sizes be
 
 - **Name** (30 characters max): `Keylight: Piano Lessons`
 - **Subtitle** (30): `Learn piano, light up the keys`
-- **Promotional text** (170): `A complete piano course and a library of songs. Falling notes and sheet music, on-screen keys, and support for MIDI keyboards over USB and Bluetooth. Free and open source.`
+- **Promotional text** (170): `A complete piano course and a library of songs. Falling notes and sheet music, on-screen keys, and support for MIDI keyboards over USB and Bluetooth. Open source.`
 - **Keywords** (100 characters, comma-separated, no spaces after commas): `piano,lessons,learn,keyboard,midi,sheet music,songs,practice,notes,scales,sight reading,ear training`
 - **Description**:
 
@@ -84,7 +84,7 @@ Required: iPad 13-inch 2064x2752 (portrait) or 2752x2064 (landscape), and iPhone
 - **2.1 App completeness / hardware**: review is done without MIDI hardware; the on-screen keys cover that (notes above). CoreMIDI does not run in the Simulator, so MIDI hardware paths are verified only on a real device (checklist in docs/IOS.md). **UNVERIFIED** until tested on a device.
 - **5.1.1 Permissions**: purpose strings exist for Bluetooth and camera. A camera string without a reachable camera feature can draw a question; consider removing `NSCameraUsageDescription` if the camera stays unavailable on iOS (then also hide the camera controls).
 - **4.0 / 4.1 Copying and 5.2 Intellectual property**: the song library is public-domain or openly licensed (see `LICENSES/`); the piano samples are CC BY 3.0 (credit is in About). No third-party brand names are used in the listing. Keep it that way; do not name keyboard makers in the title, subtitle or keywords.
-- **3.1 / payments**: free, no in-app purchases, no ads.
+- **3.1 / payments**: a paid app (one-time price, set in App Store Connect), no in-app purchases, no ads. The support/tip buttons and the Ko-fi link are removed from the iOS build (`renderer/support.js`), because Apple restricts apps that send people to outside payment or donation pages. **UNVERIFIED** against the current guideline text; re-read 3.1.1 and 3.2.1 before submitting.
 - **Privacy manifest and required-reason APIs**: declared above; third-party code is none.
 - **Open-source licence**: MIT. Nothing in the App Store terms forbids it; note that Apple's licence terms apply to the binary distribution.
 - **Account deletion (5.1.1(v))**: not applicable, there are no accounts.
