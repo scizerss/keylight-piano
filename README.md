@@ -181,6 +181,6 @@ Everything bundled keeps its own licence; the full list is in [THIRD_PARTY_NOTIC
 
 ## Licence
 
-MIT, see [LICENSE](LICENSE). Bundled third-party code, models, fonts and samples keep their own licences: see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+MIT, see [LICENSE](LICENSE). The name Keylight and its icon are not part of the licence: forks should use their own name, see [BRANDING.md](BRANDING.md). Bundled third-party code, models, fonts and samples keep their own licences: see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 The six CC BY-SA 3.0 and 4.0 Mutopia songs live apart as data files, not part of the MIT-licensed code; keep their credit and licence if you copy or adapt them. See [LICENSES/mutopia-songs.md](LICENSES/mutopia-songs.md).

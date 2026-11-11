@@ -4,6 +4,10 @@ Prepared for later. Publishing needs the Apple Developer Program ($99 a year). N
 
 Verified from Apple's public pages while preparing this: the screenshot sizes below (App Store Connect help, "Screenshot specifications") and the privacy-manifest reason codes (developer.apple.com documentation, "NSPrivacyAccessedAPITypeReasons").
 
+## First thing to do after enrolling
+
+Create the app record in App Store Connect right away (Apps > + > New App, platform iOS, name `Keylight: Piano Lessons`, bundle id `org.keylight.piano.ios`) to reserve the name before anyone else takes it. The source, including `ios/`, is public under MIT, so the name is the thing to secure early. **UNVERIFIED:** how long Apple holds a reserved name with no build uploaded (believed to be about 180 days); check in App Store Connect. See also `BRANDING.md`.
+
 ## Listing text (generic wording: no keyboard-maker or trademarked names)
 
 - **Name** (30 characters max): `Keylight: Piano Lessons`
