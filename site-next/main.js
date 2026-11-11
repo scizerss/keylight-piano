@@ -1,4 +1,5 @@
 // Keylight website: scroll reveals, the pinned scene, counters, the two piano stages and the Jam grid.
+window.klReady = true
 const still = matchMedia('(prefers-reduced-motion: reduce)').matches
 const $ = (id) => document.getElementById(id)
 const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v))
