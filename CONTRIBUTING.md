@@ -45,7 +45,7 @@ usually contains:
 
 - **What happened**, and **what you expected** instead.
 - **Steps to reproduce it**, numbered, starting from opening the app.
-- **Your platform**: Mac, Windows, Android tablet, or the iPhone/iPad sideload build.
+- **Your platform**: Mac, Windows or an Android phone or tablet.
 - **The Keylight version** (Settings → About) and your **OS version**.
 - **Your keyboard**: LUMI Keys, ROLI Piano M, 49-key ROLI Piano, two keyboards joined,
   no keyboard, or other.
@@ -123,7 +123,6 @@ Building installers (`scripts/package.sh`, `npm run package:win`,
 | `main.js` | The Electron main process: the local server, MIDI permission, starting and watching the macOS light service, the Windows window, screenshots and demo-video frames. |
 | `native/` | Native pieces: the build of the blocksd light service for the Mac app, and the experimental Ultraleap helper. |
 | `android/` | The Android host app: a Java host that bundles the renderer, uses native USB MIDI, and builds the APK. |
-| `ios/` | The iOS app (deferred while the desktop and Android builds are developed). |
 | `scripts/` | The test scripts (`test-*.js`), the packaging and icon scripts, the recording helpers and the self-test runner. |
 | `docs/` | The reference, the user guide facts, the course authoring guide, the device-support notes and the release instructions. |
 | `site-next/` | The static website and the user guide page. Static files, no build step. |

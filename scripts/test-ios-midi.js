@@ -127,6 +127,7 @@ async function pairing() {
 function bundle() {
   const fs = require('node:fs'), os = require('node:os'), { spawnSync } = require('node:child_process')
   const root = path.join(__dirname, '..')
+  if (!fs.existsSync(path.join(root, 'ios', 'scripts', 'bundle-renderer.sh'))) { console.log('iOS bundle copy: skipped (the iOS project is kept in a private repository)'); return }
   const probe = spawnSync('sh', ['-c', 'command -v rsync && command -v perl'])
   if (probe.status !== 0) { console.log('iOS bundle copy: skipped (rsync or perl missing)'); return }
   const out = fs.mkdtempSync(path.join(os.tmpdir(), 'kl-bundle-'))

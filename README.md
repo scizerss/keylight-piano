@@ -30,7 +30,7 @@ Keylight shows falling notes over a keyboard that looks like yours, lights the n
 | Mac | Disk image (`.dmg`) | Apple silicon, macOS 13 or newer. Open the image and drag Keylight to Applications. The app is ad-hoc signed, not notarised, so macOS refuses to open it until the download quarantine is cleared: the image includes the steps. |
 | Windows | Installer (`.exe`) | Windows 10 or 11, 64-bit. **Beta.** The wizard installs for the current user without administrator privileges. Keylight is not code-signed, so the first time Windows may say "Windows protected your PC": click **More info**, then **Run anyway**. |
 | Android | APK file (`.apk`) | Android 8.0 or newer. **Beta.** Installed from the APK file. |
-| iPhone and iPad | coming soon | Coming to the App Store as a paid app. Until then you can build it from source and install it yourself for free, see [docs/IOS.md](docs/IOS.md). |
+| iPhone and iPad | coming soon | Coming to the App Store as a paid app, published by the maintainer. Please do not publish a Keylight app there before it is out; see [BRANDING.md](BRANDING.md). |
 
 All files are on the [latest release page](https://github.com/scizerss/keylight-piano/releases/latest).
 
@@ -126,7 +126,6 @@ The full text is in [docs/PRIVACY.md](docs/PRIVACY.md).
 | [docs/COURSE.md](docs/COURSE.md) | Course design, the lesson data model and the content licence rules |
 | [docs/DEVICE-SUPPORT.md](docs/DEVICE-SUPPORT.md) | Adding support for a keyboard that does not work yet |
 | [docs/ANDROID.md](docs/ANDROID.md) | The Android build, signing and validation limits |
-| [docs/IOS.md](docs/IOS.md) | The iPhone and iPad app and installing it yourself |
 | [docs/PRIVACY.md](docs/PRIVACY.md) | The privacy policy |
 | [docs/RELEASING.md](docs/RELEASING.md) | The release checklist |
 
@@ -168,7 +167,7 @@ Building the installers, the test flags and the demo-video scripts are in [docs/
 
 ## Support the project
 
-Keylight for Mac, Windows and Android is free and stays free: nothing is locked, and there is no account or subscription. It is made by one person in spare time. Tips pay for the tools used to build and test each release and for keyboards to add support for. The iPhone and iPad app will be a paid App Store app, which covers Apple's yearly developer fee and keeps the work going; the code is open, so you can also build it yourself. If Keylight has earned a place on your desk, you can [leave a tip on Ko-fi](https://ko-fi.com/scizers).
+Keylight for Mac, Windows and Android is free and stays free: nothing is locked, and there is no account or subscription. It is made by one person in spare time. Tips pay for the tools used to build and test each release and for keyboards to add support for. The iPhone and iPad app will be a paid App Store app, which covers Apple's yearly developer fee and keeps the work going. If Keylight has earned a place on your desk, you can [leave a tip on Ko-fi](https://ko-fi.com/scizers).
 
 ## Thanks and credits
 

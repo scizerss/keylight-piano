@@ -36,6 +36,11 @@ The official apps are published only from:
 
 A copy of Keylight from anywhere else is not an official build.
 
+## The iPhone and iPad app
+
+The official iPhone and iPad app is being prepared for the App Store by the maintainer (scizerss). Please do not publish a Keylight app there before it is out: two apps with the same name would confuse people, and the name is reserved for this project. This is a request, not a change to the MIT licence.
+If you want to help with it, open an issue and say so: bug reports and feature ideas for the shared app code are welcome, and they reach the iPhone and iPad version too.
+
 ## Not affiliated with ROLI
 
 Keylight is an independent community project. It is not made, endorsed or supported by ROLI.
