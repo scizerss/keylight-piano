@@ -1,6 +1,6 @@
 // Web Audio: expressive MPE instrument engine, metronome click, backing player
 import { Voice, INSTRUMENTS, prepareInstrument } from './instruments.js'
-import { loadPiano, pianoStatus } from './sampler.js'
+import { loadPiano, pianoStatus, loadHarmonium, harmoniumStatus, loadSampled, sampleStatus } from './sampler.js'
 import { createFx } from './jam/fx.js'
 import { playDrum } from './jam/drums.js'
 
@@ -113,6 +113,11 @@ export function setAirExpression(value = null) {
 }
 export function loadSampledPiano() { return loadPiano(initAudio()) }
 export const sampledPianoStatus = () => pianoStatus(ctx)
+export function loadSampledHarmonium() { return loadHarmonium(initAudio()) }
+export const sampledHarmoniumStatus = () => harmoniumStatus(ctx)
+export function loadSampledInstrument(id = 'sampled-piano') { return loadSampled(initAudio(), id) }
+export const sampledInstrumentStatus = (id = 'sampled-piano') => sampleStatus(ctx, id)
+const isSampled = (id) => id === 'sampled-piano' || id === 'harmonium'
 export function setVolume(v) {
   volume = Math.max(0, Math.min(1, v))
   if (!ctx) return
@@ -136,15 +141,15 @@ function warm(id) {
     for (const type of ['sine', 'square', 'triangle']) new OscillatorNode(ctx, { type })
   }
   prepareInstrument(ctx, id)
-  if (id === 'sampled-piano' && pianoStatus(ctx).state !== 'ready') return
+  if (isSampled(id) && sampleStatus(ctx, id).state !== 'ready') return
   for (const pitch of [36, 60, 84]) new Voice(ctx, hush, pitch, 1, id, bendRangeSemis).release(0.02)
 }
 
 const vkey = (channel, pitch) => channel + ':' + pitch
 export function setInstrument(id) {
   if (!INSTRUMENTS.some((i) => i.id === id)) return false
-  // Never silently substitute a synthesised sound under a sampled-piano label.
-  if (id === 'sampled-piano' && pianoStatus(ctx).state !== 'ready') return false
+  // Never silently substitute a synthesised sound under a sampled instrument label.
+  if (isSampled(id) && sampleStatus(ctx, id).state !== 'ready') return false
   instrument = id
   stopAll()
   if (ctx) warm(id)
@@ -669,7 +674,7 @@ export function createTrack({ kind = 'notes', instrument: startInstrument = 'lea
     slide(h, v) { if (live(h)) h.voice.setSlide(v) },
     setInstrument(id) {
       if (!INSTRUMENTS.some((i) => i.id === id)) return false
-      if (id === 'sampled-piano' && pianoStatus(ctx).state !== 'ready') return false
+      if (isSampled(id) && sampleStatus(ctx, id).state !== 'ready') return false
       current = id
       prepareInstrument(ctx, id)
       return true

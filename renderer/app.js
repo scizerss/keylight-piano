@@ -22,7 +22,7 @@ import { mountBackupControls } from './backup.js'
 import { SongScheduler } from './scheduler.js'
 import { HandTracker, listCameras, BONES, TIPS } from './handtrack.js'
 import { summarize } from './scoring.js'
-import { Voice } from './instruments.js'
+import { Voice, prepareInstrument } from './instruments.js'
 import {
   initAudio, audioContext, playNote, stopNote, noteOn, noteOff, stopAll, click,
   loadBackingFile, hasBacking, backingDuration, playBacking, stopBacking,
@@ -31,7 +31,7 @@ import {
   setPolyPressure, setBendRange, activeVoiceCount, voiceState, clearBacking, isBackingPlaying, setSustain, sustainDown,
   loadRecording, unloadRecording, hasRecording, playRecording, pauseRecording, recordingPosition, nudgeRecording,
   listOutputs, setOutput, latencyInfo, scheduleNote, cancelScheduled, cancelClicks, pendingClicks,
-  createTrack, jamFx, sampledPianoStatus, jamVoiceCount
+  createTrack, jamFx, sampledPianoStatus, sampledInstrumentStatus, jamVoiceCount
 } from './audio.js'
 import {
   importFile, saveImported, saveImportedBatch, listImported, getImported, deleteImported, isLyricsFile, parseLrc, isSafeCover
@@ -2300,7 +2300,7 @@ function startPracticeExercise(activity, level) {
 function jamDeps() {
   const lit = framesDrive() || (noteLightsOnly() && !!midiOutput)
   return {
-    audio: { audioContext, initAudio, createTrack, jamFx, click, instrumentList, sampledPianoStatus, cancelClicks },
+    audio: { audioContext, initAudio, createTrack, jamFx, click, instrumentList, sampledPianoStatus, sampledInstrumentStatus, cancelClicks },
     store,
     lights: lit ? { show: (pitches) => { jamLit = new Set(pitches) }, clear: () => { jamLit = new Set() } } : null,
     exit: () => { nav.back() },
@@ -7692,6 +7692,7 @@ async function runSelfTest() {
 async function envelopeReport(id, pressureZero) {
   const sr = 48000, secs = 8
   const oc = new OfflineAudioContext(1, sr * secs, sr)
+  await prepareInstrument(oc, id)
   const v = new Voice(oc, oc.destination, 60, 90, id, 12)
   if (pressureZero) oc.suspend(0.3).then(() => { v.setPressure(0); oc.resume() })
   oc.suspend(7).then(() => { v.release(); oc.resume() })
@@ -7755,6 +7756,7 @@ async function levelReport(id, buildOutputChain) {
   const sr = 48000
   const render = async (pitches, vel) => {
     const oc = new OfflineAudioContext(4, sr * 2, sr)
+    await prepareInstrument(oc, id)
     const chain = buildOutputChain(oc, 0.8)
     const taps = new ChannelMergerNode(oc, { numberOfInputs: 4 })
     const post = new ChannelSplitterNode(oc, { numberOfOutputs: 2 })
@@ -7787,13 +7789,14 @@ async function levelReport(id, buildOutputChain) {
 }
 
 // Audio nodes one key press creates (counts node constructor calls during one voice).
-function nodesPerVoice(id) {
+async function nodesPerVoice(id) {
+  const oc = new OfflineAudioContext(2, 128, 48000)
+  await prepareInstrument(oc, id)
   const names = ['OscillatorNode', 'GainNode', 'BiquadFilterNode', 'ChannelMergerNode', 'AudioBufferSourceNode', 'WaveShaperNode', 'StereoPannerNode']
   const real = names.map((n) => window[n])
   let count = 0
   names.forEach((n, i) => { window[n] = class extends real[i] { constructor(...a) { super(...a); count++ } } })
   try {
-    const oc = new OfflineAudioContext(2, 128, 48000)
     new Voice(oc, oc.destination, 60, 90, id, 12)
   } finally { names.forEach((n, i) => { window[n] = real[i] }) }
   return count
@@ -7816,7 +7819,7 @@ async function runPerfProbe() {
     for (const inst of instrumentList()) {
       const id = inst.id
       const { note: n, chord: c } = (levels[id] = await levelReport(id, audio.buildOutputChain))
-      out(`level ${id.padEnd(7)} note  peak=${dB(n.peak)}dBFS rms=${dB(n.rms)}dBFS loud=${n.loud.toFixed(1)}LUFS limiter in=${dB(n.inPeak)} out=${dB(n.peak)}dBFS onset=${n.onset.toFixed(1)}ms nodes=${nodesPerVoice(id)}`)
+      out(`level ${id.padEnd(7)} note  peak=${dB(n.peak)}dBFS rms=${dB(n.rms)}dBFS loud=${n.loud.toFixed(1)}LUFS limiter in=${dB(n.inPeak)} out=${dB(n.peak)}dBFS onset=${n.onset.toFixed(1)}ms nodes=${await nodesPerVoice(id)}`)
       out(`level ${id.padEnd(7)} chord peak=${dB(c.peak)}dBFS rms=${dB(c.rms)}dBFS loud=${c.loud.toFixed(1)}LUFS limiter in=${dB(c.inPeak)} out=${dB(c.peak)}dBFS max|s|=${c.peak.toFixed(3)} over-knee=${c.over.toFixed(0)}ms err=${c.err.toFixed(0)}dB`)
       if (c.peak >= 0.99) fail(id + ' chord clips: max|s|=' + c.peak.toFixed(3))
       if (n.onset > 25) fail(id + ' onset ' + n.onset.toFixed(1) + 'ms')
