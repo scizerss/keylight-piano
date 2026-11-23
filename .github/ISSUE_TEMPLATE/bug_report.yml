@@ -52,7 +52,6 @@ body:
       options:
         - Mac
         - Windows
-        - Android
         - iPhone / iPad (sideload)
         - Other
     validations:
@@ -72,7 +71,7 @@ body:
     attributes:
       label: OS version
       description: Your operating system and version.
-      placeholder: macOS 13.6 / Windows 11 23H2 / Android 13
+      placeholder: macOS 13.6 / Windows 11 23H2
     validations:
       required: true
 

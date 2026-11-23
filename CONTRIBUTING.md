@@ -15,7 +15,7 @@ By taking part you agree to the [Code of Conduct](CODE_OF_CONDUCT.md).
 - **Feature requests.** Ideas for lessons, games, views, sounds or workflow. See
   [Suggesting a feature](#suggesting-a-feature).
 - **Device reports.** The most valuable reports of all: what happens when a real
-  keyboard meets real hardware. Windows, Android and the beta keyboards (the 49-key
+  keyboard meets real hardware. Windows and the beta keyboards (the 49-key
   ROLI Piano, two keyboards joined as one) need testing on devices the maintainers may
   not own. Use the [device support form](.github/ISSUE_TEMPLATE/device_support.yml).
 - **Testing on real devices.** Install a build, play a lesson, plug in a keyboard over
@@ -45,7 +45,7 @@ usually contains:
 
 - **What happened**, and **what you expected** instead.
 - **Steps to reproduce it**, numbered, starting from opening the app.
-- **Your platform**: Mac, Windows or an Android phone or tablet.
+- **Your platform**: Mac or Windows.
 - **The Keylight version** (Settings → About) and your **OS version**.
 - **Your keyboard**: LUMI Keys, ROLI Piano M, 49-key ROLI Piano, two keyboards joined,
   no keyboard, or other.
@@ -111,9 +111,10 @@ and no `FAIL` line. `scripts/selftest.js`, which CI runs on macOS and Windows, t
 
 The full reference for test and screenshot flags (`LUMI_SELFTEST`, `LUMI_QUERY`,
 `LUMI_SHOT`, `LUMI_FRAMES` and the rest) is in [docs/REFERENCE.md](docs/REFERENCE.md).
-Building installers (`scripts/package.sh`, `npm run package:win`,
-`npm run package:android` and the rest) is covered in
+Building desktop installers is covered in
 [docs/RELEASING.md](docs/RELEASING.md) and [docs/INSTALLERS.md](docs/INSTALLERS.md).
+
+Keylight for Android is a separate paid app. Its project is not in this repository.
 
 ## Project layout
 
@@ -122,7 +123,6 @@ Building installers (`scripts/package.sh`, `npm run package:win`,
 | `renderer/` | The app page itself: screens, player, note views, sound, key lights, lessons and exercises. Plain ES modules loaded directly by `index.html`, no build step. |
 | `main.js` | The Electron main process: the local server, MIDI permission, starting and watching the macOS light service, the Windows window, screenshots and demo-video frames. |
 | `native/` | Native pieces: the build of the blocksd light service for the Mac app, and the experimental Ultraleap helper. |
-| `android/` | The Android host app: a Java host that bundles the renderer, uses native USB MIDI, and builds the APK. |
 | `scripts/` | The test scripts (`test-*.js`), the packaging and icon scripts, the recording helpers and the self-test runner. |
 | `docs/` | The reference, the user guide facts, the course authoring guide, the device-support notes and the release instructions. |
 | `site-next/` | The static website and the user guide page. Static files, no build step. |
@@ -202,9 +202,7 @@ issue and someone will help. Small, well-explained contributions are always welc
 
 ## Things that are off limits
 
-- **Never commit keystores, passwords or tokens.** The Android development signing key
-  and its password live outside the repository and are backed up privately. Do not put
-  secrets in a commit, an issue or a pull request.
+- **Never commit keystores, passwords or tokens.** Keep signing keys and passwords in private storage.
 - **Never bundle ROLI or Ultraleap runtimes, drivers, firmware or SDKs.** Keylight
   contains no ROLI software, firmware, artwork, fonts, sounds or lesson content. The
   Ultraleap helper loads the user's own installed runtime at run time; none of it is

@@ -23,6 +23,6 @@ Deploying: `_headers` (security headers and cache times), `robots.txt` and `site
 
 Before going live:
 
-- The download buttons ask GitHub for the newest release and link to its files. Until a release with a disk image, an installer and an APK exists, they open the releases page.
+- The download buttons ask GitHub for the newest release and link to its files. When a desktop installer or portable build is unavailable, its button opens the releases page.
 - Every number on the page (76 songs, 94 lessons, 12 levels, fifteen sounds) comes from the app at the time of writing. Check them again at release.
 - The screenshots in `img/` and the clips in `video/` were taken from the app on 2026-11-10 with `scripts/record.sh`.

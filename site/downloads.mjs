@@ -11,8 +11,7 @@ export function releaseDownloads(release) {
   return {
     tag: typeof release.tag_name === 'string' ? release.tag_name.slice(0, 80) : '',
     mac: pick(['.dmg', '-mac.zip']),
-    win: pick(['-setup.exe', '-win-x64.zip']),
-    android: pick(['.apk'])
+    win: pick(['-setup.exe', '-win-x64.zip'])
   }
 }
 
@@ -24,13 +23,12 @@ export async function refreshDownloads(document) {
     const release = releaseDownloads(await response.json())
     if (!release) { status.textContent = 'Open the releases page to choose a download.'; return }
     status.textContent = release.tag ? 'Latest published release: ' + release.tag : 'Published downloads'
-    for (const platform of ['mac', 'win', 'android']) {
+    for (const platform of ['mac', 'win']) {
       const asset = release[platform]
       if (!asset) continue
       const link = document.getElementById(platform + 'Download')
       link.href = asset.browser_download_url
       link.textContent = 'Download ' + (asset.name.endsWith('.zip') ? 'ZIP' : asset.name.split('.').pop().toUpperCase())
-      if (platform === 'android') document.getElementById('androidStatus').textContent = 'Published Android build. Read its release notes for supported devices and requirements.'
     }
   } catch (error) {
     if (!(error instanceof Error)) throw error

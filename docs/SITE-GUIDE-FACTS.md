@@ -2,8 +2,8 @@
 
 ## Getting started
 - Keylight is free and open source (MIT). No account, no ads, no analytics, no tracking. Songs, recordings and progress stay on your device.
-- Mac: Apple silicon, macOS 13 or newer. Windows 10/11 64-bit (beta). Android 8.0 or newer (beta, installed from an APK file). iPhone and iPad: coming soon.
-- Keyboards: LUMI Keys and ROLI Piano M over USB (24 keys). On Android also over Bluetooth. A 49-key ROLI Piano works (beta). Two 24-key keyboards can be joined as one 48-key row, with two USB cables or snapped together with one cable (beta).
+- Mac: Apple silicon, macOS 13 or newer. Windows 10/11 64-bit (beta). Keylight for Android is a separate paid app. Its project is not in this repository. iPhone and iPad: coming soon.
+- Keyboards: LUMI Keys and ROLI Piano M over USB (24 keys). A 49-key ROLI Piano works (beta). Two 24-key keyboards can be joined as one 48-key row, with two USB cables or snapped together with one cable (beta).
 - On a Mac the keys light in full colour and the keyboard's arrow and mode buttons work. On Windows the keys light from the notes; these are not available on Windows yet: brightness slider, the light show after a song, find-the-keys, battery level, arrow and mode buttons. On Windows close ROLI Connect or any music software using the keyboard first.
 - First start: a short setup checks sound, keys and lights. It can be run again from Settings.
 - No keyboard? You can still look around.

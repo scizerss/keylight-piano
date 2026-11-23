@@ -53,10 +53,11 @@ Keylight is free and open source (MIT). There is no account, no ads, no analytic
 |---|---|
 | Mac | Apple silicon, macOS 13 or newer |
 | Windows | Windows 10 or 11, 64-bit. **Beta** |
-| Android | Android 8.0 or newer, installed from an APK file. **Beta** |
 | iPhone and iPad | Coming soon |
 
-Download from the [latest release page](https://github.com/scizerss/keylight-piano/releases/latest) and follow the steps for your system. Windows and Android are beta and have not yet been tested on many real devices; if something is wrong, open an [issue](https://github.com/scizerss/keylight-piano/issues).
+For desktop downloads, go to the [latest release page](https://github.com/scizerss/keylight-piano/releases/latest) and follow the steps for your system. Windows is in beta and has had limited hardware testing; if something is wrong, open an [issue](https://github.com/scizerss/keylight-piano/issues).
+
+Keylight for Android is a separate paid app. Its project is not in this repository.
 
 <p align="center">
   <img src="media/screen-home.jpg" width="720" alt="The Home screen with today's goal, the next lesson and the course">
@@ -78,7 +79,7 @@ You can run the whole setup again at any time from **Settings** > **Run setup ag
 
 ### The keyboard
 
-Keylight works with the light-up keyboards ROLI made: LUMI Keys and ROLI Piano M, 24 keys, over USB. On Android a keyboard can also connect over Bluetooth. A 49-key ROLI Piano works (**Beta**), and two 24-key keyboards can be joined as one 48-key row, with two USB cables or snapped together with one cable (**Beta**).
+Keylight works with the light-up keyboards ROLI made: LUMI Keys and ROLI Piano M, 24 keys, over USB. A 49-key ROLI Piano works (**Beta**), and two 24-key keyboards can be joined as one 48-key row, with two USB cables or snapped together with one cable (**Beta**).
 
 What differs between systems:
 
@@ -203,7 +204,7 @@ Title, artist and cover come from the file.
 - On Mac and Windows, **Find cover art and lyrics online** can look them up. It sends only the title, artist and length.
 - Drop a `.lrc` file onto an open song to add lyrics.
 
-> Note: the online lookup is the only part of the desktop app that goes online, and it only happens while you import, only with the option switched on. The Android app does not make these requests. See [PRIVACY.md](PRIVACY.md).
+> Note: the online lookup is the only part of the desktop app that goes online, and it only happens while you import, only with the option switched on. See [PRIVACY.md](PRIVACY.md).
 
 ### Correct the notes
 

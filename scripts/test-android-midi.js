@@ -63,61 +63,8 @@ async function main() {
   globalThis.__keylightNativeReceive({ kind: 'data', port: reconnected.id, bytes: [1, 2, 0x90, 65, 90] })
   assert.deepEqual(afterReconnect, [[0x90, 65, 90]])
   console.log('Android MIDI: 6 stream cases, native delivery, ordered sends, close and hotplug passed')
-  await testExport(source)
   await testBle(source)
-  await testHostTools(source)
-  testJvm()
-}
-
-async function testExport(adapterSource) {
-  const bootstrap = await fs.readFile(new URL('../android/host-bootstrap.js', pathToFileURL(__filename)), 'utf8')
-  const adapterUrl = `data:text/javascript;base64,${Buffer.from(adapterSource).toString('base64')}`
-  const transfers = new Map(), saved = []
-  let complete
-  globalThis.KeylightNative = { postMessage(raw) {
-    const message = JSON.parse(raw)
-    let result = true
-    switch (message.op) {
-      case 'exportBegin': {
-        const token = String(message.id)
-        transfers.set(token, { name: message.name, mime: message.mime, size: message.size, chunks: [] })
-        result = token; break
-      }
-      case 'exportChunk': {
-        const bytes = Buffer.from(message.data, 'base64')
-        assert.ok(bytes.length <= 32768)
-        transfers.get(message.token).chunks.push(bytes); break
-      }
-      case 'exportFinish': {
-        const transfer = transfers.get(message.token)
-        const bytes = Buffer.concat(transfer.chunks)
-        assert.equal(bytes.length, transfer.size)
-        saved.push({ name: transfer.name, mime: transfer.mime, bytes })
-        transfers.delete(message.token); complete?.(); break
-      }
-      case 'exportAbort': transfers.delete(message.token); break
-      default: assert.fail('Unexpected export operation')
-    }
-    queueMicrotask(() => globalThis.__keylightNativeReceive({ id: message.id, result }))
-  } }
-  Object.defineProperty(globalThis, 'navigator', { value: {}, configurable: true })
-  globalThis.HTMLAnchorElement = class { click() { assert.fail('Blob download escaped native handoff') } }
-  globalThis.document = { addEventListener() {} }
-  globalThis.alert = (message) => assert.fail(message)
-  const executable = bootstrap.replace("'./android-midi.js'", JSON.stringify(adapterUrl))
-  const { exportBlob } = await import(`data:text/javascript;base64,${Buffer.from(executable).toString('base64')}`)
-  const bytes = Uint8Array.from({ length: 70001 }, (_, i) => i % 256)
-  await exportBlob(new Blob([bytes], { type: 'video/mp4;codecs=avc1' }), 'take.mp4')
-  assert.deepEqual(saved[0], { name: 'take.mp4', mime: 'video/mp4', bytes: Buffer.from(bytes) })
-  const completion = new Promise((resolve) => { complete = resolve })
-  const anchor = new HTMLAnchorElement()
-  anchor.href = URL.createObjectURL(new Blob(['{"notes":3}'], { type: 'application/json' }))
-  anchor.download = 'take.json'
-  anchor.click(); URL.revokeObjectURL(anchor.href)
-  await completion
-  assert.deepEqual(saved[1], { name: 'take.json', mime: 'application/json', bytes: Buffer.from('{"notes":3}') })
-  await assert.rejects(exportBlob({ size: 256 * 1024 * 1024 + 1 }, 'large.mp4'), RangeError)
-  console.log('Android export: bounded multi-chunk byte delivery, MIME, revoked Blob download and size limit passed')
+  await testHostTools()
 }
 
 async function testBle(adapterSource) {
@@ -272,9 +219,8 @@ async function testBle(adapterSource) {
   console.log('Android Bluetooth: phases, scan, connect, remember/forget, errors, rate limit, bounded silent auto-reconnect and BLE ports passed')
 }
 
-// Link, clipboard and USB bridge methods: the page-side rules, the same rules as the desktop allow-list, and (when a JDK
-// is installed) the Java port of them that the host runs again.
-async function testHostTools(adapterSource) {
+// Link, clipboard and USB bridge methods in the shared renderer.
+async function testHostTools() {
   const read = (path) => fs.readFile(new URL(path, pathToFileURL(__filename)), 'utf8')
   const dataUrl = (source) => `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`
   const policySource = await read('../renderer/host-policy.js')
@@ -306,28 +252,6 @@ async function testHostTools(adapterSource) {
   for (const url of GOOD) { assert.equal(isAllowedLink(url), true, url); assert.equal(desktop.isAllowedExternalUrl(url), true, url) }
   for (const url of BAD) { assert.equal(isAllowedLink(url), false, JSON.stringify(url)); assert.equal(desktop.isAllowedExternalUrl(url), false, JSON.stringify(url)) }
   for (const value of [null, undefined, 5, {}, [], ['https://ko-fi.com/scizers'], { toString: () => 'https://ko-fi.com/scizers' }]) assert.equal(isAllowedLink(value), false)
-
-  // the Java port agrees on every address
-  const { spawnSync } = require('node:child_process'), os = require('node:os'), path = require('node:path'), fsSync = require('node:fs')
-  const javac = spawnSync('javac', ['-version'], { encoding: 'utf8' })
-  let java = 'skipped (no JDK on the PATH)'
-  if (javac.status === 0) {
-    const dir = fsSync.mkdtempSync(path.join(os.tmpdir(), 'keylight-link-'))
-    try {
-      const pkg = path.join(dir, 'org', 'keylight', 'piano'); fsSync.mkdirSync(pkg, { recursive: true })
-      fsSync.copyFileSync(path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'java', 'org', 'keylight', 'piano', 'LinkPolicy.java'), path.join(pkg, 'LinkPolicy.java'))
-      fsSync.writeFileSync(path.join(pkg, 'LinkCheck.java'), 'package org.keylight.piano;\nimport java.io.*;\npublic class LinkCheck { public static void main(String[] a) throws Exception {\n' +
-        ' BufferedReader in = new BufferedReader(new InputStreamReader(System.in, "UTF-8")); String line; StringBuilder out = new StringBuilder();\n' +
-        ' while ((line = in.readLine()) != null) { String url = java.net.URLDecoder.decode(line.replace("+", "%2B"), "UTF-8"); out.append(LinkPolicy.allowed(url) ? "1" : "0"); }\n System.out.println(out); } }\n')
-      const build = spawnSync('javac', ['-d', dir, path.join(pkg, 'LinkPolicy.java'), path.join(pkg, 'LinkCheck.java')], { encoding: 'utf8' })
-      assert.equal(build.status, 0, build.stderr)
-      const all = [...GOOD, ...BAD]
-      const run = spawnSync('java', ['-cp', dir, 'org.keylight.piano.LinkCheck'], { input: all.map((u) => encodeURIComponent(u)).join('\n') + '\n', encoding: 'utf8' })
-      assert.equal(run.status, 0, run.stderr)
-      assert.equal(run.stdout.trim(), all.map((u) => (isAllowedLink(u) ? '1' : '0')).join(''), 'Java LinkPolicy and the page rules agree on every address')
-      java = 'agrees on ' + all.length + ' addresses'
-    } finally { fsSync.rmSync(dir, { recursive: true, force: true }) }
-  }
 
   // the USB answer is rebuilt field by field: a serial, a path or a bad id never gets through
   const hostile = { ok: true, source: 'x', reason: 'y', redact: ['name'], os: { platform: 'darwin', release: '15 (API 35)', arch: 'arm64-v8a', serial: 'S1' },
@@ -370,34 +294,7 @@ async function testHostTools(adapterSource) {
   globalThis.__bridge = async () => { throw new Error('offline') }
   assert.equal(await tools.usbProbe(), null)
   delete globalThis.__bridge; delete globalThis.window
-
-  // downloads: a title with an apostrophe, an accent or a slash still saves, under a plain name
-  const { safeName } = await import(dataUrl(/export function safeName[\s\S]*?\n}\n/.exec(await read('../android/host-bootstrap.js'))[0]))
-  {
-    assert.equal(safeName("Für Elise - take 1.mp4"), 'Fur Elise - take 1.mp4'); assert.equal(safeName("../../etc/passwd"), 'etc-passwd'); assert.equal(safeName('..'), 'keylight-file')
-    assert.ok(/^[A-Za-z0-9][A-Za-z0-9._ -]{0,127}$/.test(safeName("O'Brien: Prelude?.json"))); assert.equal(safeName('x'.repeat(300)).length, 128)
-  }
-  console.log('Android host tools: link allow-list (' + (GOOD.length + BAD.length) + ' addresses; Java ' + java + '), clipboard, USB descriptors without serials, plain file names passed')
+  console.log('Shared renderer host tools: link allow-list, clipboard and USB descriptor checks passed')
 }
 const deadline = setTimeout(() => { console.error('Android bridge tests timed out'); process.exit(1) }, 40000)
 main().catch((error) => { console.error(error); process.exitCode = 1 }).finally(() => clearTimeout(deadline))
-
-// Pure host logic (bounded MIDI buffer, Bluetooth attempt state machine, picker URI rules) runs on a plain JVM.
-function testJvm() {
-  const { spawnSync } = require('node:child_process')
-  const os = require('node:os'), path = require('node:path')
-  const root = path.join(__dirname, '..')
-  let javaHome = process.env.JAVA_HOME
-  if (!javaHome) { const r = spawnSync('/usr/libexec/java_home', ['-v', '17'], { encoding: 'utf8' }); if (r.status === 0) javaHome = r.stdout.trim() }
-  const bin = (name) => javaHome ? path.join(javaHome, 'bin', name) : name
-  if (spawnSync(bin('javac'), ['-version'], { encoding: 'utf8' }).error) { console.log('jvm host logic: skipped (no JDK found)'); return }
-  const out = require('node:fs').mkdtempSync(path.join(os.tmpdir(), 'keylight-jvm-'))
-  try {
-    const dir = path.join(root, 'android/app/src/main/java/org/keylight/piano')
-    const compile = spawnSync(bin('javac'), ['-d', out, ...['MidiBuffer', 'PortFeed', 'StagingPolicy', 'AttemptTracker', 'UriPolicy'].map((n) => path.join(dir, n + '.java')), path.join(root, 'android/jvm-test/HostLogicTests.java')], { encoding: 'utf8' })
-    assert.equal(compile.status, 0, compile.stdout + compile.stderr)
-    const run = spawnSync(bin('java'), ['-ea', '-cp', out, 'org.keylight.piano.HostLogicTests'], { encoding: 'utf8' })
-    assert.equal(run.status, 0, run.stdout + run.stderr)
-    process.stdout.write(run.stdout)
-  } finally { require('node:fs').rmSync(out, { recursive: true, force: true }) }
-}

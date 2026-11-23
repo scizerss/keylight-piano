@@ -5,7 +5,7 @@
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="Licence: MIT"></a>
   <a href="https://github.com/scizerss/keylight-piano/releases/latest"><img src="https://img.shields.io/github/v/release/scizerss/keylight-piano?label=release" alt="Latest release"></a>
-  <img src="https://img.shields.io/badge/platforms-Mac%20%7C%20Windows%20%7C%20Android-lightgrey.svg" alt="Platforms: Mac, Windows and Android">
+  <img src="https://img.shields.io/badge/platforms-Mac%20%7C%20Windows-lightgrey.svg" alt="Platforms: Mac and Windows">
   <a href="https://ko-fi.com/scizers"><img src="https://img.shields.io/badge/Support%20on%20Ko--fi-FF5E5B?logo=ko-fi&logoColor=white" alt="Support on Ko-fi"></a>
 </p>
 
@@ -29,12 +29,13 @@ Keylight shows falling notes over a keyboard that looks like yours, lights the n
 |---|---|---|
 | Mac | Disk image (`.dmg`) | Apple silicon, macOS 13 or newer. Open the image and drag Keylight to Applications. The app is ad-hoc signed, not notarised, so macOS refuses to open it until the download quarantine is cleared: the image includes the steps. |
 | Windows | Installer (`.exe`) | Windows 10 or 11, 64-bit. **Beta.** The wizard installs for the current user without administrator privileges. Keylight is not code-signed, so the first time Windows may say "Windows protected your PC": click **More info**, then **Run anyway**. |
-| Android | APK file (`.apk`) | Android 8.0 or newer. **Beta.** Installed from the APK file. |
 | iPhone and iPad | coming soon | Coming to the App Store as a paid app, published by the maintainer. Please do not publish a Keylight app there before it is out; see [BRANDING.md](BRANDING.md). |
 
-All files are on the [latest release page](https://github.com/scizerss/keylight-piano/releases/latest).
+Desktop downloads are on the [latest release page](https://github.com/scizerss/keylight-piano/releases/latest).
 
-Windows and Android are beta and have not yet been tested on many real devices. If something is wrong, open an [issue](https://github.com/scizerss/keylight-piano/issues) and it gets fixed.
+Windows is in beta and has had limited hardware testing. If something is wrong, open an [issue](https://github.com/scizerss/keylight-piano/issues) and it gets fixed.
+
+Keylight for Android is a separate paid app. Its project is not in this repository.
 
 ## What it does
 
@@ -102,10 +103,9 @@ Two 24-key keyboards can be joined as one 48-key row, with two USB cables or sna
 
 ## Works with
 
-- **Keyboards:** LUMI Keys and ROLI Piano M over USB (24 keys). On Android also over Bluetooth. A 49-key ROLI Piano works (**beta**). Two 24-key keyboards can be joined as one 48-key row (**beta**).
+- **Keyboards:** LUMI Keys and ROLI Piano M over USB (24 keys). A 49-key ROLI Piano works (**beta**). Two 24-key keyboards can be joined as one 48-key row (**beta**).
 - **Mac:** the keys light in full colour and the keyboard's arrow and mode buttons work. macOS 13 or newer on Apple silicon.
 - **Windows (beta):** the keys light from the notes. Close ROLI Connect or any music software using the keyboard first. These are not available on Windows yet: brightness slider, the light show after a song, find-the-keys, battery level, arrow and mode buttons.
-- **Android (beta):** USB and Bluetooth. Android 8.0 or newer.
 
 Keylight is an unofficial community project. It is not affiliated with or endorsed by ROLI.
 
@@ -125,7 +125,6 @@ The full text is in [docs/PRIVACY.md](docs/PRIVACY.md).
 | [docs/REFERENCE.md](docs/REFERENCE.md) | The full reference: install, build, lighting, sound, files and the 49-key keyboard |
 | [docs/COURSE.md](docs/COURSE.md) | Course design, the lesson data model and the content licence rules |
 | [docs/DEVICE-SUPPORT.md](docs/DEVICE-SUPPORT.md) | Adding support for a keyboard that does not work yet |
-| [docs/ANDROID.md](docs/ANDROID.md) | The Android build, signing and validation limits |
 | [docs/PRIVACY.md](docs/PRIVACY.md) | The privacy policy |
 | [docs/RELEASING.md](docs/RELEASING.md) | The release checklist |
 
@@ -167,7 +166,7 @@ Building the installers, the test flags and the demo-video scripts are in [docs/
 
 ## Support the project
 
-Keylight for Mac, Windows and Android is free and stays free: nothing is locked, and there is no account or subscription. It is made by one person in spare time. Tips pay for the tools used to build and test each release and for keyboards to add support for. The iPhone and iPad app will be a paid App Store app, which covers Apple's yearly developer fee and keeps the work going. If Keylight has earned a place on your desk, you can [leave a tip on Ko-fi](https://ko-fi.com/scizers).
+Keylight for Mac and Windows is free and stays free: nothing is locked, and there is no account or subscription. It is made by one person in spare time. Tips pay for the tools used to build and test each release and for keyboards to add support for. The mobile apps are separate paid apps. If Keylight has earned a place on your desk, you can [leave a tip on Ko-fi](https://ko-fi.com/scizers).
 
 ## Thanks and credits
 

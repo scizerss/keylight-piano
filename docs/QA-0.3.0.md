@@ -1,5 +1,7 @@
 # Keylight 0.3.0 development verification
 
+This is a historical QA record for 0.3.0. Keylight for Android is a separate paid app. Its project is not in this repository.
+
 This is a local development build, not a published release. No physical MIDI keyboard,
 Airwave, camera, payment account, user app installation or user progress profile was used.
 Tests ran muted with their own profiles; test app/browser processes were closed afterward.

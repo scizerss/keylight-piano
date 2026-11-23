@@ -398,8 +398,8 @@ document.querySelectorAll('[data-switch]').forEach((box) => {
     const ok = rel.assets.filter((a) => a && typeof a.name === 'string' && a.name.startsWith('Keylight-') && typeof a.browser_download_url === 'string' &&
       a.browser_download_url.startsWith(base) && a.browser_download_url.endsWith('/' + a.name) && !/[?#\\\s]/.test(a.browser_download_url))
     const pick = (ends) => ends.map((e) => ok.find((a) => a.name.toLowerCase().endsWith(e))).find(Boolean)
-    const files = { mac: pick(['.dmg', '-mac.zip']), win: pick(['-setup.exe', '-win-x64.zip']), android: pick(['.apk']) }
+    const files = { mac: pick(['.dmg', '-mac.zip']), win: pick(['-setup.exe', '-win-x64.zip']) }
     for (const link of document.querySelectorAll('[data-dl]')) { const f = files[link.dataset.dl]; if (f) link.href = f.browser_download_url }
-    if (typeof rel.tag_name === 'string' && /^v?[0-9][0-9A-Za-z.-]{0,30}$/.test(rel.tag_name)) $('dlVersion').textContent = 'Version ' + rel.tag_name.replace(/^v/, '') + '. Mac: a disk image. Windows: an installer. Android: an APK file you open on your phone.'
+    if (typeof rel.tag_name === 'string' && /^v?[0-9][0-9A-Za-z.-]{0,30}$/.test(rel.tag_name)) $('dlVersion').textContent = 'Version ' + rel.tag_name.replace(/^v/, '') + '. Mac: a disk image. Windows: an installer.'
   } catch (_e) { /* offline or rate-limited: the buttons keep opening the releases page */ }
 })()

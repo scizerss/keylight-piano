@@ -1,8 +1,10 @@
 # Keylight privacy policy
 
-Last updated: 2026-11-09. Applies to Keylight for Android (package `org.keylight.piano`), and to the Keylight desktop apps where noted.
+Last updated: 2026-11-09. Covers the historical Android APK (package `org.keylight.piano`) and the Keylight desktop apps where noted.
 
-Keylight is a free, open-source piano-learning app. The short version: **no accounts, no ads, no analytics, no tracking. What you do in the app stays on your device.**
+Keylight for Android is a separate paid app. Its project is not in this repository. The Android details below describe the historical APK.
+
+Keylight for desktop is a free, open-source piano-learning app. The short version: **no accounts, no ads, no analytics, no tracking. What you do in the app stays on your device.**
 
 ## What Keylight does not do
 
@@ -43,4 +45,4 @@ Keylight is a general-audience music-learning app. It collects no personal infor
 
 ## Changes and contact
 
-If this policy changes, the new version is published here with a new date. Questions, or a request about data: open an issue at https://github.com/scizerss/keylight-piano/issues. The source code is public at https://github.com/scizerss/keylight-piano, so you can check every statement above.
+If this policy changes, the new version is published here with a new date. Questions, or a request about data: open an issue at https://github.com/scizerss/keylight-piano/issues. The desktop source and historical Android APK source are available at https://github.com/scizerss/keylight-piano.

@@ -4,7 +4,7 @@
 > This is the full reference. For the short version, see the [README](../README.md) and the [user guide](GUIDE.md).
 
 
-**Mac** · **Windows (beta)** · **Android tablets (experimental)** · [Published downloads](https://github.com/scizerss/keylight-piano/releases/latest)
+**Mac** · **Windows (beta)** · [Published downloads](https://github.com/scizerss/keylight-piano/releases/latest)
 
 This branch prepares **0.3.0**. These changes and the new installer formats have not yet
 been published; the public release may contain fewer features. The core app stays free,
@@ -469,7 +469,7 @@ In **Settings > Progress**, back up the imported library (including recordings),
 and progress as a `.keylightbackup` file. Restore validates the complete file, asks before
 replacing matching entries, and preserves entries absent from the backup. Song writes use
 one transaction. Keep a copy outside the app; it contains your imported media and private
-settings. Android exports have a 256 MiB limit and use the system document picker.
+settings.
 
 ## External instruments, Airwave and finger coaching
 
@@ -488,18 +488,6 @@ remain unverified. See [docs/AIRWAVE.md](AIRWAVE.md).
 fresh, confident observations from the existing camera beta. Missing, stale or ambiguous
 fingers are reported as uncertain and never change the note score. It currently covers one
 24-key keyboard. Real camera accuracy still requires user testing.
-
-## Android tablet development build
-
-`npm run package:android` builds `dist/Keylight-<version>-android.apk`. It is signed with a
-stable local development key for sideloading, not a Play Store release. The Java host bundles
-the renderer, local models and samples and uses native USB MIDI rather than WebView MIDI.
-Use an Android 8+ tablet with a current System WebView, USB host/OTG, and a compatible keyboard;
-USB MIDI 2.0-only devices and Bluetooth are not supported by this host.
-
-File import and exports use Android's document picker. Camera permission is requested only
-when starting hand tracking. Optional online metadata lookup is disabled in this build.
-Build requirements, signing-key backup and validation limits are in [docs/ANDROID.md](ANDROID.md).
 
 ## Lighting
 
@@ -722,14 +710,14 @@ for documenting Airwave expression and the wider device protocols.
 - **Windows (beta)**: works today with key lights from MIDI notes.
   Light styles use the keyboard palette; brightness, hardware buttons and battery still
   need the separate light service. Hardware feedback remains welcome.
-- **Android**: experimental native host and APK; tablet/USB testing and distribution work continue.
-- **iOS**: deferred while desktop and Android are developed.
+- **Android**: Keylight for Android is a separate paid app. Its project is not in this repository.
+- **iPhone and iPad**: a separate paid App Store app.
 - **Hand tracking**: advisory fingering feedback is implemented; full Airwave camera tracking,
   stronger calibration and wider keyboards need further validation.
 
 ## Support
 
-Keylight is free. If it helps you learn, you can support it on
+Keylight for desktop is free. If it helps you learn, you can support it on
 [Ko-fi](https://ko-fi.com/scizers), or with the Sponsor button at the top of the
 repository.
 

@@ -1,14 +1,12 @@
 # Releasing Keylight
 
-The 0.3.0 development targets add `npm run package:dmg`, `npm run package:installer`
-and `npm run package:android`. These build locally and do not publish or install Keylight.
-Desktop installer commands inspect payloads automatically. Android uses a stable local
-development signing key; back it up privately before distributing updates. See
-`docs/INSTALLERS.md` and `docs/ANDROID.md` for build and verification boundaries.
+Use `npm run package:dmg` and `npm run package:installer` to build and inspect desktop installers locally. See [INSTALLERS.md](INSTALLERS.md).
+
+Keylight for Android is a separate paid app. Its project is not in this repository.
 
 Run `npm run test:audio` in addition to the unit suite and engine self-test. It renders
 the bundled recordings and expression controls offline in a hidden, muted process.
-Keep physical MIDI, camera accuracy, Windows installer execution and Android device results
+Keep physical MIDI, camera accuracy, and Windows installer execution
 separate from synthetic test results in release notes. The `download-page` and `installers`
 GitHub Actions workflows are manual and have not run merely because their files exist.
 

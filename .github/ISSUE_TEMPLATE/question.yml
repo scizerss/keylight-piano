@@ -25,7 +25,7 @@ body:
     attributes:
       value: |
         It helps to say what you have already tried, and what you are running Keylight
-        on (Mac, Windows or Android), if that is relevant.
+        on (Mac or Windows), if that is relevant.
 
   - type: checkboxes
     id: searched

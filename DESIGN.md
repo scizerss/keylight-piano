@@ -43,7 +43,7 @@ handled on Ko-fi, external-browser explanation, close/continue action, no locked
 Native dialog supplies focus containment, Escape and return focus. Loading a payment page never
 blocks playing. No donor status or payment records are stored in Keylight.
 
-Download page primary action: Download for free. Required: desktop and Android capability wording,
+Download page primary action: Download for free. Required: desktop capability wording,
 public release link, optional donation link, source link, and no claim of a published build that
 has only been built locally. Keep the page usable without JavaScript.
 

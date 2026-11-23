@@ -98,14 +98,6 @@ Imported songs can ask the iTunes Search API (cover art) and LRCLIB (lyrics) for
 metadata. The hand-tracking model is downloaded from Google's MediaPipe storage only by
 `scripts/build-vendor.sh`. Nothing else is downloaded.
 
-## Android host — Apache License 2.0 components
-
-The Android application uses AndroidX WebKit 1.14.0 and its AndroidX dependencies,
-from the Android Open Source Project, under Apache License 2.0. They provide trusted
-asset loading and WebView messaging. The full Apache 2.0 text is also bundled at
-`renderer/models/basic-pitch/LICENSE`. Android System WebView and the operating system
-are installed separately on the user's device; Keylight does not redistribute them.
-
 ## Not affiliated with ROLI
 Keylight is an independent, unofficial project. It is not affiliated with, endorsed by
 or supported by ROLI Ltd or Luminary ROLI. ROLI, LUMI, Piano M, ROLI Learn and BLOCKS

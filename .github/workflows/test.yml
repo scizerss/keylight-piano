@@ -1,9 +1,9 @@
 name: test
 on:
   push:
-    paths-ignore: ['**.md', 'docs/**', 'LICENSES/**', 'android/store/**', 'ios/store/**', '**.png', '**.jpg']
+    paths-ignore: ['**.md', 'docs/**', 'LICENSES/**', '**.png', '**.jpg']
   pull_request:
-    paths-ignore: ['**.md', 'docs/**', 'LICENSES/**', 'android/store/**', 'ios/store/**', '**.png', '**.jpg']
+    paths-ignore: ['**.md', 'docs/**', 'LICENSES/**', '**.png', '**.jpg']
 permissions:
   contents: read
 # a newer push cancels the run it supersedes (macOS minutes cost about ten times Linux on a private repository)

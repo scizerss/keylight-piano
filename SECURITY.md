@@ -26,7 +26,7 @@ chance to fix it first.
 - **What the problem is**, and roughly how serious you think it is.
 - **Steps to reproduce it**, or the smallest example that shows it.
 - **Which version** of Keylight you were running (Settings → About), and on which
-  platform (Mac, Windows or Android).
+  platform (Mac or Windows).
 - **Any files or output** that help: a log line, a report from Settings → Support my
   device, or a short clip.
 - A way to **contact you** if the private report needs follow-up.
@@ -38,9 +38,9 @@ you saw is enough to start.
 
 - **The desktop app** (Mac and Windows): the Electron main process, the renderer, and
   the bundled light service and third-party libraries.
-- **The Android app.** It is installed from an APK and uses native USB/Bluetooth MIDI
-  and a system WebView.
 - **The website** (`site-next/` and the published pages) and the download pages.
+
+Keylight for Android is a separate paid app. Its project is not in this repository.
 
 ## What Keylight is not
 

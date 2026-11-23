@@ -12,7 +12,6 @@
 - [ ] I ran the app and checked the change by hand
 - [ ] I tested on Mac
 - [ ] I tested on Windows
-- [ ] I tested on Android
 - [ ] Not applicable to my change
 
 <!-- Anything else you ran: npm run test:audio, the engine self-test

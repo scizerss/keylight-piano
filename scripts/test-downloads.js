@@ -6,9 +6,10 @@ async function main() {
   const release = { tag_name: 'v0.3.0', assets: [asset('Keylight-0.3.0-mac.zip'), asset('Keylight-0.3.0.dmg'), asset('Keylight-0.3.0-Setup.exe'), asset('Keylight-0.3.0-android.apk')] }
   assert.equal(releaseDownloads(release).mac.name, 'Keylight-0.3.0.dmg')
   assert.equal(releaseDownloads(release).win.name, 'Keylight-0.3.0-Setup.exe')
-  assert.equal(releaseDownloads(release).android.name, 'Keylight-0.3.0-android.apk')
+  assert.deepEqual(Object.keys(releaseDownloads(release)).sort(), ['mac', 'tag', 'win'])
+  assert.deepEqual(releaseDownloads({ assets: [asset('Keylight-0.3.0-android.apk')] }), { tag: '', mac: null, win: null })
   assert.equal(releaseDownloads({ assets: [asset('Keylight-0.2.4-win-x64.zip')] }).win.name, 'Keylight-0.2.4-win-x64.zip')
-  assert.equal(releaseDownloads({ assets: [] }).android, null)
+  assert.deepEqual(releaseDownloads({ assets: [] }), { tag: '', mac: null, win: null })
   assert.equal(releaseDownloads({ ...release, draft: true }), null)
   assert.equal(releaseDownloads({ ...release, prerelease: true }), null)
   assert.equal(releaseDownloads(null), null)
