@@ -12,7 +12,7 @@ They are registered in `renderer/songs-mutopia.js`, and the app shows each piece
 - **CC BY** files (3) are credited to their typesetter, with the licence, wherever the song is shown.
   Licence: https://creativecommons.org/licenses/by/3.0/
 - **CC BY-SA** files (6) are kept apart in `renderer/songs/mutopia-sa/`. They are separate, attributed data files
-  that the app loads at run time. They are not part of the MIT-licensed code, and the MIT licence does not apply to them:
+  that the app loads at run time. Their own CC BY-SA licences apply independently of the app licence:
   anyone who redistributes or adapts those files must keep the attribution and share the result under the same
   CC BY-SA licence. Licences: https://creativecommons.org/licenses/by-sa/3.0/ and https://creativecommons.org/licenses/by-sa/4.0/
 - The files are provided as-is, with no warranty, and no claim that they match the printed editions.

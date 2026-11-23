@@ -1,7 +1,7 @@
 # Name and branding
 
-Keylight's code is free software under the [MIT licence](LICENSE). You may use, copy, change and
-share it, including commercially, as long as you keep the copyright notice and the licence text.
+Keylight's desktop code is free software under the [GNU GPL 3.0 or later](LICENSE).
+Releases up to and including 1.0.0 remain under the MIT License.
 
 This note is about something the licence does not cover: the **name and identity** of the project.
 
@@ -21,7 +21,7 @@ If you publish your own version of the code, on an app store or anywhere else:
 - Do not say or suggest that it is the official Keylight, or that it is made, approved or
   supported by the Keylight project.
 - Keep the copyright notice in `LICENSE` and the notices in `THIRD_PARTY_NOTICES.md`.
-  Those are required by the MIT licence and by the licences of the songs and sounds it includes.
+  Those are required by the GPL and by the licences of the songs and sounds it includes.
 - Do not use the project's screenshots or videos to advertise your version as the original.
 
 You are welcome to say that your version is **based on Keylight** and to link to this repository.
@@ -38,7 +38,7 @@ A copy of Keylight from anywhere else is not an official build.
 
 ## The iPhone and iPad app
 
-The official iPhone and iPad app is being prepared for the App Store by the maintainer (scizerss). Please do not publish a Keylight app there before it is out: two apps with the same name would confuse people, and the name is reserved for this project. This is a request, not a change to the MIT licence.
+The official iPhone and iPad app is being prepared for the App Store by the maintainer (scizerss). Please do not publish a Keylight app there before it is out: two apps with the same name would confuse people, and the name is reserved for this project. This is a request, not a change to the desktop licence.
 If you want to help with it, open an issue and say so: bug reports and feature ideas for the shared app code are welcome, and they reach the iPhone and iPad version too.
 
 ## Not affiliated with ROLI

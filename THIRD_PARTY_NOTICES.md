@@ -1,6 +1,6 @@
 # Third-party notices
 
-Keylight is MIT-licensed (see `LICENSE`). It bundles or adapts the following.
+Keylight for desktop is licensed under GPL-3.0-or-later (see `LICENSE`). It bundles or adapts the following.
 
 ## ROLILearn4All — MIT
 The SysEx config-packet encoder in `renderer/lights.js` (7-bit packing and checksum) is
@@ -89,9 +89,9 @@ public notes of the LUMI-lights project and the JUCE BLOCKS protocol definitions
 
 ## Songs and artwork
 The built-in songs are public-domain compositions; the arrangements in `renderer/songs/`
-were written for this project and are covered by its MIT licence. The cover art in
+were written for this project and are covered by the desktop app licence. The cover art in
 `renderer/covers/` and the app icon were made with AI image tools for this project and,
-to the extent anyone holds rights in them, are released under the project's MIT licence.
+to the extent anyone holds rights in them, are released under the desktop app licence.
 
 ## Online lookups
 Imported songs can ask the iTunes Search API (cover art) and LRCLIB (lyrics) for
@@ -126,7 +126,7 @@ Mutopia typesetter and carries that piece's licence:
 - **CC BY 3.0** (attribution required): 3 pieces, Liszt's Consolations Nos. 1, 3 and 4, typeset by Ryan Prince.
   https://creativecommons.org/licenses/by/3.0/
 - **CC BY-SA 3.0 / 4.0** (attribution, share-alike): 6 pieces, kept in `renderer/songs/mutopia-sa/`. They are
-  separate, attributed data files and not part of the MIT-licensed code; if you redistribute or adapt those files,
+  separate, attributed data files distributed under their own licences. If you redistribute or adapt those files,
   keep the credit and share them under the same licence.
   https://creativecommons.org/licenses/by-sa/3.0/ and https://creativecommons.org/licenses/by-sa/4.0/
 

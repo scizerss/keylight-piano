@@ -2,7 +2,7 @@
 // The compositions are in the public domain; each .mid is the work of its Mutopia typesetter and
 // carries that piece's Mutopia licence (Public Domain, CC BY or CC BY-SA), listed per piece below
 // and in LICENSES/mutopia-songs.md. The CC BY-SA files live in songs/mutopia-sa/ so they stay
-// separable from the MIT-licensed code: they are attributed data files, not part of the program.
+// separate from the program code and distributed under their own licences.
 // The files are mechanical LilyPond previews (steady tempo, no rubato), which suits learning.
 //   file: under songs/, id: also the cover name (covers/<id>.png, a generated tile shows until it exists),
 //   heavy: very long or note-dense, so it may be slow to follow at full speed.

@@ -45,7 +45,7 @@ async function build(version, compiler) {
       'warn or block them. Follow your security policy; no protection is disabled.\r\n' +
       'Help: https://github.com/scizerss/keylight-piano/issues\r\n' +
       'Attach %APPDATA%\\lumi-app\\app.log when reporting a problem.\r\n' +
-      'Licenses and third-party notices are in the installed app folder.\r\n')
+      'Keylight is licensed under GPL 3.0 or later. The license and third-party notices are in the installed app folder.\r\n')
     const temporary = path.join(stage, path.basename(output))
     const flag = process.platform === 'win32' ? '/' : '-'
     execFileSync(compiler, [`${flag}NOCONFIG`, `${flag}WX`, `${flag}DVERSION=${version}`,

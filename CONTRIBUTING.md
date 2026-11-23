@@ -8,6 +8,11 @@ difference. You do not need to be an experienced developer or a good pianist: so
 the most useful reports come from people who just plugged in a keyboard and tried it.
 By taking part you agree to the [Code of Conduct](CODE_OF_CONDUCT.md).
 
+## Contribution licence
+
+Contributions are accepted under [GPL-3.0-or-later](LICENSE).
+By submitting a contribution you also allow the maintainer to include it in Keylight's separately licensed mobile apps.
+
 ## What kinds of help are wanted
 
 - **Bug reports.** Something crashed, a screen looks wrong, a note was scored unfairly,

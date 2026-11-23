@@ -14,7 +14,7 @@ VIAddVersionKey /LANG=1033 "ProductName" "Keylight Setup"
 VIAddVersionKey /LANG=1033 "FileDescription" "Keylight per-user installer"
 VIAddVersionKey /LANG=1033 "FileVersion" "${VERSION}"
 VIAddVersionKey /LANG=1033 "ProductVersion" "${VERSION}"
-VIAddVersionKey /LANG=1033 "LegalCopyright" "Keylight contributors"
+VIAddVersionKey /LANG=1033 "LegalCopyright" "scizerss"
 
 !include "MUI2.nsh"
 !include "x64.nsh"

@@ -667,7 +667,7 @@ scripts/placeholder-icon.js  stand-in icon when assets/icon.png is missing
 scripts/build-vendor.sh rebuilds renderer/vendor/ and the Basic Pitch model
 scripts/vendor-licenses.sh  collects the bundled npm packages' licences
 scripts/sync-take.py    lines a phone video up with a take and renders them together
-LICENSE                 MIT; THIRD_PARTY_NOTICES.md and LICENSES/ for what is bundled
+LICENSE                 GPL-3.0-or-later. See THIRD_PARTY_NOTICES.md and LICENSES/ for what is bundled
 ```
 
 ## Notes
@@ -689,8 +689,8 @@ compositions are in the public domain. Each file carries its typesetter's licenc
 title when you play it ("Public domain · typeset by ... via Mutopia Project"):
 
 - 48 are Public Domain, 3 are CC BY 3.0 (Liszt's Consolations, credited to Ryan Prince) and 6 are CC BY-SA.
-- The CC BY-SA files are separate, attributed data files in `renderer/songs/mutopia-sa/`. They are not
-  part of the MIT-licensed code; keep their credit and licence if you copy or adapt them.
+- The CC BY-SA files are separate, attributed data files in `renderer/songs/mutopia-sa/`. They
+  are distributed under their own licences. Keep their credit and licence if you copy or adapt them.
 - They are mechanical previews with a steady tempo, good for learning but not performances. A few very
   long or dense pieces are marked "long piece". Use the speed buttons to slow them down.
 - The full list (title, composer, licence, typesetter, source page, file) is in
@@ -739,5 +739,5 @@ self-test (`npm run selftest`, see Test and screenshot flags); it should end wit
 
 ## License
 
-MIT, see [LICENSE](../LICENSE). Bundled third-party code, models and fonts keep their own
-licences: see [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md).
+The desktop app uses [GPL 3.0 or later](../LICENSE). Releases up to and including 1.0.0 remain under MIT.
+Bundled third-party code, models and fonts keep their own licences: see [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md).

@@ -41,7 +41,8 @@ Updates keep progress in ~/Library/Application Support/lumi-app/.
 Removing the app does not remove progress or your recorded takes.
 Help / report a problem: https://github.com/scizerss/keylight-piano/issues
 Attach app.log from that Application Support folder when reporting a problem.
-Licenses and third-party notices are in Keylight.app/Contents/Resources/.
+Keylight is licensed under GPL 3.0 or later. The license and third-party
+notices are in Keylight.app/Contents/Resources/.
 TXT
 OUT="$ROOT/dist/Keylight-$VERSION-mac.dmg"
 [[ ! -e $OUT ]] || OUT="$ROOT/dist/Keylight-$VERSION-mac-$(date +%Y%m%d-%H%M%S)-$$.dmg"

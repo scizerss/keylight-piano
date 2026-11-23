@@ -3,7 +3,7 @@
 <p align="center">Follow the light. A free, open-source piano teacher for light-up keyboards.</p>
 
 <p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="Licence: MIT"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg" alt="Licence: GPL-3.0-or-later"></a>
   <a href="https://github.com/scizerss/keylight-piano/releases/latest"><img src="https://img.shields.io/github/v/release/scizerss/keylight-piano?label=release" alt="Latest release"></a>
   <img src="https://img.shields.io/badge/platforms-Mac%20%7C%20Windows-lightgrey.svg" alt="Platforms: Mac and Windows">
   <a href="https://ko-fi.com/scizers"><img src="https://img.shields.io/badge/Support%20on%20Ko--fi-FF5E5B?logo=ko-fi&logoColor=white" alt="Support on Ko-fi"></a>
@@ -179,6 +179,6 @@ Everything bundled keeps its own licence; the full list is in [THIRD_PARTY_NOTIC
 
 ## Licence
 
-MIT, see [LICENSE](LICENSE). The name Keylight and its icon are not part of the licence: forks should use their own name, see [BRANDING.md](BRANDING.md). Bundled third-party code, models, fonts and samples keep their own licences: see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+The desktop app is free and open source under [GPL 3.0 or later](LICENSE). Releases up to and including 1.0.0 remain under the MIT License. The iPhone, iPad and Android apps are separately licensed and proprietary. The name Keylight and its icon are not part of the licence: forks should use their own name, see [BRANDING.md](BRANDING.md). Bundled third-party code, models, fonts and samples keep their own licences: see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-The six CC BY-SA 3.0 and 4.0 Mutopia songs live apart as data files, not part of the MIT-licensed code; keep their credit and licence if you copy or adapt them. See [LICENSES/mutopia-songs.md](LICENSES/mutopia-songs.md).
+The CC BY-SA Mutopia songs are distributed as separate data files under their own licences. Please keep their credit and licence if you copy or adapt them. See [LICENSES/mutopia-songs.md](LICENSES/mutopia-songs.md).

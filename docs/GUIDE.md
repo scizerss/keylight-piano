@@ -2,7 +2,7 @@
 
 This is the guide for playing Keylight. For the project front page see the [README](../README.md); for install, build, lighting, sound and file details see the [full reference](REFERENCE.md).
 
-Keylight is free and open source (MIT). There is no account, no ads, no analytics and no tracking: your songs, recordings and progress stay on your device.
+Keylight for desktop is free and open source under GPL 3.0 or later. Releases through 1.0.0 were licensed under MIT. There is no account, no ads, no analytics and no tracking: your songs, recordings and progress stay on your device.
 
 ## Contents
 
@@ -367,6 +367,6 @@ If the app misbehaves in the player, the first things worth trying are **Setting
 
 ## Supporting the project
 
-Keylight is free, and no features are locked. If you like it you can leave a tip at [https://ko-fi.com/scizers](https://ko-fi.com/scizers).
+Keylight for desktop is free, and no features are locked. If you like it you can leave a tip at [https://ko-fi.com/scizers](https://ko-fi.com/scizers).
 
 It is an unofficial community project, not affiliated with or endorsed by ROLI.
