@@ -57,15 +57,18 @@ filename: plain `Setup.exe` triggers NSIS's insecure compatibility-shim warning.
 ## The light daemon inside the Mac app
 
 The Mac app carries the blocksd light daemon, so key lights need no Homebrew, uv or Terminal
-step. `scripts/build-blocksd.sh` builds it once (Apple silicon, needs `uv` and Xcode's command
-line tools, network the first time) into `native/build/darwin-arm64/blocksd/`:
+step. `scripts/build-blocksd.sh` builds it for the current Mac into
+`native/build/darwin-arm64/blocksd/` on Apple silicon or
+`native/build/darwin-x86_64/blocksd/` on Intel. It needs `uv`, Xcode's command line tools
+and a network connection for the first build. It uses
 blocksd's release tag v0.6.0 (`native/blocksd/VERSION`, with the tarball's SHA-256), the
 `button_id` patch from the README, CPython 3.13, python-rtmidi compiled from source (it has no 3.13
 wheel) and every Python dependency pinned with hashes in `native/blocksd/requirements.lock`,
 frozen with PyInstaller `--onedir` (about 29 MB). The build is idempotent and fails with a plain
 message when `uv`, the command line tools or the network are missing.
 
-`scripts/package.sh` copies that folder to `Contents/Resources/blocksd` when it exists (the app
+`scripts/package.sh` copies the folder that matches the Electron architecture to
+`Contents/Resources/blocksd` when it exists (the app
 still builds without it, with a note), ad-hoc signs each Mach-O file in it (libraries and
 extension modules first, the executable last) and then the app. It adds about 30 MB to the ZIP.
 Run `scripts/build-blocksd.sh` before `scripts/package-dmg.sh` to get a DMG with lights. The
@@ -80,11 +83,12 @@ plus a bridge through the main process would be stronger (future work). Licences
 `scripts/blocksd-licenses.py`) and `THIRD_PARTY_NOTICES.md`, which also records the unresolved
 provenance note about blocksd's protocol code.
 
-The installers workflow builds the daemon before `package:dmg`. Still open: Developer ID signing and notarization (the daemon would need hardened-runtime signing
+The installers workflow builds for Apple silicon. To build for Intel, run the Mac
+build steps on an Intel Mac with x64 Node.js. Still open: Developer ID signing and
+notarization (the daemon would need hardened-runtime signing
 with a timestamp, and probably the library-validation entitlement exception because PyInstaller
-loads its own libraries), an Intel or universal2 build (the macOS runner builds arm64 only),
-Windows
-(blocksd does not run there; keys light with plain MIDI notes).
+loads its own libraries), and a universal2 build. On Windows, keys light with plain
+MIDI notes.
 
 ## Outputs and installation behavior
 

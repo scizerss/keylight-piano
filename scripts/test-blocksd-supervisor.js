@@ -350,9 +350,10 @@ test('the watchdog asks for the daemon port on every check', () => {
 })
 
 // native/blocksd/entry.py: the daemon ends when Keylight goes away (needs the built daemon)
-const BUILT = path.join(__dirname, '..', 'native', 'build', 'darwin-arm64', 'blocksd', 'blocksd')
+const macArch = process.arch === 'x64' ? 'x86_64' : process.arch
+const BUILT = path.join(__dirname, '..', 'native', 'build', `darwin-${macArch}`, 'blocksd', 'blocksd')
 test('the real daemon exits when its parent is killed (stdin pipe / parent watch)', async () => {
-  if (!fs.existsSync(BUILT)) { console.log('     (skipped: the daemon is not built, scripts/build-blocksd.sh)'); return }
+  if (process.platform !== 'darwin' || !fs.existsSync(BUILT)) { console.log('     (skipped: the macOS daemon is not built, scripts/build-blocksd.sh)'); return }
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'keylight-orphan-'))
   const port = await freePort()
   fs.writeFileSync(path.join(dir, 'c.toml'), configText(port))

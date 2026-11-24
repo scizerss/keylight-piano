@@ -1,9 +1,9 @@
 #!/bin/zsh
 # Build the blocksd light daemon (https://github.com/hyperb1iss/blocksd, ISC) as a
 # self-contained PyInstaller folder, for scripts/package.sh to put inside the Mac app.
-#   scripts/build-blocksd.sh            build (or reuse) native/build/darwin-arm64/blocksd/
+#   scripts/build-blocksd.sh            build (or reuse) native/build/darwin-<arch>/blocksd/
 #   scripts/build-blocksd.sh --force    rebuild from scratch
-# Needs: macOS on Apple silicon, uv (brew install uv), Xcode command line tools
+# Needs: macOS, uv (brew install uv), Xcode command line tools
 # (python-rtmidi has no Python 3.13 wheel, so it is compiled), and network the first time.
 # Pinned: the blocksd release tag + tarball SHA256 in native/blocksd/VERSION, every Python
 # dependency (with hashes) in native/blocksd/requirements.lock. Regenerate the lock with
@@ -13,14 +13,15 @@
 set -euo pipefail
 ROOT=${0:A:h:h}
 SRC="$ROOT/native/blocksd"
-OUT_ROOT="$ROOT/native/build/darwin-arm64"
+ARCH=$(uname -m)
+OUT_ROOT="$ROOT/native/build/darwin-$ARCH"
 OUT="$OUT_ROOT/blocksd"
 WORK="$OUT_ROOT/blocksd-work"      # throwaway: download, patched source, venv, PyInstaller scratch
 FORCE=0
 [[ ${1:-} == --force ]] && FORCE=1
 fail() { echo "error: $*" >&2; exit 1; }
 
-[[ $(uname -s) == Darwin && $(uname -m) == arm64 ]] || fail "this builds the macOS Apple-silicon daemon; this machine is $(uname -s) $(uname -m)"
+[[ $(uname -s) == Darwin && ( $ARCH == arm64 || $ARCH == x86_64 ) ]] || fail "this builds the light daemon for arm64 or x86_64 macOS"
 command -v uv >/dev/null || fail "uv is missing: install it (brew install uv)"
 xcode-select -p >/dev/null 2>&1 && command -v clang >/dev/null || fail "Xcode command line tools are missing (xcode-select --install): python-rtmidi is built from source"
 

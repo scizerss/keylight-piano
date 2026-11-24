@@ -15,6 +15,17 @@ ditto -x -k "$ZIP" "$STAGE/unpacked"
 mkdir "$STAGE/image"
 mv "$STAGE/unpacked/Keylight-$VERSION/Keylight.app" "$STAGE/image/"
 ln -s /Applications "$STAGE/image/Applications"
+APP="$STAGE/image/Keylight.app"
+case $(lipo -archs "$APP/Contents/MacOS/Keylight") in
+  arm64) MAC='an Apple silicon Mac' ;;
+  x86_64) MAC='an Intel Mac' ;;
+  *) MAC='a compatible Mac' ;;
+esac
+MIN_MACOS=$(plutil -extract LSMinimumSystemVersion raw -o - "$APP/Contents/Info.plist")
+LIGHTS='For Piano M and LUMI key lights, follow the manual blocksd setup in the reference.'
+if [[ -x "$APP/Contents/Resources/blocksd/blocksd" ]]; then
+  LIGHTS='Keylight starts the bundled light service (blocksd) for Piano M and LUMI key lights.'
+fi
 cat > "$STAGE/image/INSTALL AND SUPPORT.txt" <<TXT
 KEYLIGHT $VERSION FOR MAC
 
@@ -32,9 +43,8 @@ macOS may block it. Follow your organization's security policy and Apple's
 guidance; this image does not remove quarantine or bypass security warnings:
 https://support.apple.com/102445
 
-Requires Apple Silicon and the macOS version required by the bundled Electron.
-Piano M / LUMI key lights need no extra install: the app carries its own light
-service (blocksd, https://github.com/hyperb1iss/blocksd) and starts it itself.
+Requires $MAC with macOS $MIN_MACOS or newer.
+$LIGHTS
 Setup and keyboard details: https://github.com/scizerss/keylight-piano#install
 
 Updates keep progress in ~/Library/Application Support/lumi-app/.

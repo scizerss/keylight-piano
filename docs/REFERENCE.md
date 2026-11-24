@@ -87,8 +87,8 @@ Full videos with sound: [app tour (65 s)](https://github.com/scizerss/keylight-p
 
 ## Requirements
 
-- A Mac with Apple Silicon (M1 or later) on macOS 13 or newer, or a 64-bit PC with
-  Windows 10 or 11
+- A Mac on macOS 13 or newer, or a 64-bit PC with Windows 10 or 11. Intel Macs need a
+  [local build](#build-from-source).
 - A ROLI Piano M or LUMI Keys over USB, or in beta the [49-key ROLI Piano](#the-49-key-roli-piano-beta)
 - Only when building from source or if the app's own light service fails: on a Mac, [blocksd](https://github.com/hyperb1iss/blocksd) for the key lights (step 4
   below). Windows needs nothing else: the keys light from plain MIDI notes
@@ -103,8 +103,9 @@ The app is ad-hoc signed, not notarised; follow the included instructions if mac
 Building an installer never updates your installed copy automatically. Build targets and
 signing limitations are in [docs/INSTALLERS.md](INSTALLERS.md).
 
-On a Mac (for Windows, see [Install on Windows](#install-on-windows)). You need a Mac
-with Apple Silicon (M1 or later) on macOS 13 or newer, and the keyboard.
+The release downloads are for Apple silicon on macOS 13 or newer. On an Intel Mac,
+[build the app locally](#build-from-source) and unzip the resulting archive from `dist/`.
+For Windows, see [Install on Windows](#install-on-windows).
 
 1. Download `Keylight-<version>-mac.zip` from the
    [Releases page](https://github.com/scizerss/keylight-piano/releases) and double-click it. You get a
@@ -135,14 +136,14 @@ with Apple Silicon (M1 or later) on macOS 13 or newer, and the keyboard.
 
 ## Advanced: installing blocksd by hand
 
-The packaged Mac app (Apple silicon) carries blocksd v0.6.0 and runs it itself, so there is
-nothing to do. You only need this when you run Keylight from a source checkout
-(`npm start`), or when the setup screen says the key lights could not start. With
+The packaged Mac app carries blocksd v0.6.0 and runs it itself. You only need this
+when you run Keylight from a source checkout (`npm start`), or when the setup screen
+says the key lights could not start. With
 [Homebrew](https://brew.sh):
 
 ```sh
 brew install uv python@3.13
-uv tool install --python /opt/homebrew/bin/python3.13 --from "git+https://github.com/hyperb1iss/blocksd@v0.6.0" blocksd
+uv tool install --python "$(brew --prefix python@3.13)/bin/python3.13" --from "git+https://github.com/hyperb1iss/blocksd@v0.6.0" blocksd
 ```
 
 Keylight then starts it from `~/.local/bin/blocksd` as before. Use the `v0.6.0` tag, not
@@ -197,8 +198,8 @@ What is different on Windows:
 
 ## Build from source
 
-Needs git and Node.js 22.12 or newer, on an Apple Silicon Mac (the commands below) or
-on Windows (see below).
+Needs git and Node.js 22.12 or newer. On a Mac, use the Node.js build for your Mac's
+architecture. For Windows, see below.
 
 ```sh
 git clone https://github.com/scizerss/keylight-piano.git keylight
@@ -206,7 +207,8 @@ cd keylight
 npm ci
 env -u ELECTRON_RUN_AS_NODE npm start    # run from source
 npm test                                 # unit tests (watchdog, takes, Windows build)
-scripts/package.sh                       # build Keylight.app
+scripts/build-blocksd.sh                 # build the light service (needs uv and Xcode tools)
+scripts/package.sh --zip-only            # build and zip Keylight.app
 ```
 
 `env -u ELECTRON_RUN_AS_NODE` is needed when launching from another Electron app,

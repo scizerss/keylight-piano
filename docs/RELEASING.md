@@ -41,8 +41,9 @@ GitHub Actions workflows are manual and have not run merely because their files 
    the Windows zip should be up before the "Install on Windows" section reaches `main`.
 
 The build is ad-hoc signed and not notarised, hence the `xattr` step for testers. A
-Developer ID signature plus notarisation would remove it. It is Apple Silicon only:
-the bundle is the arm64 Electron from `node_modules`.
+Developer ID signature plus notarisation would remove it. The bundle uses the
+Electron architecture from `node_modules`. The release workflow builds for Apple
+silicon. Build on an Intel Mac with x64 Node.js to get an Intel bundle.
 
 The Windows exe is not code-signed either, so SmartScreen warns on first run (and
 again after each new version) until it is signed with an Authenticode certificate.

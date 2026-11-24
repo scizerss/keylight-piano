@@ -26,6 +26,7 @@ VERSION=$(plutil -extract version raw -o - "$ROOT/package.json")
 
 ELECTRON=$("$ROOT/scripts/find-electron.sh")
 ELECTRON_VERSION=$(plutil -extract CFBundleShortVersionString raw -o - "$ELECTRON/Contents/Info.plist")
+ARCHS=$(lipo -archs "$ELECTRON/Contents/MacOS/Electron")
 echo "Building $NAME $VERSION from Electron $ELECTRON_VERSION ($ELECTRON)"
 
 STAGE=$(mktemp -d "${TMPDIR:-/tmp}/keylight-build.XXXXXX")
@@ -60,7 +61,7 @@ if plutil -extract keylightBuild json -o - "$ROOT/package.json" >/dev/null 2>&1;
 fi
 # The light daemon (scripts/build-blocksd.sh), so the keys light with no install step. Optional:
 # without it the app still builds, and the Mac user falls back to the manual blocksd install.
-BLOCKSD_DIR="$ROOT/native/build/darwin-arm64/blocksd"
+BLOCKSD_DIR="$ROOT/native/build/darwin-$ARCHS/blocksd"
 HAVE_BLOCKSD=0
 if [[ -x $BLOCKSD_DIR/blocksd ]]; then
   ditto "$BLOCKSD_DIR" "$RES/blocksd"
@@ -137,7 +138,6 @@ ditto -c -k --norsrc --keepParent "$PKG" "$ZIP"
 mkdir "$STAGE/unzipped"
 ditto -x -k "$ZIP" "$STAGE/unzipped"
 codesign --verify --deep --strict "$STAGE/unzipped/$NAME-$VERSION/$NAME.app"
-ARCHS=$(file -b "$NEW/Contents/MacOS/$EXE" | grep -oE 'arm64|x86_64' | sort -u | paste -sd ' ' -)
 echo
 echo "$NAME $VERSION (Electron $ELECTRON_VERSION, macOS $MIN_MACOS+, $ARCHS), ad-hoc signed$( (( HAVE_BLOCKSD )) && echo ', with the light daemon' )"
 echo "  zip        ${ZIP#$ROOT/} ($(du -h "$ZIP" | cut -f1 | tr -d ' '))"
