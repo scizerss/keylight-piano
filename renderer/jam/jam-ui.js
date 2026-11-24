@@ -91,9 +91,14 @@ export function mountJam(root, deps) {
   let audioProblem = ''
   const instrumentOptions = () => {
     const list = audio.instrumentList ? audio.instrumentList() : []
-    let ready = false
-    try { ready = !!(audio.sampledPianoStatus && audio.sampledPianoStatus().state === 'ready') } catch (_e) { ready = false }
-    return list.filter((i) => i.id !== 'sampled-piano' || ready)
+    const isReady = (id) => {
+      try {
+        if (audio.sampledInstrumentStatus) return audio.sampledInstrumentStatus(id).state === 'ready'
+        if (id === 'sampled-piano' && audio.sampledPianoStatus) return audio.sampledPianoStatus().state === 'ready'
+      } catch (_e) {}
+      return false
+    }
+    return list.filter((i) => !i.sampled || isReady(i.id))
   }
   try {
     if (audio.initAudio) audio.initAudio()
