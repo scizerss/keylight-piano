@@ -5,7 +5,7 @@ const path = require('node:path')
 
 async function checkSamples() {
   const check = (ok, message) => { if (!ok) throw new Error(message) }
-  const { loadPiano, pianoStatus, loadHarmonium, harmoniumStatus, HARMONIUM_TOTAL, SampleVoice, PianoSampleError, PIANO_SAMPLES } = await import('/renderer/sampler.js')
+  const { loadPiano, pianoStatus, SampleVoice, PianoSampleError, PIANO_SAMPLES } = await import('/renderer/sampler.js')
   const { Voice, INSTRUMENTS, prepareInstrument } = await import('/renderer/instruments.js')
   const audio = await import('/renderer/audio.js')
   const sr = 44100
@@ -55,16 +55,6 @@ async function checkSamples() {
   check(rms(rendered, 0.28, 0.5) > 0.01, 'transposed sampled note produces audio')
   check(rms(rendered, 0.9, 1.1) === 0, 'release stops sampled note')
 
-  const hc = offline(4.5)
-  check(harmoniumStatus(hc).state === 'idle', 'initial harmonium status')
-  const hReady = await loadHarmonium(hc)
-  check(hReady.state === 'ready' && hReady.loaded === HARMONIUM_TOTAL, 'harmonium sf2 decodes all 49 stereo notes')
-  const hVoice = new Voice(hc, hc.destination, 60, 100, 'harmonium', 12, 0.1)
-  hVoice.release(0.18, 4.0)
-  const hRendered = (await hc.startRendering()).getChannelData(0)
-  check(rms(hRendered, 0.2, 0.6) > 0.01 && rms(hRendered, 3.7, 3.95) > 0.01, 'harmonium sustains across its SF2 loop points')
-  check(rms(hRendered, 4.35, 4.5) === 0, 'harmonium stops after release')
-
   const render = async (velocity, cancel = false) => {
     const c = offline(3)
     await loadPiano(c)
@@ -91,10 +81,7 @@ async function checkSamples() {
     resume() { return Promise.resolve() }
   }
   check(audio.setInstrument('sampled-piano') === false && audio.currentInstrument() === 'grand', 'unready selection preserves built-in grand')
-  check(audio.setInstrument('harmonium') === false && audio.currentInstrument() === 'grand', 'unready harmonium selection preserves built-in grand')
   const ac = audio.initAudio()
-  await audio.loadSampledHarmonium()
-  check(audio.sampledHarmoniumStatus().state === 'ready' && audio.setInstrument('harmonium'), 'ready harmonium instrument can be selected')
   await audio.loadSampledPiano()
   check(audio.sampledPianoStatus().state === 'ready', 'parent status hook')
   check(audio.setInstrument('sampled-piano'), 'ready sample instrument can be selected')

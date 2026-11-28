@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en" class="apple">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <title>Keylight TV</title>
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="tv.css">
+</head>
+<body>
+  <main id="tvRoot" class="tv" data-screen="idle">
+    <canvas id="tvCanvas" hidden aria-hidden="true"></canvas>
+
+    <section class="tv-screen tv-idle">
+      <div class="tv-ambient" aria-hidden="true"><i class="l"></i><i class="r"></i></div>
+      <div class="tv-safe tv-idle-body">
+        <h1 class="tv-wordmark" id="tvWordmark">Keylight</h1>
+        <div class="tv-idle-card" id="tvIdleCard" hidden>
+          <p class="tv-card-title" id="tvIdleTitle"></p>
+          <p class="tv-card-artist" id="tvIdleArtist"></p>
+        </div>
+        <div class="tv-mark" aria-hidden="true"><i></i><i></i><i class="l"></i><i class="l"></i><i class="r"></i><i></i><i></i></div>
+        <p class="tv-tagline" id="tvIdleTagline">Pick a song on your iPhone or iPad</p>
+      </div>
+    </section>
+
+    <section class="tv-screen tv-premium">
+      <div class="tv-safe tv-idle-body">
+        <h1 class="tv-wordmark">Keylight</h1>
+        <div class="tv-mark" aria-hidden="true"><i></i><i></i><i class="l"></i><i class="l"></i><i class="r"></i><i></i><i></i></div>
+        <p class="tv-tagline">TV mode is part of Keylight Premium.<br>Unlock it on your iPhone or iPad.</p>
+      </div>
+    </section>
+
+    <section class="tv-screen tv-play">
+      <div class="tv-safe tv-play-body">
+        <header class="tv-head">
+          <div class="tv-plate tv-title-plate">
+            <h1 class="tv-title" id="tvTitle"></h1>
+            <p class="tv-composer" id="tvComposer"></p>
+          </div>
+          <div class="tv-plate tv-score-plate">
+            <p class="tv-acc" id="tvAcc">0%</p>
+            <p class="tv-streak" id="tvStreak">Streak 0</p>
+          </div>
+        </header>
+        <div class="tv-progress"><span id="tvProgressFill"></span></div>
+        <p class="tv-wait" id="tvWait" hidden><span class="tv-dot" id="tvWaitDot"></span><span id="tvWaitText"></span></p>
+      </div>
+    </section>
+
+    <section class="tv-screen tv-results">
+      <div class="tv-bloom" aria-hidden="true"><i class="l"></i><i class="r"></i></div>
+      <div class="tv-safe tv-results-body">
+        <p class="tv-kicker">Song complete</p>
+        <h2 class="tv-res-title" id="tvResTitle"></h2>
+        <p class="tv-res-artist" id="tvResArtist"></p>
+        <div class="tv-stars" id="tvStars" role="img" aria-label="Stars earned, out of 3">
+          <span class="tv-star"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.95 6.1 6.7.98-4.85 4.73 1.15 6.68L12 17.7l-5.95 3.29 1.15-6.68L2.35 9.58l6.7-.98z"/></svg></span>
+          <span class="tv-star"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.95 6.1 6.7.98-4.85 4.73 1.15 6.68L12 17.7l-5.95 3.29 1.15-6.68L2.35 9.58l6.7-.98z"/></svg></span>
+          <span class="tv-star"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.95 6.1 6.7.98-4.85 4.73 1.15 6.68L12 17.7l-5.95 3.29 1.15-6.68L2.35 9.58l6.7-.98z"/></svg></span>
+        </div>
+        <p class="tv-res-acc" id="tvResAcc">0%</p>
+        <p class="tv-res-label">Accuracy</p>
+        <p class="tv-res-row"><span id="tvResStreak">Longest streak 0</span><span id="tvResCounts">0 hit, 0 missed</span></p>
+        <p class="tv-badge" id="tvBest" hidden>New best</p>
+      </div>
+    </section>
+
+    <section class="tv-screen tv-calib">
+      <div class="tv-sweep" aria-hidden="true">
+        <div class="tv-sweep-line"></div>
+        <div class="tv-sweep-mark" id="tvSweepMark"></div>
+        <div class="tv-sweep-dot" id="tvSweepDot"></div>
+      </div>
+      <p class="tv-hint">Tap your phone each time the dot reaches the line</p>
+    </section>
+  </main>
+  <script type="module" src="tv.js"></script>
+</body>
+</html>

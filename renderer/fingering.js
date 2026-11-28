@@ -170,12 +170,14 @@ function fingerHand(list, left, beat) {
     let j = i + 1
     while (j < nodes.length && !brk[j]) j++
     let lo = Infinity, hi = -Infinity, ok = true
+    const keyOf = new Map()   // white-key slot -> the one pitch played there (anywhere in the phrase, not only next door)
     for (let k = i; k < j; k++) {
       const p = nodes[k].keys[0].pitch, w = wIdx(p)
       if (w < lo) lo = w
       if (w > hi) hi = w
       if (nodes[k].keys[0].pin) ok = false
-      if (k > i && nodes[k - 1].keys[0].pitch !== p && wIdx(nodes[k - 1].keys[0].pitch) === w) ok = false
+      if (keyOf.has(w) && keyOf.get(w) !== p) ok = false
+      keyOf.set(w, p)
     }
     if (ok && hi - lo <= 4) {
       // right hand: the thumb may sit anywhere from hi-4 to lo; left hand mirrored

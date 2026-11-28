@@ -1,16 +1,61 @@
 // Unit test for the piano course (renderer/course/): node scripts/test-course.js
-// Pure data and logic, no window, keyboard or sound.
+// Data, logic and course actions, no browser, keyboard or sound.
 const assert = require('node:assert/strict')
+const { readFileSync } = require('node:fs')
+const vm = require('node:vm')
 const path = require('node:path')
 const { pathToFileURL } = require('node:url')
 
 const load = (f) => import(pathToFileURL(path.join(__dirname, '..', 'renderer', 'course', f)).href)
+
+async function testHomeExperience(app) {
+  const { experienceDefaults, normalizeExperience, SETUP_STEPS } = await import(pathToFileURL(path.join(__dirname, '..', 'renderer', 'setup-flow.js')).href)
+  const slice = (start, end) => app.slice(app.indexOf(start), app.indexOf(end))
+  const saved = new Map()
+  let hidden, refreshes = 0
+  const context = vm.createContext({
+    experienceDefaults, normalizeExperience, SETUP_STEPS,
+    store: { get: (key, def) => saved.get(key) ?? def, set: (key, value) => saved.set(key, value) },
+    $: () => ({ classList: { toggle: (_cls, show) => { hidden = show } } }),
+    settings: { experience: '' }, setup: { first: true, step: SETUP_STEPS.indexOf('level') },
+    player: null, course: { refreshExperience: () => { refreshes++ } },
+    saveSettings() {}, syncHudButtons() {}, syncLevelSettings() {}, setupPlan() {}, nextStep: () => 'ready', goSetupStep() {}
+  })
+  vm.runInContext([
+    slice('function syncExperienceCard(', 'function updateHome('),
+    slice('function applyExperience(', 'function applySetupLevel('),
+    slice('const setupSkip =', '// "Find my level" on the last screen'),
+    'globalThis.skip = setupSkip'
+  ].join('\n'), context)
+  context.syncExperienceCard()
+  assert.equal(hidden, true, 'new installs do not show the card before onboarding')
+  saved.set('lumi.onboarded', true)
+  context.syncExperienceCard()
+  assert.equal(hidden, false, 'an onboarded user without an answer sees the card')
+  context.dismissExperienceCard()
+  context.syncExperienceCard()
+  assert.equal(hidden, true, 'Not now persists across Home visits')
+  saved.delete('lumi.experienceCardDismissed')
+  context.skip()
+  context.syncExperienceCard()
+  assert.equal(hidden, true, 'skipping the setup level step also dismisses the card')
+  assert.equal(context.settings.experience, '')
+  saved.delete('lumi.experienceCardDismissed')
+  assert.ok(context.applyExperience('new'))
+  assert.deepEqual(context.settings, { experience: 'new', labels: 'fingers', rate: 0.75, handGuide: 'auto', handGuideRuns: 0 })
+  assert.equal(refreshes, 1, 'changing experience refreshes the course')
+  context.settings.experience = ''
+  context.syncExperienceCard()
+  assert.equal(hidden, true, 'clearing a previous answer does not reoffer the card')
+}
 
 ;(async () => {
   const { COURSE } = await load('index.js')
   const schema = await load('course-schema.js')
   const E = await load('course-engine.js')
   const { seq } = await load('builders.js')
+  const { buildPieceSong, pieceHand } = await load('runners.js')
+  const { Player } = await import(pathToFileURL(path.join(__dirname, '..', 'renderer', 'player.js')).href)
   const { validateCourse, wordCount, MAX_TEACH_WORDS } = schema
   const clone = (o) => JSON.parse(JSON.stringify(o))
   const [L1, L2, L3] = COURSE.levels
@@ -39,6 +84,47 @@ const load = (f) => import(pathToFileURL(path.join(__dirname, '..', 'renderer', 
   // 24-key levels stay inside two octaves of reachable notes per hand window
   for (const level of [L1, L2]) assert.equal(level.keys, 24)
 
+  // The first lesson teaches hand placement, then opens the piece in Watch before its scored Wait run.
+  const [handIntro, intro] = L1.lessons[0].items
+  assert.deepEqual(handIntro, {
+    id: 'hand-intro', title: 'Meet your fingers', type: 'hand-intro',
+    params: { hand: 'right', findC: true }, passAt: 1
+  })
+  const leftLesson = L1.lessons.find((lesson) => lesson.id === 'l1-left')
+  assert.deepEqual(leftLesson.items[0], {
+    id: 'hand-intro-left', title: 'Place your left hand', type: 'hand-intro',
+    params: { hand: 'left', findC: false }, passAt: 1
+  })
+  assert.equal(intro.id, 'l1-find-c.ode-intro')
+  assert.ok(intro.params.watchFirst)
+  assert.deepEqual(L1.lessons[0].items.slice(2).map((item) => item.id), ['l1-find-c.theory', 'l1-find-c.game'])
+  assert.deepEqual(L1.lessons[0].items.at(-1).params, { game: 'find-the-key', names: ['C'], mode: 'every', rounds: 3 })
+  for (const item of [L1.lessons[1].items.at(-1), L1.exam.items.find((item) => item.id === 'l1-exam.names')]) {
+    assert.deepEqual(item.params.names, ['C', 'D', 'E', 'F', 'G', 'A', 'B'])
+  }
+
+  const app = readFileSync(path.join(__dirname, '..', 'renderer', 'app.js'), 'utf8')
+  await testHomeExperience(app)
+  const appTest = vm.createContext({ IS_IOS: false, HAS_COVERS: true, dot: () => ' \u00b7 ',
+    Player, buildPieceSong, initAudio() {}, resetSession() {}, audioContext() {},
+    onPlayerState() {}, onJudgement() {}, onFinish() {}, setKeyCount() {},
+    showScreen() {}, syncHudButtons() {}, resize() {}, status() {}, setKeyboardWindow() {}, hintOffKeys() {},
+    passText: () => '80%', pieceHand, keysStayAt: () => null, kbKeys: () => 24,
+    usesScreenKeys: () => true, $: () => ({}), settings: { countIn: 0 }, player: null, song: null, courseRun: null,
+    scheduler: { reset() {} }
+  })
+  vm.runInContext(app.slice(app.indexOf('async function startCoursePiece'), app.indexOf('async function fetchLibraryFile')), appTest)
+  vm.runInContext(app.slice(app.indexOf('function loadIntoPlayer'), app.indexOf('let lastSongKey')), appTest)
+  vm.runInContext(app.slice(app.indexOf('function playerRange'), app.indexOf('const lightKeys')), appTest)
+  await appTest.startCoursePiece({ item: intro }, 1)
+  assert.equal(appTest.player.mode, 'WATCH')
+  assert.equal(appTest.player.windowKeys, 24)
+  const level10Run = COURSE.levels[9].lessons.flatMap((lesson) => lesson.items).find((item) => item.title === 'Four octaves up, both hands')
+  await appTest.startCoursePiece({ item: level10Run }, 10)
+  assert.equal(appTest.player.mode, 'PRACTISE')
+  assert.ok(appTest.player.windowKeys >= 49)
+  assert.equal(appTest.player.playableNotes().length, appTest.song.notes.length, 'the wide on-screen keyboard covers both hands')
+
   // ---------- builders ----------
   assert.deepEqual(seq('C4 D#4:0.5 r:2 Bb3'), [{ p: 60, beats: 1 }, { p: 63, beats: 0.5 }, { p: null, beats: 2 }, { p: 58, beats: 1 }])
   assert.throws(() => seq('H4'))
@@ -51,7 +137,14 @@ const load = (f) => import(pathToFileURL(path.join(__dirname, '..', 'renderer', 
   assert.ok(problems((c) => { c.levels[0].lessons[1].id = c.levels[0].lessons[0].id }).some((p) => /duplicate/.test(p)))
   assert.ok(problems((c) => { c.levels[1].number = 5 }).some((p) => /number/.test(p)))
   assert.ok(problems((c) => { c.levels[0].lessons[0].items[0].type = 'bogus' }).some((p) => /unknown item type/.test(p)))
-  assert.ok(problems((c) => { c.levels[0].lessons[0].items[0].params.answer = 9 }).some((p) => /answer/.test(p)))
+  assert.ok(problems((c) => { c.levels[0].lessons[0].items[0].params = { hand: 'both', findC: 'yes' } }).filter((p) => /hand-intro/.test(p)).length === 2)
+  assert.ok(problems((c) => { c.levels[0].lessons[0].items.find((item) => item.id === 'l1-find-c.theory').params.answer = 9 }).some((p) => /answer/.test(p)))
+  const gameProblems = (patch) => problems((c) => { Object.assign(c.levels[0].lessons[0].items.at(-1).params, patch) })
+  assert.ok(gameProblems({ names: [] }).some((p) => /names/.test(p)))
+  assert.ok(gameProblems({ names: ['C#'] }).some((p) => /names/.test(p)))
+  assert.deepEqual(gameProblems({ names: ['C♯'] }), [])
+  assert.ok(gameProblems({ mode: 'all' }).some((p) => /mode/.test(p)))
+  assert.ok(gameProblems({ game: 'read-treble' }).some((p) => /mode/.test(p)))
   assert.ok(problems((c) => { c.levels[0].lessons[0].pass.minItemsDone = 99 }).some((p) => /exceeds/.test(p)))
   assert.ok(problems((c) => { delete c.levels[0].lessons[0].goal }).some((p) => /goal/.test(p)))
   assert.ok(problems((c) => { delete c.levels[0].exam }).some((p) => /exam/.test(p)))
@@ -88,6 +181,12 @@ const load = (f) => import(pathToFileURL(path.join(__dirname, '..', 'renderer', 
   assert.equal(E.starsFor(0.3), 0); assert.equal(E.starsFor(0.7), 2); assert.equal(E.starsFor(1), 5)
 
   // a lesson is done once enough items pass
+  for (const lesson of [first, leftLesson]) {
+    const partial = lesson.items.slice(0, 2).reduce((p, item) => E.recordItemResult(p, lesson.id, item.id, { accuracy: 1 }), E.emptyProgress())
+    assert.equal(E.isLessonDone(COURSE, partial, lesson), false)
+    const next = E.recordItemResult(partial, lesson.id, lesson.items[2].id, { accuracy: 1 })
+    assert.equal(E.isLessonDone(COURSE, next, lesson), true)
+  }
   prog = passAll(E.emptyProgress(), first)
   assert.equal(E.lessonStatus(COURSE, prog, first.id), 'done')
   assert.equal(E.lessonStatus(COURSE, prog, L1.lessons[1].id), 'open')
@@ -314,6 +413,241 @@ const load = (f) => import(pathToFileURL(path.join(__dirname, '..', 'renderer', 
   assert.equal(JSON.parse(E.serializeProgress(hp)).version, 1)
   const old = '{"version":1,"lessons":{"a":{"b":{"accuracy":0.8,"stars":2,"tries":3,"at":9}}},"exams":{"level-1":{"percent":90,"passed":true,"tries":1,"at":2,"placement":true}},"unlocked":[2],"seconds":61}'
   assert.equal(E.serializeProgress(E.parseProgress(old)), old)
+
+  // ---------- "Find my level" placement (placement.js) ----------
+  const P = await load('placement.js')
+  const lastNum = COURSE.levels[COURSE.levels.length - 1].number
+  // the run walks the exams of levels 1 .. (last - 1): each one opens the level after it
+  assert.deepEqual(P.placementLevels(COURSE), COURSE.levels.slice(0, -1).map((l) => l.number))
+  // a level without an exam, or a draft level after it, ends the walk there
+  const mini = { levels: [{ number: 1, exam: {}, lessons: [] }, { number: 2, exam: {}, lessons: [] }, { number: 3, lessons: [] }, { number: 4, exam: {}, lessons: [] }, { number: 5, lessons: [] }] }
+  assert.deepEqual(P.placementLevels(mini), [1, 2])
+  assert.deepEqual(P.placementLevels({ levels: [{ number: 1, exam: {}, lessons: [] }, { number: 2, draft: true, lessons: [] }] }), [])
+  assert.deepEqual(P.placementLevels({ levels: [{ number: 1, draft: true, exam: {}, lessons: [] }, { number: 2, exam: {}, lessons: [] }] }), [])
+
+  /** Plays a run through: results[i] is the pass of the i-th exam asked for. Returns the finished run and the exams asked. */
+  const playRun = (course, results) => {
+    let run = P.startPlacement()
+    const asked = []
+    for (const passed of results) {
+      const n = P.nextPlacementLevel(course, run)
+      if (n === null) break
+      asked.push(n)
+      run = P.afterPlacementExam(course, run, n, passed)
+    }
+    return { run, asked }
+  }
+  // first exam missed: start at level 1
+  let r = playRun(COURSE, [false])
+  assert.deepEqual(r.asked, [1]); assert.deepEqual(r.run, { state: 'done', lastPassed: 0 }); assert.equal(P.placementStart(r.run), 1)
+  // levels 1 to 3 passed, 4 missed: start at level 4, and the run stops asking
+  r = playRun(COURSE, [true, true, true, false, true, true])
+  assert.deepEqual(r.asked, [1, 2, 3, 4]); assert.deepEqual(r.run, { state: 'done', lastPassed: 3 }); assert.equal(P.placementStart(r.run), 4)
+  assert.equal(P.nextPlacementLevel(COURSE, r.run), null)
+  // every exam passed: start at the last level
+  r = playRun(COURSE, COURSE.levels.map(() => true))
+  assert.equal(r.run.state, 'done'); assert.equal(P.placementStart(r.run), lastNum); assert.equal(r.asked.length, lastNum - 1)
+  // the walk stops at a level with no exam after it in a smaller course
+  r = playRun(mini, [true, true, true])
+  assert.deepEqual(r.asked, [1, 2]); assert.equal(P.placementStart(r.run), 3)
+  // only the exam the run waits on counts; a retry, another exam or a finished run changes nothing
+  const waiting = P.afterPlacementExam(COURSE, P.startPlacement(), 1, true)
+  assert.deepEqual(waiting, { state: 'running', lastPassed: 1 })
+  assert.equal(P.nextPlacementLevel(COURSE, waiting), 2)
+  assert.equal(P.afterPlacementExam(COURSE, waiting, 1, false), waiting, 'a retry of an exam already counted is ignored')
+  assert.equal(P.afterPlacementExam(COURSE, waiting, 5, false), waiting, 'an exam out of turn is ignored')
+  const skippedRun = P.skipPlacement()
+  assert.equal(P.afterPlacementExam(COURSE, skippedRun, 1, true), skippedRun)
+  assert.equal(P.nextPlacementLevel(COURSE, null), null)
+  // Stop here keeps what was passed
+  assert.deepEqual(P.stopPlacement(waiting), { state: 'done', lastPassed: 1 })
+  assert.equal(P.placementStart(P.stopPlacement(P.startPlacement())), 1)
+  // messages: plain, no em dashes
+  assert.equal(P.placementMessage(4), 'You start at level 4. Earlier levels stay open if you want to review.')
+  assert.ok(/level 1/.test(P.placementMessage(1)))
+  for (const n of [1, 2, 4, lastNum]) assert.ok(!/—/.test(P.placementMessage(n)))
+
+  // applying a run: stored on progress, levels up to the start opened with unlockLevel
+  const placedRun = P.withPlacement(E.emptyProgress(), { state: 'done', lastPassed: 3 })
+  assert.deepEqual(placedRun.unlocked, [2, 3, 4])
+  assert.deepEqual(placedRun.placement, { state: 'done', lastPassed: 3 })
+  assert.deepEqual(P.withPlacement(E.emptyProgress(), { state: 'done', lastPassed: 0 }).unlocked, [])
+  assert.deepEqual(P.withPlacement(E.emptyProgress(), P.skipPlacement()).unlocked, [])
+  assert.deepEqual(E.emptyProgress(), { version: 1, lessons: {}, exams: {}, unlocked: [], seconds: 0 }, 'withPlacement does not touch its input')
+
+  // which card the Course screen shows
+  assert.equal(P.placementCard(COURSE, E.emptyProgress()), 'offer')
+  assert.equal(P.placementCard(COURSE, P.withPlacement(E.emptyProgress(), P.startPlacement())), 'running')
+  assert.equal(P.placementCard(COURSE, P.withPlacement(E.emptyProgress(), P.skipPlacement())), null)
+  assert.equal(P.placementCard(COURSE, placedRun), null)
+  assert.equal(P.placementCard(COURSE, E.unlockLevel(E.emptyProgress(), 2)), null, 'not after Skip ahead')
+  assert.equal(P.placementCard(COURSE, E.recordExamResult(E.emptyProgress(), L1.id, { percent: 90, passed: true, placement: true })), null, 'not after a placement pass')
+  let oneLesson = E.emptyProgress()
+  for (const it of L1.lessons[0].items) oneLesson = E.recordItemResult(oneLesson, L1.lessons[0].id, it.id, { accuracy: 1 })
+  assert.ok(E.isLessonDone(COURSE, oneLesson, L1.lessons[0]))
+  assert.equal(P.placementCard(COURSE, oneLesson), null, 'not once a lesson is done')
+  // an exam task tried (not yet a lesson) keeps the card: a run in progress writes exam records
+  assert.equal(P.placementCard(COURSE, E.recordItemResult(E.emptyProgress(), L1.exam.id, L1.exam.items[0].id, { accuracy: 1 })), 'offer')
+
+  // the engine: a finished run makes the start level the recommended step, levels below it are for review
+  let placedProg = E.emptyProgress()
+  for (const lv of COURSE.levels.slice(0, 3)) placedProg = E.recordExamResult(placedProg, lv.id, { percent: 95, passed: true, placement: true })
+  placedProg = P.withPlacement(placedProg, { state: 'done', lastPassed: 3 })
+  assert.equal(E.placedAt(placedProg), 4)
+  const L4 = COURSE.levels[3]
+  assert.equal(E.nextStep(COURSE, placedProg).lesson.id, L4.lessons[0].id, 'Continue goes to level 4, lesson 1')
+  assert.equal(E.nextLesson(COURSE, placedProg).id, L4.lessons[0].id)
+  assert.equal(E.lessonStatus(COURSE, placedProg, L4.lessons[0].id), 'open')
+  assert.equal(E.lessonStatus(COURSE, placedProg, L1.lessons[0].id), 'ahead', 'review levels have no Up next')
+  assert.equal(E.levelStatus(COURSE, placedProg, 4), 'open')
+  assert.equal(E.levelStatus(COURSE, placedProg, 2), 'done')
+  // a review lesson done there still counts as done
+  let review = placedProg
+  for (const it of L1.lessons[0].items) review = E.recordItemResult(review, L1.lessons[0].id, it.id, { accuracy: 1 })
+  assert.equal(E.lessonStatus(COURSE, review, L1.lessons[0].id), 'done')
+  assert.equal(E.nextStep(COURSE, review).lesson.id, L4.lessons[0].id)
+  // without a finished run, nothing changes: a running or skipped run, or a start of 1, keeps the normal order
+  for (const pl of [P.startPlacement(), P.skipPlacement(), { state: 'done', lastPassed: 0 }]) {
+    const p = P.withPlacement(E.recordExamResult(E.emptyProgress(), L1.id, { percent: 95, passed: true, placement: true }), pl)
+    assert.equal(E.placedAt(p), 1)
+    assert.equal(E.nextStep(COURSE, p).lesson.id, L1.lessons[0].id)
+  }
+
+  // storage: a valid run survives parse; a bad one is dropped, and an old progress gains nothing
+  assert.deepEqual(E.parseProgress(E.serializeProgress(placedProg)), placedProg)
+  assert.deepEqual(E.parseProgress(JSON.stringify({ ...E.emptyProgress(), placement: { state: 'running', lastPassed: 2 } })).placement, { state: 'running', lastPassed: 2 })
+  assert.deepEqual(E.parseProgress(JSON.stringify({ ...E.emptyProgress(), placement: { state: 'done', lastPassed: -3 } })).placement, { state: 'done', lastPassed: 0 })
+  for (const bad of [{ state: 'weird' }, 'done', 5, [], null]) {
+    assert.equal(Object.hasOwn(E.parseProgress(JSON.stringify({ ...E.emptyProgress(), placement: bad })), 'placement'), false, `bad placement ${JSON.stringify(bad)}`)
+  }
+  assert.equal(Object.hasOwn(E.parseProgress(old), 'placement'), false)
+  assert.equal(E.placedAt(E.parseProgress('{"version":1,"lessons":{},"exams":{},"unlocked":[],"seconds":0,"placement":{"state":"done","lastPassed":1.5}}')), 1)
+
+  globalThis.location = { search: '?platform=mac' }
+  globalThis.navigator ||= {}
+  const { mountCourse } = await load('course-ui.js')
+  globalThis.document = { body: { dataset: { screen: 'course' } } }
+  const surface = (stored = new Map(), failRead = () => false, options = {}) => {
+    let handleClick
+    const host = {
+      dataset: {}, scrollTop: 0, querySelector: () => null, contains: () => true,
+      addEventListener: (_, handler) => { handleClick = handler }
+    }
+    const notices = []
+    const storage = { getItem(key) { if (failRead(key)) throw new Error('unreadable'); return stored.get(key) ?? null }, setItem: (key, value) => stored.set(key, value) }
+    const course = mountCourse({ host, storage, goto: () => course.show(), notice: (text) => notices.push(text), ...options })
+    course.show()
+    const click = (act, data = {}) => handleClick({ target: { closest: () => ({ dataset: { act, ...data } }) } })
+    return { course, host, click, stored, notices }
+  }
+  const courseKey = 'lumi.course'
+  for (const raw of ['{broken', E.serializeProgress(E.emptyProgress())]) {
+    const stored = new Map([[courseKey, raw]])
+    let blocked = raw !== '{broken'
+    const { course, notices } = surface(stored, (key) => blocked && key === courseKey)
+    const [lesson] = L1.lessons, [item] = lesson.items
+    course.record(lesson.id, item, { accuracy: 1, stars: 5 })
+    assert.equal(stored.get(courseKey), raw)
+    assert.match(notices.at(-1), /Course progress could not be read/)
+    blocked = false
+    stored.set(courseKey, E.serializeProgress(E.emptyProgress()))
+    course.show()
+    course.record(lesson.id, item, { accuracy: 1, stars: 5 })
+    assert.equal(E.parseProgress(stored.get(courseKey)).lessons[lesson.id][item.id].accuracy, 1)
+  }
+  const beginner = surface()
+  assert.match(beginner.host.innerHTML, /Already play a little\?/)
+  beginner.click('place-skip')
+  assert.doesNotMatch(surface(beginner.stored).host.innerHTML, /Already play a little\?/)
+
+  let experience = 'some'
+  const levelChoice = surface(new Map(), undefined, { getExperience: () => experience })
+  assert.match(levelChoice.host.innerHTML, /Already play a little\?/)
+  for (experience of ['new', 'experienced']) {
+    levelChoice.course.render()
+    assert.doesNotMatch(levelChoice.host.innerHTML, /Already play a little\?/)
+  }
+  levelChoice.course.findMyLevel()
+  assert.equal(levelChoice.course.view.ownerId, L1.exam.id)
+
+  const starts = []
+  const runItem = (item, ctx) => starts.push({ item, ctx })
+  {
+    let premium = false
+    let offers = 0
+    const launched = []
+    const openPaywall = () => { offers++ }
+    const { course, click, host } = surface(new Map(), undefined, {
+      premium: () => premium, openPaywall, runItem: (item) => launched.push(item.id)
+    })
+    const lesson = L2.lessons[0], item = lesson.items[0]
+    assert.match(host.innerHTML, /Keylight Premium/)
+    course.openOwner(lesson.id)
+    course.startItem(lesson.id, item.id)
+    click('skip', { level: '2' })
+    assert.equal(offers, 3)
+    assert.deepEqual(launched, [])
+    assert.equal(course.progress.unlocked.includes(2), false)
+    course.findMyLevel()
+    for (const task of L1.exam.items) course.record(L1.exam.id, task, { accuracy: 1 })
+    click('place-next')
+    assert.equal(course.view.ownerId, L2.exam.id, 'the Level 2 placement exam is accessible')
+    course.startItem(L2.exam.id, L2.exam.items[0].id)
+    assert.deepEqual(launched, [L2.exam.items[0].id])
+    click('place-stop')
+    course.openStep()
+    assert.equal(offers, 4, 'placed players still need premium for the next lesson')
+    premium = true
+    course.openOwner(lesson.id)
+    assert.equal(course.view.ownerId, lesson.id)
+    premium = false
+    course.startItem(lesson.id, item.id)
+    assert.equal(offers, 5, 'a lapse gates an already-open lesson')
+    course.returnToOwner(lesson.id)
+    assert.equal(course.view.name, 'map', 'after a lapse Back still leaves an activity')
+    assert.equal(offers, 5)
+  }
+  const introRun = surface(new Map(), undefined, { runItem })
+  introRun.course.openStep()
+  assert.deepEqual(starts, [{ item: handIntro, ctx: { ownerId: first.id, levelNum: 1 } }])
+  assert.equal(introRun.course.record(first.id, handIntro, { accuracy: 0.99 }).passed, false)
+  assert.equal(starts.length, 1)
+  introRun.course.startItem(first.id, handIntro.id)
+  assert.equal(introRun.course.record(first.id, handIntro, { accuracy: 1 }).passed, true)
+  assert.deepEqual(starts.map(({ item }) => item.id), [handIntro.id, handIntro.id, intro.id])
+  assert.equal(introRun.course.record(first.id, handIntro, { accuracy: 1 }).passed, true)
+  assert.equal(starts.length, 3, 'duplicate completion does not start another piece')
+  surface(introRun.stored, undefined, { runItem }).course.openStep()
+  assert.equal(starts.at(-1).item, intro, 'Continue resumes with Watch if only hand placement was completed')
+  assert.equal(starts.length, 4)
+
+  const placement = surface()
+  placement.click('place-find')
+  assert.equal(placement.course.view.ownerId, L1.exam.id)
+  assert.match(placement.host.innerHTML, /Finding your level: test 1 of/)
+  for (const item of L1.exam.items) placement.course.record(L1.exam.id, item, { accuracy: 1 })
+  assert.equal(placement.course.progress.exams[L1.id].placement, true)
+  const resumed = surface(placement.stored)
+  assert.match(resumed.host.innerHTML, /Next: the level 2 exam/)
+  resumed.click('place-next')
+  assert.equal(resumed.course.view.ownerId, L2.exam.id)
+  const [firstTask, ...rest] = L2.exam.items
+  const theory = rest.at(-1)
+  assert.equal(theory.type, 'theory')
+  resumed.course.record(L2.exam.id, firstTask, { accuracy: 0 })
+  assert.equal(resumed.course.nextAction(L2.exam.id, firstTask.id, false).label, `Next: ${rest[0].title}`)
+  for (const item of rest.slice(0, -1)) resumed.course.record(L2.exam.id, item, { accuracy: 1 })
+  resumed.course.startItem(L2.exam.id, theory.id)
+  resumed.click('answer', { i: (theory.params.answer + 1) % theory.params.options.length })
+  assert.match(resumed.host.innerHTML, /See your level/)
+  assert.doesNotMatch(resumed.host.innerHTML, /Try again/)
+  resumed.click('place-result-action')
+  assert.match(resumed.host.innerHTML, /You start at level 2\. Earlier levels stay open/)
+  resumed.click('map')
+  assert.match(resumed.host.innerHTML, /You start at level 2\. Earlier levels stay open/)
+  assert.deepEqual(resumed.course.progress.unlocked, [2])
+  assert.equal(resumed.course.progress.exams[L2.id].passed, false)
+  assert.equal(E.nextStep(COURSE, surface(resumed.stored).course.progress).lesson.id, L2.lessons[0].id)
 
   console.log('course: ok')
 })().catch((e) => { console.error(e); process.exit(1) })

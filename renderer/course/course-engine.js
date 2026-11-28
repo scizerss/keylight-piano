@@ -5,7 +5,8 @@
 // Progress: { version, lessons: { [lessonId]: { [itemId]: { accuracy, stars, tries, at } } },
 //             exams: { [levelId]: { percent, passed, tries, at, placement } },
 //             unlocked: number[]   // levels opened by skipping ahead
-//             seconds: number }    // practice time reported by the runners
+//             seconds: number,     // practice time reported by the runners
+//             placement?: { state: 'running' | 'done' | 'skipped', lastPassed } }   // the "Find my level" run (placement.js)
 
 export const PROGRESS_VERSION = 1
 export const DEFAULT_PASS_ACCURACY = 0.8
@@ -40,7 +41,7 @@ const isDraft = (level, lesson) => level.draft === true || lesson.draft === true
 // ---------- items and lessons ----------
 export function isItemDone(item, record, minStars = 0) {
   if (!record) return false
-  const need = item.passAt || {}
+  const need = item.passAt === 1 ? { accuracy: 1 } : item.passAt || {}
   if (record.accuracy < (need.accuracy ?? (need.stars ? 0 : DEFAULT_PASS_ACCURACY))) return false
   if (need.stars && record.stars < need.stars) return false
   return record.stars >= minStars
@@ -93,13 +94,23 @@ export function unlockLevel(progress, n) {
   return next
 }
 
+export const PLACEMENT_STATES = ['running', 'done', 'skipped']
+/** The level a finished "Find my level" run starts the learner at (the last exam passed in it + 1); 1 without one. */
+export function placedAt(progress) {
+  const p = ownGet(progress, 'placement')
+  return plain(p) && p.state === 'done' && Number.isInteger(p.lastPassed) && p.lastPassed > 0 ? p.lastPassed + 1 : 1
+}
+
 // Explicit unlocks allow early practice, but Guided order still waits for every
 // earlier lesson and exam. A placement pass alone does not complete lessons.
+// The one exception is a finished "Find my level" run: the levels below the level it placed the learner at
+// are for review only, so they are never the recommended step and do not hold back the levels after them.
 function isLevelInOrder(course, progress, level) {
-  return !level.draft && isLevelUnlocked(course, progress, level.number) &&
-    course.levels.slice(0, course.levels.indexOf(level)).every((earlier) =>
+  const from = placedAt(progress)
+  return !level.draft && level.number >= from && isLevelUnlocked(course, progress, level.number) &&
+    course.levels.slice(0, course.levels.indexOf(level)).every((earlier) => earlier.number < from || (
       !earlier.draft && earlier.lessons.every((lesson) => isLessonDone(course, progress, lesson)) &&
-      (!earlier.exam || ownGet(progress.exams, earlier.id)?.passed === true))
+      (!earlier.exam || ownGet(progress.exams, earlier.id)?.passed === true)))
 }
 
 /**
@@ -244,5 +255,9 @@ export function parseProgress(raw) {
   }
   if (Array.isArray(data.unlocked)) out.unlocked = [...new Set(data.unlocked.filter((n) => Number.isInteger(n) && n >= 2 && n <= 99))].sort((a, b) => a - b)
   if (isNum(data.seconds) && data.seconds > 0) out.seconds = data.seconds
+  const pl = data.placement
+  if (plain(pl) && PLACEMENT_STATES.includes(pl.state)) {
+    out.placement = { state: pl.state, lastPassed: Number.isInteger(pl.lastPassed) && pl.lastPassed >= 0 && pl.lastPassed <= 99 ? pl.lastPassed : 0 }
+  }
   return out
 }

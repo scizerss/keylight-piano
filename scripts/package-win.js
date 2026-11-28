@@ -28,6 +28,7 @@ const { promisify } = require('node:util')
 const { Readable } = require('node:stream')
 const { pipeline } = require('node:stream/promises')
 const { flipFuses, readFuses } = require('./flip-fuses.js')
+const { stageModels } = require('./cover-models.js')
 
 const ROOT = path.join(__dirname, '..')
 const NAME = 'Keylight'
@@ -390,6 +391,9 @@ async function main() {
     fs.mkdirSync(app, { recursive: true })
     for (const f of ['main.js', 'package.json']) fs.copyFileSync(path.join(ROOT, f), path.join(app, f))
     copyTree(path.join(ROOT, 'renderer'), path.join(app, 'renderer'))
+    // piano cover models: checked against their manifest first; without them the build keeps Basic Pitch for songs
+    const modelBytes = stageModels(path.join(appDir, 'resources/music2midi-models'))
+    console.log(modelBytes ? `  models     piano cover, ${(modelBytes / 1e6).toFixed(0)} MB` : '  note: no piano cover models (tools/music2midi/fetch-and-build-onnx.sh): this build keeps Basic Pitch for songs')
     // licence notices travel with the binary
     for (const f of ['LICENSE', 'THIRD_PARTY_NOTICES.md']) fs.copyFileSync(path.join(ROOT, f), path.join(appDir, f))
     copyTree(path.join(ROOT, 'LICENSES'), path.join(appDir, 'LICENSES'))

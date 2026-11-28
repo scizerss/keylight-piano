@@ -6,7 +6,7 @@
 //   bend     (pitch wheel, per channel)            -> glide, and vibrato when wiggled
 // Built-in instruments are synthesised locally; the optional sampled piano uses
 // Alexander Holm's Salamander samples (CC BY 3.0; see LICENSES/piano-samples.md).
-import { SampleVoice, loadPiano, loadHarmonium } from './sampler.js'
+import { SampleVoice, loadPiano } from './sampler.js'
 //
 // A key press builds its voice from as few audio nodes as possible: every node is
 // work for the audio thread, and the whole voice is built while the key waits. Each
@@ -18,7 +18,6 @@ import { SampleVoice, loadPiano, loadHarmonium } from './sampler.js'
 export const INSTRUMENTS = [
   { id: 'grand', name: 'Grand Piano', short: 'Piano' },
   { id: 'sampled-piano', name: 'Salamander Piano (sampled)', short: 'Sampled', sampled: true },
-  { id: 'harmonium', name: 'Harmonium', short: 'Harmonium', sampled: true },
   { id: 'epiano', name: 'Electric Piano', short: 'E.Piano' },
   { id: 'tine', name: 'Tine Electric Piano', short: 'Tine' },
   { id: 'organ', name: 'Drawbar Organ', short: 'Organ' },
@@ -274,7 +273,6 @@ function breathNoise(ctx) {
 // Build an instrument's waves and samples on `ctx` now, ahead of its first note.
 export function prepareInstrument(ctx, id) {
   if (id === 'sampled-piano') return loadPiano(ctx)
-  if (id === 'harmonium') return loadHarmonium(ctx)
   if (id === 'grand') {
     for (let p = 24; p <= 108; p += 12) pianoWaves(ctx, p)
     hammerSamples(ctx)
@@ -286,9 +284,7 @@ export function prepareInstrument(ctx, id) {
 
 export class Voice {
   constructor(ctx, out, pitch, velocity, instrumentId = 'grand', bendRange = 48, when = null) {
-    if (instrumentId === 'sampled-piano' || instrumentId === 'harmonium') {
-      return new SampleVoice(ctx, out, { id: instrumentId, pitch, velocity, bendRange, when })
-    }
+    if (instrumentId === 'sampled-piano') return new SampleVoice(ctx, out, { pitch, velocity, bendRange, when })
     this.ctx = ctx
     this.pitch = pitch
     this.velocity = Math.max(0.05, Math.min(1, velocity / 127))

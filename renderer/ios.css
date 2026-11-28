@@ -1,0 +1,1120 @@
+/* iPhone/iPad app only: ios/scripts/bundle-renderer.sh links this after touch.css, so no desktop or Android page ever loads it.
+   Layout fixes that need the real safe area: WKWebView can report env(safe-area-inset-*) as 0 on its first layout and after a
+   rotation, so the host also sets --kl-top/right/bottom/left (WebViewController.pushSafeArea) and every rule here uses the larger. */
+html.ios {
+  /* Illuminated Studio (docs/DESIGN-ILLUMINATED-STUDIO.md): ebony lacquer, ivory keys, and the only light is the music
+     (left hand cobalt, right hand amber). Mint is retired here; emerald and felt red are semantic only. */
+  --ebony: #0a0b0f;
+  --chassis: #14161d;
+  --raised: #1e212b;
+  --ivory: #f2efe8;
+  --stage-top: #0d0f15;
+  --stage-bottom: #07080b;
+  --key-bed: #07080c;
+  --key-white: #d9d3c7;
+  --key-white-off: #c2bbae;
+  --key-black: #15161d;
+  --key-black-scale: #262833;
+  --chrome: #0d0f15;
+  --chrome-raised: #14161d;
+  --chrome-line: rgba(242, 239, 232, .12);
+  --chrome-text: rgba(242, 239, 232, .92);
+  --chrome-muted: rgba(242, 239, 232, .72);
+  --chrome-ink: #f2efe8;
+  --play-glass: linear-gradient(180deg, rgba(28, 30, 38, .88), rgba(20, 22, 29, .86));
+  --bg: var(--ebony);
+  --bg-deep: #07080b;
+  --bg-dark: var(--ebony);
+  --surface: var(--chassis);
+  --surface-2: var(--raised);
+  --surface-3: #262a36;
+  --list: #0d0e13;
+  --pane: var(--surface);
+  --tooltip: var(--surface-2);
+  --onboarding: var(--bg);
+  --glass: rgba(20, 22, 29, .88);
+  --scrim: rgba(5, 6, 9, .68);
+  --line: rgba(242, 239, 232, .07);
+  --line-strong: rgba(242, 239, 232, .16);
+  --outline: rgba(242, 239, 232, .22);
+  --pane-line: var(--line);
+  --hover: rgba(242, 239, 232, .06);
+  --highlight: rgba(242, 239, 232, .04);
+  --text: var(--ivory);
+  --white: var(--ivory);
+  --muted: rgba(242, 239, 232, .66);
+  --faint: rgba(242, 239, 232, .56);
+  --ink: var(--ebony);
+  --mint: var(--ivory);
+  --mint-2: #c9c4b8;
+  --accent: var(--ivory);
+  --accent-rgb: 242, 239, 232;
+  --accent-hi: #ffffff;
+  --accent-2: #ffffff;
+  --accent-hover: #fbf9f4;
+  --accent-deep: #dad5c8;
+  --accent-night: var(--chassis);
+  --accent-soft: rgba(242, 239, 232, .10);
+  --accent-line: rgba(242, 239, 232, .30);
+  --accent-ink: var(--ebony);
+  --glow: rgba(0, 0, 0, .4);
+  --glow-soft: rgba(0, 0, 0, .2);
+  --glow-rgb: 0, 0, 0;
+  --glow-mint: 0 0 0 0 transparent;
+  --grad-accent: none;
+  --grad-accent-hi: none;
+  --focus-ring: 0 0 0 3px rgba(134, 182, 255, .55);
+  --ok: #3ec982;
+  --ok-rgb: 62, 201, 130;
+  --bad: #e0585f;
+  --felt: #d94f57;
+  --alert-text: #f08a91;
+  --info: var(--left);
+  --star: #ffb866;
+  --star-off: rgba(242, 239, 232, .16);
+  --switch-on: #3ec982;
+  --control-outline: #7c7f88;
+  --e1: inset 0 1px 0 rgba(242, 239, 232, .08);
+  --card-edge: inset 0 0 0 1px var(--line), inset 0 1px 0 rgba(242, 239, 232, .08);
+  --key-grain: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACAAgMAAAC+UIlYAAAADFBMVEUAAABgYGCwsLD///8lFimFAAAABHRSTlMGBAQGHP7xqwAAEItJREFUeNoBgBB/7wCcCEPEwTEbSRgH76VLuDZ8KvCwu45MZfx+e7UVTaHpPwDzxHSASB2rD/hK0ZIpmV14Lm6EdnODd4/FR3lAdSZrSwDU0VwsFgw5vZ3PhxhmdPV+2iLzoEKGe3iHIISMuRGFpgDaIB3P5ZeELQ5jWyqSZLOUIcyke2TRAY8HjA4lfzhGpADOHr8YyztQaYn8T+e4isSo8uIJbmzQ9sX6q28Ud71RiQCk/ejpSf+E/D9FTAUmwJ5C6dTgfJ5y7SHZdo18cRwfgQCXLrQIsesNtrNzMJKoqgE/vdJa4dcOcIT9X0qqnVWY5QAwN4kFJ4JKRhLmE8zR7rK8n03DtQclpQ9k4xd1N4VCPgDn70PffBuMEg0BeUprbZoXa2Cy65o1KoFvh0AonltRcABuC9QDVAXdiM/NSQoukGVnn8NnFAGQEAkxUAsRq4qK4wAyxJxgs3pl0Mo8ya3dKefltaVpZhHWuQnw9sbH1T6N2wDzY8JWNyvXIrwPobfVHW+ebtymvybCYEoV5dJ0wtfPdwBG+7xgI9HYrbuKvqcmkPOAc0TRMJqcjMPw3w1MARydJAC+AA6cr1J/6oht/eKtJbj1j2PIetVGrU4sYoB2s2JcAgDzCk3ZUoCwYbOrL3U0UnMOnJkd29SpsvEeJuU7STnJswBlVQ5VkMqw9lhiwmyPERUoBjchI+A1X08ytuyZyEtF/AAKCDSKQjcbpLdu+GXyWumBLPheljnDPeP6r4/mfSmcCwCv+LBO1/4aiStl0IwiwF5cUAfwlpIJ8HMVFjux3vEW0gDi7DnenIlRn1p9tdudQsYxZCkhnr2Ss3hiTHZyXuCBCQCPYvsd0lZGsZfU2lY19ItCksb6QPKP2IpENpStpmkDHwDYVfD1g2DjF45y9wrtoXG5+FRht0M0PXGNIHhxJohrIgCBpzDCW2sJ8B99KZFu+i5HFuKQcpSpuK5ZU/5GqEa7OQChkT2FECRiGj5ML7CjkFSuZsupjJcEFpUn29gDh/SLWQC615ojW0Y3YEZh87hQXAgNxUslJKBOiOu+9/RtQDuz7QDjoa7UlldLs2yrLs9RtrhIapsxej4vp1hg/8P/T9FyvAAQMcbNxpGi68p+lG9pyDieX9RwTR2VTENvRHmalctkdQDsIS4x6F5gJYa9pIwfAN4mSOYEeLUptVANRY8gVEgWjQAvBVlWDOBLJ9o34JXc+8biw/tkvKJ9E3plu5cEejbLqgDPgPnLSU2Y8+pyUZi5rbyu+H2G8u4sKpDJT7+l5YwfZQBSOeJYiAk3jDNqVhS4g/So39k2Q1mAnKagbMhvK0tobwB1BwMSvRbBfw3fTxTREM1OHMFYwALxHRwgQqp5AB/QBwAbmosd6TJoYQug1HFix22gZDgAhO0r3Ok0ahBpHDhCJgCWqRbFeeA5j8PM9fBK9gdwxZDvThoPkMdniUzS1pMS0wC1duY2yUb9ktWF0+WwwiXON5y2eg2PnnH1r5WB8+rnHgAlakxOARFZABeKvoJgJrUfhjBfT0U24EZ1aUeuiIlXGAC4D8nvuDJEyLHAkJ1focL1vVyS2mcGIJqq+E0Wr5YmTgD2kCBgx++6oPxWg8caEbc2px1CBHVc2ncCWVU2zMNtbQBXulxYn/7dUsy63DvkbmdhL+isriyKtwUWU4EdPxYBAgBNFmO+3FWMzy0d0LfttkqnjHOwTj44OSp7vBhtjwB8pQAaV2hY9PjfZLX+jmLHrYnLrWWkxESEjKORUSvDJ4D2mgCVUGPwdRk/sTRSIjjVuNMSIHV7HHHKmk/EBj5PjU9ECQAabn0TWDESK2eaZPSjt6y564l6IrOaxybG+2VoYT1gvgA9yKRRhXgjF7hLdnK/D19LLQBj+pMpeqIpicnF7l2DbAD1FlpxqXm9AGEHNWhoAGoeCY3/WlsR7stb13Vio7bKVgA/0dZ+RXfBw2WjGYBUoti2cQjxYv2z+fR0LC121yPmEACKQInw783b+Dl+l2Qw7A45wFBG+YOAxucuoOYqnn5UJgCfSHx/a/dsEa+pUXhWonN88HkPHkgN3rUtogqv/hFV5gDxHDDzU2vwjWAP447PMzw4428inPeIYRnZH52iwTKHYADcWQh5bellBii3C1QMXPDl7nLoe57DPuxdPsNtr7WMuQDPQbe+xI+167zRKF7wFNobQOOtnXnGpLYPrWbsDt3NsgCdtbgpXiSu6hmeiiWKHj6Ln5YVFe4X0go1HZs7Y9TSRgCML+odG0BPo4nVSfjwzfXehOFQmQ0PeX0mHCSPG823qADI/SES4XvxYtNPQ9HmNiC2Mlmra1dZ79jmeW1aNIS5qAABjXso6GqEOelkRt9IJBaHaXfW2eLCGsB6GKnyoi65IQDCcUcRF1+Gst2NL4ww5s+tzJ1VjoO5/sOTWiKyqUOQngCgo4sogcihPWu0B5+0FtCg5TRFMu329DwZP994aV/1aAAjfMNFuZkYID+NHrKgMzCMdI0FWst2G3Yt8AjARfabewAl6EFHStyZ6pLE90wlwYHh5s281ZXVXOhAAnr0lffT+gDs+No8H7rcKavFZ7cYSvuZecc4C3OnRdew5iJXcWosewBhXS7VswNRSDgT4gyGKNxUQGkJFwFAr7Ey/0sSvIkfagBpgK6eTBi/yjPKQ5TLA8SBS+WAyZxQ7Jep7lbssoDY9QA2j3LInbGmOi/CE5IpCg2hH6pDGxSWZ2LbA4bh+1Tw0QCz+4WYpti+nvI2WVdg/LgMqhRtxard5LoFgd2RUOOzOACcRTFNPHEzTfOzmwY/tBxBGyPdM6Bt3WfvPf7GpQZEpgB0A5dEyyOxdKFAWBo2zHFWFiKKnlhiPGtXig+x2jCR+QD22hO2wrS27gCwWAZbUcA2aOrhKg7t6kFirFLSEDYzCQBDbfdJ6XNTwMup7amyf6/mQafdYoadBC0VUBUJFOCgFwCRTkY7Gfx9sZ1E9yB5VSuyCLAlXZ8MBSkFw4QMaO7M0wCzFRaAIwaQPZm/Env0k622e4XB3iVg+L5luzTPwk25agCEoU9TdJMdm0gxcJ6KBJS8C6u9o5Rmyd7YDxRlzM5cSgDxIrifr9kcsngZXamPuHN/h2K7gnZ3gDtds3SVCCoipwCX+dO6dKhLiLHfv58OyGzxX7/VOmySB/9up0SfY0pCpwBDz50d2YCp4imPEokfCO+6vSdhNXavfNsfuh4A/JMsFwBAQnQW7KAd0gdLNyCVmTKniErKMzUyL3HoIZJK/LkTGQDMwCcW8th3IcV32zw78zmSph3C2CLoeWLDv1ForrV1YADzhkex76iD/wKUxHRJvdreRh8hSR2JL5nvLLe/yb/E+AC8FL7cMSLgKPOGbwR6K+nnp+nkXULaDj4m9PuvBP+AzgDGcjlK0PAr0wf35FIJ0fMaWNcRQGzYzsbd+tba7anNtAD6c5fbIm71rj9BPn7nK3xagWlxbKXZUdXGxtX2Q379QgCu1O1F5HxV8W4K09GV0f4ZodpB6Tt4O3JyA96w63Oj0wBZnNdSvqu4cggCh8sDpJfu5qk6Di6oknmAceN9OHFtowAa3q3OkBqi/OFQgweOJ5jLO54WJRrxEKO9izva2n3bBQAHMBLp4pzbQdO+B5EZ2GrQS278qWQp9maVxXBx+ZDt5ABwp+rSv5i9LizTItXkI0d392ZPv+9X0xo7Nn7r/w+T9QA75SL8a6IHgJ1M5qmseQ0KhDz0cma/gtGESqpweckPrADnjnATBvSXQApLMfZ4daBhanV112mStAV0oJb7XL6cPQD1HeJnsn0bikPcEtoVdIgeeA7U1pDtQIAMdpF+OfczxgDFF2+XZgaihfaZxoY9CTGFmp5YYorP3AYHxFxbYmGxUQDKn4cECZDupHJTIAaEhhFo7jWKvm3U71PT9spmBBScSgB5KTgHSlaap1+QE+fwIePxPk0rjdVa/yg/8KntQ7rzFAAzGLBl5VVVcde9YjGLb4lXsU+5hqhbTVU7OTFeZveXVgCv/p/mIaTz6n2jaFPdhuiKQHr9kSaJJCKfmgw1RElRxwB2H4o1tgklGDWTmVBBr3b5OjNffs+5fPFfgiFWDtexnAAB8rx4XG27rbEuA1snoF+Rpmv2nOjfVbiDZeXPTFl4gQDg7Z/fgbg+xtGcrLVjXpqCDaMoQxHPu010oUFaAHL4TAA23hkAF2Y488Zziocp43zyeT+lKyFhs+DlduadkIm/FQCWpCIWcWFWsMLX/2qB4FlMRGYjEZqz6yc48u4GVFbJIgDz7AVc3itTSLN03xB9JNX0ye49ukRAJrl15q1hzbb2aACsN7saxCFbuTQZrX4vPkrJjr5cNK8AUnXAugTemFUQQQAANDJQkW0Pyk/T9QUoFdlMPU/hxd9aKNzXJexO+3+VqwDl0/vYeAz+XEntaS2bkocs53hw5VtNCU0QhnYG2JPJ8ABvEh6p8TmDv/nFzoFWV5yobpzNQ1i0I0HYk4nB0osDkADtA5Q9uopPbXE+jDVsKzunajaAeS9ng5n7BWJevzaVRACxbZr3YhYcHacnnuSgrBy6if89p01iWhDJvX1QHiQ6lwCpsawRaYBlJsdqcD2va2ZSC6B6dl9Pwgf2PsVApJyd4AAn20qis77iAGzhy179huSvKkP6dHjg29wCJ9RhuKqEBgBGeJolxRG/cFufBxQ9jHv3c3TGGsQcA8yvo4K/AQZDXwDc5rwSd+85yS8cvnydaTVCpNVrUbxCJAkfihL0u5mc8QA0OF2XGIAvwme+tNxAldPl1t/SLWcqPof4XDeU3yCtaQCQxqPqsv8TjVMo4mmmyGFHsXmP+mvIv+4Ca6NsP6o3/ADgYXs84H/6GykG3K0BnDaAfqu9gfH0b2RrZai4bdiXBwCzIxsXWHHkys/TFeMXQByudfJqKVYWkNUQYlZpuomysAAPwDXjJIpemHB5kXpXIxx1eKi5FTptfjaOaB2XpsvAMgBQS2uVITUu/0epQ9nq9nC4lyiBKMUzUdBVrO/XbJXJPgCQHRyTKWHdhH+VDRGLB+yyqG9l/tR0deqi6gzNT9B+MQAOrGQ39hKX8l2SdmfapKoXh+Gp/5WPo+l/ZlPq49PuLwCgCSGqyJecmqrp4VlWt+9rJ/OfIkFp4iP6MvGQBH1rcgBfG78CDjJAMihno18Nh8UXRyNqm5sspdmk1QH9ex2U6gBnBKlDH7pn/KwMGbZ/7YJ5lUCHnYjJnq19AWBzePG8jABvuvRb6HCbnndEMbwE3jzfpy+/N2SdRRWxpzThKiQ4QwAVx4s0uw3uRW5Frbcg4FxfbgwOPTvVukDVZJuIs/+jUgAe6JMYWPnos96uIrBZUphXNT9dwfhlUyvfrcmnGX3g+AAOjtU9ASVrYEnTM7ULvqGIdoOROzN+32K9wKc5W4sE9gBlE4kaJxaAg1iLgXCzH4wFd3wRefCVa1paHgqRdhkuRQDqDTjVXrLSsaZ/z9qtcK21Ci5JzPT+fQAstPWtaD0K7AAXQTLTrZ4ya7z4rEyqWZK9KNv46GtuEhLifQ5BrfiUqQB7YOnyietilNmTaaqSv19Sv3QKgdCxr5bJi+eORuhakABLNRj1IunYS+OkVy/ctxl1w59gLqp+Drw9Pxo1hRLEmz108gDF6OkeAAAAAElFTkSuQmCC");
+  --title-serif: "New York", ui-serif, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --serif: var(--font);
+  --press: 90ms cubic-bezier(.2, 0, 0, 1);
+  --sheet-in: 340ms cubic-bezier(.32, .72, 0, 1);
+  --sheet-out: 220ms cubic-bezier(.4, 0, 1, 1);
+  --fs-display-0: 34px;
+  --fs-title-0: 22px;
+  --fs-headline-0: 17px;
+  --fs-body-0: 17px;
+  --fs-sub-0: 15px;
+  --fs-caption-0: 13px;
+  --fs-hero-0: 34px;
+  --fs-display: calc(var(--fs-display-0) * var(--ts));
+  --fs-title: calc(var(--fs-title-0) * var(--ts));
+  --fs-headline: calc(var(--fs-headline-0) * var(--ts));
+  --fs-body: calc(var(--fs-body-0) * var(--ts));
+  --fs-sub: calc(var(--fs-sub-0) * var(--ts));
+  --fs-caption: calc(var(--fs-caption-0) * var(--ts));
+  --fs-hero: calc(var(--fs-hero-0) * var(--ts));
+  --sat: max(env(safe-area-inset-top, 0px), var(--kl-top, 0px));
+  --sar: max(env(safe-area-inset-right, 0px), var(--kl-right, 0px));
+  --sab: max(env(safe-area-inset-bottom, 0px), var(--kl-bottom, 0px));
+  --sal: max(env(safe-area-inset-left, 0px), var(--kl-left, 0px));
+}
+
+/* the shell: the page starts below the status bar / Dynamic Island, and the tab bar clears the home indicator */
+html.ios #app { padding-top: var(--sat); }
+html.ios body[data-screen="play"] #app { padding-left: var(--sal); padding-right: var(--sar); }
+
+/* a phone on its side (and iPad): the tab bar is a column down the left edge (tokens.css); the grid starts after the safe area */
+html.ios #app { padding-left: var(--sal); padding-right: var(--sar); }
+
+/* dialogs and the first-run setup stay clear of the status bar and home indicator */
+@media (min-width: 700px) {
+  html.ios dialog[open] {
+    max-height: calc(100dvh - 24px - var(--sat) - var(--sab));
+    margin-top: calc(12px + var(--sat)); margin-bottom: calc(12px + var(--sab));
+  }
+}
+/* iPhone: dialogs are bottom sheets (tokens.css); the grabber sits below the status bar, the content above the home indicator */
+@media (max-width: 699px) {
+  html.ios dialog[open]:not(.confirm-dialog) { margin: auto 0 0; max-height: calc(100dvh - var(--sat) - 12px); }
+  html.ios .confirm-dialog[open] { margin: auto; max-height: calc(100dvh - 48px - var(--sat) - var(--sab)); }
+}
+/* the bottom inset is padded inside the pinned button bar, not on #onboarding: padding the layer left a strip of its gradient under
+   the bar's solid fill, a band of a different colour over the home indicator */
+html.ios #onboarding { padding: var(--sat) var(--sar) 0 var(--sal); }
+html.ios #onboarding .ob-actions { padding-bottom: calc(var(--s4) + var(--sab)); }
+
+/* the Settings jump chips stay put under the status bar while the page scrolls; page text must not show through them */
+html.ios .settings-jump { background: var(--bg); }
+
+/* Scales & chords: the type pills are styled in practice/practice.css (v2 chips, 44px), not here */
+
+/* the setup (onboarding.css) centres its own column on every size: no iPad override here */
+
+/* taps: on a touch screen the first tap on a tile used to be spent on :hover (it lifts, grows a shadow and fades one in), and WebKit
+   then treats the tap as "content changed" and does not send the click: the second tap was needed. Nothing hover-only on touch. */
+@media (hover: none) {
+  html.ios .cover-tile:hover, html.ios .lesson-tile:not(.locked):hover, html.ios .game-card:hover, html.ios .explore-card:hover,
+  html.ios .lesson-tile:hover, html.ios .primary:hover:not(:disabled), html.ios .ghost:hover:not(:disabled), html.ios .mini-btn:hover:not(:disabled),
+  html.ios .chips button:hover, html.ios .chip-btn:hover, html.ios .settings-jump button:hover, html.ios .tonics button:hover, html.ios .cr-opt:hover { transform: none; }
+  html.ios .cover-tile:hover::before, html.ios .lesson-tile:not(.locked):hover::before, html.ios .game-card:hover::before, html.ios .explore-card:hover::before { opacity: 0; }
+}
+
+/* Keep the import sheet clear of the status bar and the landscape side insets. */
+html.ios #importSheet { padding-inline: var(--sal) var(--sar); }
+@media (max-width: 699px) {
+  html.ios #importSheet .sheet { max-height: min(92dvh, calc(100dvh - var(--sat) - var(--s3))); }
+}
+@media (min-width: 700px) {
+  html.ios #importSheet .sheet { max-height: calc(100dvh - 48px - var(--sat) - var(--sab)); }
+}
+
+/* Neutral chrome and scalable system type. */
+/* the page: ebony lacquer, a soft sheen from above, a little grain (all static; the grain and the ambient light are off in Lite and reduced transparency) */
+html.ios body { background: transparent; }   /* the page colour is on <html>; an opaque body would hide the layers painted behind it */
+html.ios body::before {
+  background:
+    var(--key-grain) 0 0 / 128px 128px repeat,
+    radial-gradient(120% 38% at 50% -10%, rgba(242, 239, 232, .055), rgba(242, 239, 232, .015) 45%, transparent 72%),
+    linear-gradient(180deg, #101219 0%, #0a0b0f 48%, #07080b 100%);
+  animation: none;
+}
+html.ios .greeting { font-weight: 700; }
+html.ios body:not(.scrolled):not([data-screen="play"]) #title { font-size: var(--fs-display); }
+html.ios #onboarding .ob-step-title { font-size: var(--fs-title); }
+html.ios #onboarding[data-step="welcome"] .ob-step-title { font-size: var(--fs-display); }
+html.ios #onboarding .ob-note-chip small { font-size: calc(13px * min(var(--ts), 1.2)); }
+html.ios #onboarding .ob-note-chip b { font-size: calc(30px * min(var(--ts), 1.2)); font-weight: 700; }
+html.ios #onboarding .kb-opt .kb-glyph b { font-size: calc(22px * min(var(--ts), 1.2)); }
+
+html.ios :is(.lib-dots, .lib-flag, .lib-len) { background: rgba(0, 0, 0, .82); }
+html.ios .lib-tile :is(.heart, .lib-del)::before { background: rgba(0, 0, 0, .72); }
+html.ios .lib-tile .lib-del:hover::before { background: var(--bad); }
+html.ios #connBanner { background: var(--glass); }
+html.ios.fx-lite {
+  --glass: var(--pane);
+}
+html.ios.fx-lite #nav, html.ios.fx-lite .cr-hero { background: var(--pane); box-shadow: none; }
+html.ios.fx-lite .settings-jump::before { background: none; }
+html.ios.fx-lite #importSheet, html.ios.fx-lite .guided, html.ios.fx-lite .support-dialog::backdrop, html.ios.fx-lite .ed::backdrop { background: var(--scrim); }
+@media (prefers-reduced-transparency: reduce) {
+  html.ios { --glass: var(--pane); --glass-blur: none; }
+}
+@media (prefers-contrast: more) {
+  html.ios { --muted: rgba(235, 235, 245, .9); --faint: rgba(235, 235, 245, .82); --line: rgba(255, 255, 255, .28); }
+}
+
+/* Filled primary actions, tinted alternatives, gray utilities and plain links. */
+html.ios :is(.primary, .ghost, .mini-btn, .link):not(#importSheet *) {
+  min-height: 44px;
+  font-weight: 600;
+}
+html.ios :is(.primary, .ghost):not(#importSheet *) { font-size: var(--fs-headline); }
+html.ios .ghost:not(:is(.danger, :disabled, #importSheet *)) {
+  background: var(--accent-soft);
+  color: var(--accent);
+  box-shadow: none;
+}
+html.ios .ghost:not(:is(.danger, :disabled, #importSheet *)):hover { background: rgba(var(--accent-rgb), .16); }
+html.ios :is(.mini-btn, .chip-btn):not(:is(.is-primary, .danger, .on, #importSheet *)) { box-shadow: none; }
+html.ios :is(.hero-actions, .fs-foot, .results-actions) :is(.primary, .ghost),
+html.ios #screen-home .hero-actions :is(.primary, .ghost) { height: auto; min-height: 50px; }
+html.ios .setting input[type="checkbox"] { box-shadow: inset 0 0 0 1px var(--control-outline); }
+html.ios .setting input[type="checkbox"]:checked { background: var(--switch-on); box-shadow: none; }
+html.ios #results .ring-fg.glow, html.ios #results.is-best .results-ring { filter: none; }
+@media (max-height: 520px) and (orientation: landscape) {
+  html.ios #results .results-actions .primary { min-height: 46px; font-size: var(--fs-body); }
+  html.ios #results .results-actions .ghost { min-height: 44px; font-size: var(--fs-sub); }
+}
+
+html.ios #onboarding { --ob-left: var(--left); --ob-right: var(--right); background: var(--onboarding); }
+html.ios #onboarding .ob-keys { box-shadow: inset 0 1px 0 var(--line); }
+/* the welcome: nothing loops. The first time, light runs along the keys once (app.js setupIntro adds .intro for under 1.0s, a tap ends it) and
+   the three middle keys stay lit, the Keylight mark; every later visit shows the mark at rest. */
+html.ios #onboarding .ob-rain { display: none; }
+html.ios #onboarding[data-step="welcome"] .ob-keys i { animation: none; }
+html.ios #onboarding[data-step="welcome"] .ob-keys i:is(.mk-l, .mk-r) { transform: translateY(2px); }
+html.ios #onboarding[data-step="welcome"] .ob-keys i.mk-l::before { opacity: .95; }
+html.ios #onboarding[data-step="welcome"] .ob-keys i.mk-r::before { opacity: .95; background: radial-gradient(60% 70% at 50% 100%, var(--ob-right), transparent 72%); }
+html.ios #onboarding.intro .ob-keys i::before { animation: ob-run 360ms cubic-bezier(.22, 1, .36, 1) calc(var(--i, 0) * var(--step, 30ms)) both; }
+html.ios #onboarding.intro .ob-keys i.hr:not(.mk-l)::before { background: radial-gradient(60% 70% at 50% 100%, var(--ob-right), transparent 72%); }
+html.ios #onboarding.intro .ob-keys i:is(.mk-l, .mk-r)::before { animation-name: ob-run-hold; }
+@keyframes ob-run { 0% { opacity: 0; } 30% { opacity: .8; } 100% { opacity: 0; } }
+@keyframes ob-run-hold { 0% { opacity: 0; } 30% { opacity: .85; } 100% { opacity: .95; } }
+@media (prefers-reduced-motion: reduce) { html.ios #onboarding.intro .ob-keys i::before { animation: none; } }
+html.ios.reduce-motion #onboarding.intro .ob-keys i::before, html.ios.shot #onboarding.intro .ob-keys i::before { animation: none; }
+/* P9 the call to action sits on the instrument's chassis: a lip of the same lacquer as the key bed above it, not a fade into the page */
+html.ios #onboarding .ob-actions { background: var(--chassis); border-radius: 18px 18px 0 0; box-shadow: inset 0 1px 0 rgba(242, 239, 232, .08); margin-top: var(--s3); }
+html.ios #onboarding .ob-rain i.l { box-shadow: 0 0 24px rgba(134, 182, 255, .7); }
+html.ios #onboarding .ob-side-pick { background: var(--left-soft); }
+html.ios #onboarding .ob-goal-chips button, html.ios .hg-skip { min-height: 44px; }
+html.ios.reduce-motion :is(#onboarding .ob-card.enter, .screen, .cr-sheet, .guided-panel, .lib-filters, .hud-actions, dialog[open]) { animation-name: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  html.ios :is(.screen, .cr-sheet, .guided-panel, .lib-filters, .hud-actions, dialog[open]) { animation-name: none !important; }
+}
+
+/* Navigation glyphs. The outline and fill share the same 24px box. */
+html.ios #nav button > svg:not(.ios-tab-icon),
+html.ios :is(#kbStatus, #btnView) use:not(.ios-symbol) { display: none; }
+html.ios #nav button .ios-tab-icon { display: block; width: 24px; height: 24px; }
+/* outline and fill are both drawn and swap by opacity, 140ms: a crossfade, no path morph */
+html.ios #nav button .ios-tab-icon use { transition: opacity 140ms linear; }
+html.ios #nav button .ios-tab-icon use:not(.ios-tab-fill) { fill: none; stroke: currentColor; stroke-width: 1.65; stroke-linecap: round; stroke-linejoin: round; opacity: 1; }
+html.ios #nav button .ios-tab-icon .ios-tab-fill { fill: currentColor; stroke: none; opacity: 0; }
+html.ios #nav button.on .ios-tab-icon use:not(.ios-tab-fill) { opacity: 0; }
+html.ios #nav button.on .ios-tab-icon .ios-tab-fill { opacity: 1; }
+html.ios #nav button.on .ios-tab-icon { fill-opacity: 1; }   /* tokens.css tints the desktop's active icon at .18; the iOS filled glyph is solid */
+@media (prefers-reduced-motion: reduce) { html.ios #nav button .ios-tab-icon use { transition-duration: 0s; } }
+html.ios.reduce-motion #nav button .ios-tab-icon use, html.ios.shot #nav button .ios-tab-icon use { transition: none; }
+html.ios #nav button { min-height: 44px; }
+@media (max-width: 699px) and (orientation: portrait), (max-width: 699px) and (min-height: 601px) {
+  html.ios #nav button { justify-content: center; padding: 4px 2px; }
+  html.ios #nav { border-top: .5px solid var(--line); }
+}
+@media (min-width: 700px), (max-height: 600px) and (orientation: landscape) {
+  html.ios #nav { background: var(--list); border-right: .5px solid var(--line); }
+}
+
+/* Songs uses one title row, a search field, then the two sets of filters. */
+html.ios body[data-screen="search"] #topbar {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; row-gap: var(--s2);
+  padding-bottom: var(--s2);
+}
+html.ios body[data-screen="search"] .top-left { grid-column: 1; grid-row: 1; }
+html.ios body[data-screen="search"] .top-actions { grid-column: 2; grid-row: 1; }
+html.ios body[data-screen="search"] .top-search {
+  grid-column: 1 / -1; grid-row: 2; position: static; transform: none; width: 100%;
+}
+html.ios body[data-screen="search"] .search-wrap { background: var(--surface-2); border-radius: var(--r-sm); }
+html.ios body[data-screen="search"] #screen-search.screen { padding-top: var(--s2); }
+html.ios body[data-screen="search"] #openImport:not(.hidden) {
+  display: grid; place-items: center; width: 44px; height: 44px; min-height: 44px; flex: none;
+  background: var(--accent-soft); color: var(--accent); border-radius: 50%; padding: 0; margin: 0; box-shadow: none;
+}
+html.ios body:not([data-screen="search"]) #openImport { display: none; }
+html.ios #openImport :is(.lib-add-txt, .lib-add-chev) { display: none; }
+html.ios #openImport .lib-add-ico { background: none; color: inherit; }
+html.ios #searchChips {
+  display: flex; flex-direction: column; gap: var(--s2); padding: 0; margin: 0;
+  overflow: visible; -webkit-mask-image: none; mask-image: none;
+}
+html.ios #searchChips .song-segments {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; padding: 3px;
+  border-radius: var(--r-sm); background: var(--surface);
+}
+html.ios #searchChips .song-segments button {
+  height: auto; min-height: 44px; padding: 4px; justify-content: center;
+  border-radius: var(--r-xs); font-size: var(--fs-sub); background: transparent;
+  color: var(--muted); box-shadow: none; white-space: normal; overflow-wrap: anywhere;
+}
+html.ios #searchChips .song-segments button.on { background: var(--surface-3); color: var(--text); font-weight: 700; }
+html.ios #searchChips .song-shortcuts { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; }
+html.ios #searchChips .song-shortcuts button:not(.hidden) { min-height: 44px; min-width: 44px; font-size: var(--fs-caption); }
+html.ios #searchChips #openFilters:not(.hidden) { display: inline-flex; width: auto; padding: 0 var(--s3); }
+html.ios #openFilters span:not(.lib-badge) { position: static; width: auto; height: auto; clip-path: none; }
+html.ios #libBrowse:not(.hidden) {
+  display: flex; gap: var(--s2); overflow-x: auto; scrollbar-width: none; padding: 4px;
+}
+html.ios #libBrowse :is(.lb-sect, .lb-row) { display: contents; }
+html.ios #libBrowse .kl-caption { display: none; }
+html.ios #libBrowse button { flex: none; min-height: 44px; }
+html.ios .lib-meta :is(#sortBtn, .lib-view button) { min-width: 44px; min-height: 44px; }
+@media (max-width: 699px) and (orientation: portrait), (max-width: 699px) and (min-height: 601px) {
+  html.ios body.scrolled[data-screen="search"] .titles {
+    position: absolute; inset: 0 max(104px, 27%) auto; min-height: 44px; display: grid; place-items: center;
+    padding: 0; pointer-events: none;
+  }
+}
+
+/* Settings values, dividers, and footers follow the inset groups. */
+html.ios #screen-settings .kl-group { box-shadow: none; }
+html.ios #screen-settings .kl-group > :is(.setting, .setting-row, .kl-row) {
+  position: relative; min-height: 52px; height: auto; gap: var(--s2); border: 0; box-shadow: none;
+}
+html.ios #screen-settings .kl-group > :not(.hidden, .s-off, [hidden], [aria-hidden="true"]) ~
+  :is(.setting, .setting-row, .kl-row):not(.hidden, .s-off, [hidden], [aria-hidden="true"])::before {
+  content: ""; position: absolute; inset: 0 var(--s4) auto; height: .5px; background: var(--line); pointer-events: none;
+}
+html.ios #screen-settings .settings-card > p.cam-help {
+  color: var(--muted); font-size: var(--fs-caption); margin: var(--s1) var(--s4) var(--s4);
+}
+html.ios #screen-settings .setting select {
+  appearance: none; color: var(--muted); text-align: right; text-align-last: right;
+  min-height: 44px; padding: 4px 22px 4px 4px; border-radius: var(--r-xs); box-shadow: none;
+  background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 16'%3E%3Cpath d='m3 6 3-3 3 3m-6 4 3 3 3-3' fill='none' stroke='%23b8b8bf' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") right 3px center / 12px 16px no-repeat;
+}
+html.ios #screen-settings input[type="range"] {
+  appearance: none; min-height: 44px; max-width: 100%; background: none; margin: 0;
+}
+html.ios #screen-settings input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px; background: var(--control-outline); border-radius: var(--r-pill);
+}
+html.ios #screen-settings input[type="range"]::-webkit-slider-thumb {
+  appearance: none; width: 26px; height: 26px; margin-top: -11px;
+  border: 0; border-radius: 50%; background: var(--text);
+}
+html.ios #screen-settings :is(.reminder-controls, .range-wrap) { max-width: 100%; }
+html.ios #reminderTime { min-height: 44px; color: var(--text); background: var(--surface-2); }
+html.ios.ts-large #screen-settings .setting { align-items: flex-start; }
+html.ios.ts-large #screen-settings .setting select { max-width: 100%; }
+html.ios #screen-settings :is(.setting-row, .setting-text, .setting) { overflow-wrap: anywhere; }
+
+/* Touch drag starts at the header. The body of a sheet can still scroll. */
+@media (max-width: 699px) {
+  html.ios dialog[open]:not(.confirm-dialog) > :is(.kl-dlg-head, .diagnostics-heading, .ds-head, header, h2),
+  html.ios #importSheet .kl-dlg-head,
+  html.ios :is(.fs-head, .hud-sheet-head, .guided-head, .cr-sheet-t) {
+    touch-action: none; -webkit-user-select: none; user-select: none;
+  }
+  html.ios body.filters-open #filterBar:not(.hidden),
+  html.ios body[data-screen="play"].hud-more .hud-actions.play-only,
+  html.ios .guided-panel, html.ios #importSheet .sheet { animation-fill-mode: backwards; }
+  html.ios .sheet-dragging { transition: none !important; }
+}
+
+/* Home: the greeting and its actions share row one, the subtitle spans row two. */
+html.ios #screen-home:not(.hidden) :is(.hero, .home-today) { animation: none; }
+html.ios #screen-home .home-head {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto;
+  gap: var(--s2); padding: 0;
+}
+html.ios #screen-home .home-greet { display: contents; }
+html.ios #screen-home .greeting { grid-area: 1 / 1; overflow-wrap: anywhere; }
+html.ios #screen-home .home-acts { grid-area: 1 / 2; position: static; }
+html.ios #screen-home .home-head .greeting-sub { grid-area: 2 / 1 / 3 / -1; margin: 0; max-width: 60ch; }
+html.ios #screen-home .hero-actions { align-items: stretch; }
+@media (max-width: 699px) and (orientation: portrait), (max-width: 699px) and (min-height: 601px) {
+  html.ios #screen-home .home-head { grid-template-columns: minmax(0, 1fr) auto 44px; }
+}
+
+/* Course subpages and exercises use the navigation bar's existing Back action. */
+html.ios body[data-screen="course"]:has(#screen-course[data-view]:not([data-view="map"])) #topbar,
+html.ios body[data-screen="exercise"] #topbar { align-items: center; }
+html.ios body[data-screen="course"]:has(#screen-course:is([data-view="lesson"], [data-view="exam"], [data-view="theory"])) #topbar .titles,
+html.ios body[data-screen="exercise"] #topbar .titles,
+html.ios #screen-course:is([data-view="lesson"], [data-view="exam"], [data-view="theory"]) .cr-back,
+html.ios #screen-exercise .cr-back { display: none; }
+html.ios body[data-screen="course"]:has(#screen-course:is([data-view="lesson"], [data-view="exam"], [data-view="theory"])) #back,
+html.ios body[data-screen="exercise"] #back {
+  display: inline-flex; gap: var(--s1); align-items: center; justify-content: center;
+  width: auto; min-width: 44px; min-height: 44px; padding: 0 var(--s3) 0 var(--s2);
+  border-radius: var(--r-pill); background: var(--accent-soft); color: var(--accent);
+  font-size: var(--fs-sub); font-weight: 600;
+}
+html.ios #back svg { flex: none; }
+html.ios body[data-screen="course"]:has(#screen-course:is([data-view="lesson"], [data-view="exam"], [data-view="theory"])) #back .ios-course-back,
+html.ios body[data-screen="exercise"] #back .ios-exercise-back { display: inline; }
+html.ios body[data-screen="course"] #screen-course:is([data-view="lesson"], [data-view="exam"], [data-view="theory"]),
+html.ios body[data-screen="exercise"] #screen-exercise { padding-top: var(--s2) !important; }
+
+/* Player in Illuminated Studio (TV look): ebony stage, charcoal glass HUD, console bottom bar, ivory Play pill, amber active Wait. */
+html.ios body[data-screen="play"] {
+  background: var(--stage-bottom);
+  --muted: rgba(242, 239, 232, .72);
+  --faint: rgba(242, 239, 232, .72);
+  --hud-pill: rgba(20, 22, 29, .86);
+  --hud-pill-blur: blur(16px);
+}
+html.ios body[data-screen="play"] .hand-legend.is-quiet { visibility: hidden; }
+html.ios body[data-screen="play"] .titles { flex: 0 1 auto; }
+html.ios body[data-screen="play"] #topbar {
+  background: linear-gradient(180deg, rgba(20, 22, 29, .86), rgba(13, 15, 21, .55) 58%, transparent);
+}
+html.ios body[data-screen="play"] .sheet-strip::before {
+  background: var(--hud-pill);
+  border: 1px solid var(--chrome-line);
+}
+html.ios body[data-screen="play"] .toast {
+  background: var(--hud-pill);
+  -webkit-backdrop-filter: var(--hud-pill-blur); backdrop-filter: var(--hud-pill-blur);
+  box-shadow: inset 0 0 0 1px rgba(242, 239, 232, .12), 0 10px 26px rgba(0, 0, 0, .48);
+}
+html.ios body[data-screen="play"] :is(#back, #hudMore),
+html.ios body[data-screen="play"] :is(.hudbtn:not(.on), .speed-track:not(.open), .score-float, .hand-legend, .hand-intro, .arm-pill) {
+  background-color: var(--hud-pill);
+  box-shadow: inset 0 0 0 1px rgba(242, 239, 232, .12);
+  -webkit-backdrop-filter: var(--hud-pill-blur); backdrop-filter: var(--hud-pill-blur);
+}
+html.ios body[data-screen="play"] .hand-legend {
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+}
+html.ios body[data-screen="play"]:not(.tv-on) .hand-intro {
+  top: calc(var(--sat, 0px) + 100px);
+}
+@media (min-height: 521px) {
+  html.ios body[data-screen="play"]:has(.hand-intro.show) .toast {
+    top: calc(var(--sat, 0px) + 150px);
+  }
+}
+@media (max-height: 520px) {
+  html.ios body[data-screen="play"]:not(.tv-on) .hand-intro {
+    top: calc(var(--sat, 0px) + 94px);
+  }
+}
+html.ios body[data-screen="play"] :is(.hl-left, .hi-left) i { background: var(--left); }
+html.ios body[data-screen="play"] :is(.hl-right, .hi-right) i { background: var(--right); }
+html.ios body[data-screen="play"] .arm-pill {
+  box-shadow: inset 0 0 0 1px rgba(255, 138, 61, .5), 0 6px 20px rgba(0, 0, 0, .4);
+}
+html.ios.reduce-motion body[data-screen="play"] .arm-pill,
+html.ios.shot body[data-screen="play"] .arm-pill { animation: none; }
+html.ios body[data-screen="play"] .speed-track.compact.open {
+  background: var(--chassis);
+  box-shadow: inset 0 0 0 1px rgba(242, 239, 232, .14), var(--e3);
+}
+html.ios body[data-screen="play"] .speed-track button[data-speed="wait"].on,
+html.ios body[data-screen="play"] .speed-track.compact.open button[data-speed="wait"].on {
+  background: var(--right);
+  color: var(--ink);
+  box-shadow: none;
+  font-weight: 650;
+}
+html.ios body[data-screen="play"] #speedTrack.compact:not(.open):has(button[data-speed="wait"].on) {
+  background-color: var(--right);
+  box-shadow: none;
+}
+html.ios body[data-screen="play"] #speedTrack.compact:not(.open) button[data-speed="wait"].on {
+  background: transparent;
+  color: var(--ink);
+}
+html.ios body[data-screen="play"] #speedTrack.compact:not(.open) button[data-speed="wait"].on::after {
+  border-color: var(--ink);
+}
+html.ios body[data-screen="play"] .fp-bar label { color: var(--muted); }
+html.ios body[data-screen="play"] .fp-bar select {
+  background-color: var(--hud-pill);
+  color: var(--ivory);
+  box-shadow: inset 0 0 0 1px rgba(242, 239, 232, .14);
+}
+html.ios body[data-screen="play"] .player-bottom,
+html.ios body.tv-on[data-screen="play"] .player-bottom,
+html.ios body.tv-on[data-screen="play"].hud-idle .player-bottom {
+  background: linear-gradient(180deg, #24252b, #16171c);
+  border-top: 0;
+  box-shadow: inset 0 1px 0 rgba(242, 239, 232, .18);
+}
+html.ios body.stage-follows[data-screen="play"]:not(.tv-on).hud-idle .player-bottom {
+  background: transparent;
+  box-shadow: none;
+}
+html.ios body[data-screen="play"]:not(.tv-on) .play-btn {
+  width: 58px;
+  height: 44px;
+  border-radius: var(--r-pill);
+  background: var(--ivory);
+  color: var(--ink);
+  box-shadow: inset 0 1px 0 #fff, 0 2px 8px rgba(0, 0, 0, .42);
+}
+html.ios body[data-screen="play"]:not(.tv-on) .play-btn:active {
+  background: var(--accent-deep);
+  transform: scale(.96);
+}
+html.ios body[data-screen="play"]:not(.tv-on) :is(#editSong, .guided-btn) {
+  height: 44px;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: var(--r-pill);
+  background: #14161d;
+  color: var(--ivory);
+  font-size: var(--fs-sub);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px rgba(242, 239, 232, .14);
+}
+html.ios body[data-screen="play"]:not(.tv-on) :is(#editSong, .guided-btn):hover { background: #1e212b; }
+html.ios body[data-screen="play"]:not(.tv-on) :is(#editSong, .guided-btn):active { background: #262a36; }
+html.ios body.tv-on[data-screen="play"] #btnPlay {
+  box-shadow: inset 0 1px 0 #fff, 0 2px 10px rgba(0, 0, 0, .45);
+}
+html.ios body.tv-on[data-screen="play"] .tv-extra {
+  background: #14161d;
+  color: var(--ivory);
+  box-shadow: inset 0 0 0 1px rgba(242, 239, 232, .14);
+}
+html.ios body.tv-on[data-screen="play"] .tv-extra:active { background: #262a36; }
+html.ios body.tv-on[data-screen="play"] .tv-extra[aria-pressed="true"] {
+  background: var(--ivory);
+  color: var(--ink);
+  box-shadow: none;
+}
+html.ios body.tv-on[data-screen="play"] #tvWait[aria-pressed="true"] {
+  background: var(--right);
+  color: var(--ink);
+  box-shadow: none;
+}
+html.ios.fx-lite body[data-screen="play"] { --hud-pill: #14161d; --hud-pill-blur: none; }
+@media (prefers-reduced-transparency: reduce) {
+  html.ios body[data-screen="play"] { --hud-pill: #14161d; --hud-pill-blur: none; }
+}
+html.ios body.tv-on[data-screen="play"]:not(.hud-more) :is(#btnHands, #btnView, #btnLoop) { display: none; }
+html.ios body.tv-on[data-screen="play"] #tvChip { flex: none; }
+html.ios body.tv-on[data-screen="play"] #topbar { flex-wrap: nowrap; }
+
+/* Keep the keyboard at the bottom and the exercise actions directly above it. */
+html.ios #screen-exercise { padding-bottom: max(var(--s4), var(--sab)); }
+html.ios #screen-exercise :is(.ex-page, .ex-card, .ex-stage) {
+  display: flex; flex-direction: column; min-height: 0;
+}
+html.ios #screen-exercise .ex-page { min-height: 100%; }
+html.ios #screen-exercise :is(.ex-card, .ex-stage) { flex: 1 0 auto; }
+html.ios #screen-exercise .ex-prog {
+  appearance: none; flex: none; width: 100%; height: 5px; border: 0;
+  border-radius: var(--r-pill); overflow: hidden; background: var(--surface-3);
+}
+html.ios #screen-exercise .ex-prog::-webkit-progress-bar { background: var(--surface-3); }
+html.ios #screen-exercise .ex-prog::-webkit-progress-value { background: var(--accent); border-radius: var(--r-pill); }
+html.ios #screen-exercise .ex-card .ex-acts:not(:empty) {
+  position: static; margin: var(--s3) 0; padding: 0; background: none; box-shadow: none;
+}
+html.ios #screen-exercise .ex-stage:has(> .ex-pad) > .ex-acts:not(:empty),
+html.ios #screen-exercise .ex-stage:has(> .ex-acts:empty) > .ex-pad { margin-top: auto; }
+html.ios #screen-exercise .ex-stage:has(.ex-result) > .ex-acts:not(:empty) {
+  position: sticky; bottom: 0; z-index: 5; margin-top: auto; padding-block: var(--s3) max(var(--s3), var(--sab));
+  background: var(--surface);
+}
+html.ios #screen-exercise .ex-hint { margin-bottom: var(--s4); }
+html.ios #screen-exercise .ex-pad { flex: none; }
+html.ios #screen-exercise .ex-chip { height: auto; min-height: 32px; }
+html.ios #screen-exercise .er-prompt { font-size: var(--fs-title); }
+
+/* Big text: titles and controls grow with the text size instead of clipping or breaking inside words. */
+html.ios #screen-home .greeting { font-size: calc(var(--fs-display-0) * min(var(--ts), 1.3)); overflow-wrap: break-word; }
+html.ios .cr-title { font-size: calc(30px * min(var(--ts), 1.4)); }
+html.ios .btn-l { height: auto; min-height: 52px; padding-block: var(--s2); }
+html.ios.ts-large :is(.primary, .ghost, .mini-btn):not(#importSheet *) { height: auto; }
+html.ios.ts-large .lib-meta { flex-wrap: wrap; }
+html.ios #screen-settings .setting select { font-size: var(--fs-body); }
+html.ios #screen-exercise .ex-title { padding: 0; }
+
+/* Reduced motion: the welcome notes sit still where they would fall, instead of vanishing with their opacity:0 start. */
+html.ios.reduce-motion #onboarding .ob-rain i { animation: none !important; opacity: .9; top: 20%; }
+html.ios.reduce-motion #onboarding .ob-rain i:nth-child(2n) { top: 42%; }
+html.ios.reduce-motion #onboarding .ob-rain i:nth-child(3n) { top: 62%; }
+@media (prefers-reduced-motion: reduce) {
+  html.ios #onboarding .ob-rain i { animation: none !important; opacity: .9; top: 20%; }
+  html.ios #onboarding .ob-rain i:nth-child(2n) { top: 42%; }
+  html.ios #onboarding .ob-rain i:nth-child(3n) { top: 62%; }
+}
+
+
+/* ======================================================================================================================
+   Illuminated Studio (docs/DESIGN-ILLUMINATED-STUDIO.md): surfaces, type, Home, the song tile, lit keys and motion.
+   The light is the music: cobalt (left hand) and amber (right hand) appear only as light. Everything else is ebony and ivory.
+   ====================================================================================================================== */
+html.ios { --d-slow: 340ms; --ease-sheet: cubic-bezier(.32, .72, 0, 1); }
+html.ios :focus-visible { outline-color: var(--left) !important; }   /* a11y.css sets the accent (ivory here) with !important */
+html.ios :is(.primary, .mini-btn.is-primary):focus-visible { outline-offset: 2px; }
+
+/* page: Lite and reduced transparency drop the grain; the sheen and the gradient stay */
+html.ios.fx-lite body::before {
+  background:
+    radial-gradient(120% 38% at 50% -10%, rgba(242, 239, 232, .055), rgba(242, 239, 232, .015) 45%, transparent 72%),
+    linear-gradient(180deg, #101219 0%, #0a0b0f 48%, #07080b 100%);
+}
+@media (prefers-reduced-transparency: reduce) {
+  html.ios body::before {
+    background:
+      radial-gradient(120% 38% at 50% -10%, rgba(242, 239, 232, .055), rgba(242, 239, 232, .015) 45%, transparent 72%),
+      linear-gradient(180deg, #101219 0%, #0a0b0f 48%, #07080b 100%);
+  }
+}
+
+/* Home's light field: two soft pools, coloured from the lesson or song on the hero (app.js ambientCrossfade). Two static layers,
+   #ambient .a and .b; a change of colours crossfades them by opacity once, 500ms. No drift, no @property, nothing loops. Home only
+   (Course has none; Results has its own, below). */
+html.ios #ambient { display: none; position: fixed; inset: -24px -24px auto -24px; height: 62vh; z-index: -1; pointer-events: none; }
+html.ios body[data-screen="home"] #ambient { display: block; }
+html.ios #ambient i {
+  position: absolute; inset: 0; opacity: 0; transition: opacity 500ms cubic-bezier(.22, 1, .36, 1);
+  background:
+    radial-gradient(56% 64% at 16% 6%, color-mix(in srgb, var(--c1, #86b6ff) 22%, transparent), transparent 70%),
+    radial-gradient(52% 60% at 90% 12%, color-mix(in srgb, var(--c2, #ff8a3d) 22%, transparent), transparent 70%);
+}
+html.ios body[data-amb-front="a"] #ambient .a, html.ios body[data-amb-front="b"] #ambient .b { opacity: 1; }
+html.ios #ambient.still i { transition: none; }
+html.ios.fx-lite #ambient i, html.ios.shot #ambient i { transition: none; }
+@media (prefers-reduced-motion: reduce) { html.ios #ambient i { transition-duration: 100ms; } }
+@media (prefers-reduced-transparency: reduce) { html.ios #ambient { display: none !important; } }
+
+/* press feedback: 90ms, scale .975, on touch-down */
+html.ios :is(.primary, .ghost, .mini-btn, .chip-btn, .iconbtn, .hudbtn, .link, .chips button, .seg button, .song-segments button,
+  .pr-chip, button.today-tile, .course-card, .game-card, #nav button, .lesson-tile, .cr-level .cr-card, .kb-opt, .cr-opt) {
+  transition: transform var(--press), background-color 160ms var(--ease-out), color 160ms var(--ease-out), opacity 160ms var(--ease-out);
+}
+html.ios :is(.primary, .ghost, .mini-btn, .chip-btn, .iconbtn, .hudbtn, .chips button, .seg button, .song-segments button,
+  .pr-chip, button.today-tile, .course-card, .game-card, #nav button, .lesson-tile, .kb-opt, .cr-opt):active:not(:disabled) { transform: scale(.975); }
+html.ios .lib-tile { transition: transform var(--press); }
+html.ios .lib-tile:active { transform: scale(.975); }
+
+/* buttons: the primary is an ivory key (a real key is a rounded rectangle, not a pill) */
+html.ios :is(.primary, .ghost, .mini-btn.is-primary) { border-radius: 14px; }
+html.ios :is(.primary, .mini-btn.is-primary) {
+  background: var(--ivory); background-image: none; color: var(--ink);
+  box-shadow: inset 0 1px 0 #fff, 0 2px 8px rgba(0, 0, 0, .45);
+}
+html.ios :is(.primary, .mini-btn.is-primary):active:not(:disabled) { background: var(--accent-deep); }
+html.ios .primary:disabled { background: var(--surface-3); color: var(--faint); box-shadow: none; }
+html.ios .ghost:not(:is(.danger, :disabled)) { background: rgba(242, 239, 232, .09); color: var(--ivory); }
+html.ios .ghost:not(:is(.danger, :disabled)):active { background: rgba(242, 239, 232, .15); }
+html.ios .link { color: var(--ivory); }
+html.ios .ghost.danger, html.ios .mini-btn.danger { color: var(--bad); box-shadow: inset 0 0 0 1px rgba(217, 79, 87, .45); }
+html.ios :is(.chips button.on, .settings-jump button.on) { color: var(--ivory); box-shadow: none; }
+html.ios #nav button.on { background: none; box-shadow: none; color: var(--accent); }   /* P5: the active tab is the filled icon plus the tint, no border box */
+html.ios .nav-ind { transition: transform 220ms var(--ease-sheet), width 220ms var(--ease-sheet), opacity 120ms linear; }
+/* a segmented control has one thumb (ios-motion.js) that slides under the selected segment, 220ms on the same curve */
+html.ios .has-thumb { position: relative; }
+html.ios .has-thumb > .seg-thumb {
+  position: absolute; left: 0; top: 0; z-index: 0; pointer-events: none; width: var(--w, 0px); height: var(--h, 0px); border-radius: var(--r-xs);
+  background: var(--surface-3); box-shadow: inset 0 1px 0 rgba(242, 239, 232, .08); opacity: 0;
+  transform: translate(var(--x, 0px), var(--y, 0px));
+  transition: transform 220ms var(--ease-sheet), opacity 120ms linear;   /* translateX only: the segments are equal width, so the width never animates */
+}
+html.ios :is(.seg, .kl-seg).has-thumb { display: inline-grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+html.ios .has-thumb > .seg-thumb.jump { transition: none; }
+html.ios .has-thumb > button { position: relative; z-index: 1; }
+html.ios .has-thumb > button.on, html.ios .has-thumb > button[aria-selected="true"],
+html.ios #searchChips .song-segments.has-thumb > button.on { background: transparent; box-shadow: none; }
+@media (prefers-reduced-motion: reduce) { html.ios .has-thumb > .seg-thumb, html.ios .nav-ind { transition: none; } }
+html.ios.reduce-motion .has-thumb > .seg-thumb, html.ios.reduce-motion .nav-ind, html.ios.shot .has-thumb > .seg-thumb, html.ios.shot .nav-ind { transition: none; }
+html.ios .heart { --heart: var(--ivory); }
+
+/* type: New York only for song and lesson titles and the one big title of a screen; the rest is SF Pro in sentence case */
+html.ios :is(#title, #screen-home .hero-title, .tile-name, .cr-title, .cr-hero-title, .cc-title, .lesson-title, .lesson-tile .l-title, #onboarding .ob-step-title, .cr-lt, .cr-place-t, #homeExperienceTitle) {
+  font-family: var(--title-serif); font-weight: 600; letter-spacing: -.012em;
+}
+html.ios .tile-sub { font-family: var(--font); font-style: normal; }
+html.ios :is(.kicker, .cr-hero .kicker, .cr-order-l, .cr-lk, .ds-sub, .cr-tip b, .cr-opt-tag, .rx-cell.rest b, .sc-grid h3, .about-list dt,
+  .guided .guided-kicker, .guided .guided-pref, .guided .guided-sub, .hg-kicker, .hg-finger small, .danger-zone p, .results-kicker,
+  #screen-settings .settings-card > h3, #screen-settings .settings-group > h3, .kl-caption, .kl-group > h3, .settings-group > h3,
+  .pr-sec, .course-card .kicker, .long-tag, .cover .c-level) { text-transform: none; letter-spacing: 0; }
+html.ios :is(.cr-hero .kicker, .guided .guided-kicker, .sc-grid h3, .about-list dt) { color: var(--muted); }
+
+/* surfaces: chassis cards with a hairline and a catch-light on the top edge */
+html.ios :is(#screen-home .today-tile, #screen-home .pr-chip, #screen-home .course-card, #screen-home .home-experience, .support-reminder) {
+  background: var(--surface); border: 0; box-shadow: var(--card-edge);
+}
+html.ios #screen-home .course-card.fresh { box-shadow: var(--card-edge); }
+html.ios #screen-home .pr-glyph { --tint: var(--accent-rgb); background: var(--raised); color: var(--ivory); }
+html.ios #screen-home .today-tile > svg, html.ios #screen-home .tt-min > svg { color: var(--muted); }
+html.ios #screen-home .tt-streak.lit > svg { color: var(--right); }
+html.ios #screen-home .goal-ring .gr-fill { stroke: var(--ivory); filter: none; }
+html.ios #screen-home .goal-ring.done { box-shadow: var(--card-edge); }
+html.ios #screen-home .goal-ring.done small { color: var(--ok); }
+html.ios #screen-home .course-card .primary { background: rgba(242, 239, 232, .1); color: var(--ivory); box-shadow: none; }
+/* first run: "How much piano have you played?" is a calm inline choice under Up next, never a card above it: a serif question, three quiet rows
+   on hairlines, and Not now. Up next and its rail stay the hero. */
+html.ios #screen-home .home-experience { margin: var(--s7) 0 0; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; }
+html.ios #homeExperienceTitle { margin: 0 0 var(--s3); font-size: var(--fs-title); line-height: 1.2; text-wrap: balance; }
+html.ios #screen-home .home-experience-choices { display: block; box-shadow: inset 0 1px 0 var(--line); }
+html.ios #screen-home .home-experience-choices button {
+  display: grid; grid-template-columns: minmax(0, 1fr) 16px; grid-template-rows: auto auto; column-gap: var(--s3); row-gap: 2px; align-items: center;
+  width: 100%; min-height: 60px; padding: var(--s3) var(--s1) var(--s3) 0; border-radius: 0; background: none; color: var(--text);
+  box-shadow: inset 0 -1px 0 var(--line); text-align: start; font-size: var(--fs-body); font-weight: 400;
+}
+html.ios #screen-home .home-experience-choices button:is(:hover, :active) { background: var(--hover); }
+html.ios #screen-home .home-experience-choices b { grid-column: 1; font-weight: 600; }
+html.ios #screen-home .home-experience-choices small { grid-column: 1; color: var(--muted); font-size: var(--fs-sub); line-height: 1.35; }
+html.ios #screen-home .home-experience-choices .hx-ch { display: block; grid-column: 2; grid-row: 1 / span 2; width: 16px; height: 16px; color: var(--faint); }
+html.ios #screen-home .home-experience > .link { min-height: 44px; margin: var(--s1) 0 0; padding: 0; color: var(--muted); font-weight: 500; font-size: var(--fs-sub); }
+
+/* Home: no greeting. The hero sits straight on the light field: where you are, what to do next, one ivory key to press. */
+html.ios #screen-home .home-greet {
+  display: block; position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
+html.ios body.first-run #screen-home .hero-actions .ghost, html.ios #screen-home .hero-actions .ghost.hidden { display: none; }
+html.ios #screen-home .hero {
+  display: block; min-height: 0; overflow: visible; border-radius: 0; background: none; box-shadow: none;
+  -webkit-backdrop-filter: none; backdrop-filter: none;   /* the glass blur drew a hard-edged box over the light field once the hero sits at the top */
+}
+html.ios #screen-home .hero-art { display: none; }
+html.ios #screen-home .hero-body { padding: var(--s3) 0 0; max-width: 34rem; }
+html.ios #screen-home .hero .kicker { color: var(--muted); font-size: var(--fs-sub); font-weight: 500; font-variant-numeric: tabular-nums; }
+html.ios #screen-home .hero-title {
+  font-size: calc(34px * min(var(--ts), 1.3)); line-height: 1.08; margin: var(--s2) 0 var(--s3);
+  -webkit-line-clamp: 3;
+}
+html.ios #screen-home .hero-sub { font-family: var(--font); font-size: var(--fs-body); line-height: 1.4; color: var(--muted); }
+html.ios #screen-home .hero-meta { display: block; margin: var(--s3) 0 0; font-size: var(--fs-sub); color: var(--muted); }   /* muted, not faint: it sits over the light field and the plumes */
+html.ios #screen-home .hero-meta::before { content: none; }
+html.ios #screen-home .hero-meta .lib-stars { margin: 0; gap: 3px; }
+html.ios #screen-home .hero-meta .lib-stars svg { width: 16px; height: 16px; }
+html.ios #screen-home .hero-actions { margin-top: var(--s5); gap: var(--s3); }
+html.ios #screen-home .hero-actions .primary { height: auto; min-height: 52px; }
+html.ios #screen-home .hero-actions .primary > svg { display: none; }
+html.ios #screen-home .hero-actions .ghost { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(242, 239, 232, .09); }
+html.ios body.no-practice #screen-home .home-today { display: none; }
+html.ios #screen-home .home-today { margin-top: var(--home-gap); }
+html.ios #screen-home .rail-head h2, html.ios #screen-home .home-today-title { font-weight: 600; letter-spacing: -.01em; }
+html.ios #screen-home .rail-section { margin-top: var(--s7); }
+
+/* the Home key-light rail (renderer/home-light.js + key-light-engine.js): one canvas fills the hero, light rises from the keyboard base
+   in its bottom strip, behind the title and the ivory button. The strip is 64px on a phone, 56px in landscape, 84px on an iPad. */
+html.ios #screen-home .hero { --rail-h: 64px; position: relative; isolation: isolate; padding-bottom: calc(var(--rail-h) + var(--s6)); }
+@media (min-width: 700px) { html.ios #screen-home .hero { --rail-h: 84px; } }
+@media (max-height: 600px) and (orientation: landscape) { html.ios #screen-home .hero { --rail-h: 56px; } }
+html.ios #screen-home .hero::after { display: none; }
+html.ios #screen-home .hero-body { position: relative; z-index: 2; }
+/* the canvas is masked from the bottom up: full strength over the keys, a third where the title sits, so a plume never costs the
+   title its 4.5:1 (the engine also caps plume alpha at .6; scripts/contrast-check.js checks the worst pixels) */
+html.ios .key-light-canvas {
+  position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 0; pointer-events: none;
+  -webkit-mask-image: linear-gradient(to top, #000 0, #000 30%, rgba(0, 0, 0, .2) 62%, transparent 92%);
+  mask-image: linear-gradient(to top, #000 0, #000 30%, rgba(0, 0, 0, .2) 62%, transparent 92%);
+}
+html.ios .key-light-hit {
+  position: absolute; left: 0; right: 0; bottom: 0; height: calc(var(--rail-h) + 12px); z-index: 3;
+  touch-action: pan-y; -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none;
+}
+
+/* Phone in landscape: the keyboard button (icon only, as in portrait) and the trophy share one row at the top right, the hero is two
+   columns (words left, the ivory key right) and the rail runs across the whole content width, 56px tall. */
+@media (max-height: 600px) and (orientation: landscape) {
+  html.ios body[data-screen="home"] #app { position: relative; }
+  html.ios body[data-screen="home"] #topbar {
+    position: absolute; top: var(--s2); right: var(--sar, 0px); left: auto; width: auto; min-height: 44px; height: 44px; padding: 0 var(--gutter) 0 0;
+    background: none !important; border-bottom-color: transparent !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+  }
+  html.ios body[data-screen="home"] #topbar .top-actions { margin: 0; height: 44px; align-items: center; }
+  html.ios body[data-screen="home"] #kbStatus { width: 44px; height: 44px; min-height: 44px; padding: 0; flex: none; justify-content: center; background: var(--surface-2); border-radius: 50%; position: relative; }
+  html.ios body[data-screen="home"] #kbStatusText { position: absolute; width: 1px; height: 1px; min-width: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  html.ios body[data-screen="home"] #kbStatus .kb-glyph { display: block; width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  html.ios body[data-screen="home"] #kbStatus .dot { position: absolute; right: 6px; bottom: 8px; width: 9px; height: 9px; border: 2px solid var(--bg); background: var(--faint); box-shadow: none; }
+  html.ios body[data-screen="home"] #kbStatus.on .dot { background: var(--ok); }
+  html.ios body[data-screen="home"] #screen-home { padding-top: var(--s2) !important; }
+  html.ios #screen-home .home-head { position: relative; min-height: 44px; margin: 0 0 var(--s2); display: block; }
+  html.ios #screen-home .home-acts { position: absolute; top: 0; right: calc(44px + var(--s2)); }
+  html.ios #screen-home .hero-body { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--s6); align-items: end; max-width: none; padding-top: 0; }
+  html.ios #screen-home .hero-body > :is(.kicker, .hero-title, .hero-sub) { grid-column: 1; }
+  html.ios #screen-home .hero-body .hero-actions { grid-column: 2; grid-row: 1 / span 3; align-self: end; margin: 0; flex-direction: column; min-width: 190px; }
+  html.ios #screen-home .hero-title { font-size: calc(30px * min(var(--ts), 1.3)); margin: var(--s1) 0 var(--s2); }
+  html.ios #screen-home .hero { padding-bottom: calc(var(--rail-h) + var(--s4)); }
+}
+
+/* the one song tile (Home rails, Recent, the Songs grid): a square cover, heart top right, length bottom right, title, composer, three stars */
+html.ios .lib-tile::before { display: none; }
+html.ios .lib-tile { background: none; border: 0; box-shadow: none; padding: 0; overflow: visible; border-radius: var(--r-md); }
+html.ios .lib-tile:hover { background: none; }
+html.ios .lib-tile .cover { border-radius: 14px; box-shadow: inset 0 0 0 1px rgba(242, 239, 232, .1); }
+html.ios .lib-tile .tile-meta { padding: 0 2px; margin-top: var(--s2); }
+html.ios .lib-tile .tile-name { font-size: calc(var(--fs-body) * .94); line-height: 1.22; }
+html.ios .lib-tile .tile-sub { color: var(--muted); font-size: var(--fs-caption); }
+html.ios .lib-tile .cover > .lib-dots { display: none; }
+html.ios .lib-stars { margin-top: 6px; gap: 2px; }
+html.ios .lib-stars svg { width: 13px; height: 13px; }
+html.ios .lib-tile .heart.on svg { fill: var(--ivory); stroke: var(--ivory); }
+html.ios .is-list .lib-tile { padding: var(--s2) var(--s1) var(--s2) var(--s2); border-radius: var(--r-md); }
+html.ios #screen-home .rail { grid-auto-columns: 152px; }
+html.ios #screen-home .cover-tile { padding: 0; }
+html.ios .cover .c-stars { display: none; }
+
+/* P7 lesson and exercise keyboards: studio ivory (#E8E3D9) and bevelled ebony. A target key is lit by a glow of light at its front edge,
+   an overlay (.dk-glow, drawn right after its key) that fades by opacity over 260ms, instead of a flat orange or navy fill. Amber is the
+   target; emerald when a key is right, felt red when it is wrong. */
+html.ios .dk-w { fill: #E8E3D9; stroke: rgba(10, 11, 15, .34); }
+html.ios .dk-b { fill: url(#klEbony); stroke: #040508; }
+html.ios .dk-w.ex-key:is(:hover, .lit, .ok, .bad) { fill: #E8E3D9; }   /* the base never changes colour: the light is the overlay */
+html.ios .dk-b.ex-key:is(:hover, .lit, .ok, .bad) { fill: url(#klEbony); }
+html.ios .dk-bface { display: inline; fill: url(#klEbonyFace); pointer-events: none; }
+html.ios .dk-glow { display: inline; opacity: 0; pointer-events: none; transition: opacity 260ms cubic-bezier(.22, 1, .36, 1); transform-box: fill-box; }
+html.ios .dk-gw { fill: url(#klGlowW); }
+html.ios .dk-gb { fill: url(#klGlowB); }
+html.ios :is(.dk-w.hl, .dk-w.ex-key.lit, .dk-w.ex-key.down) + .dk-glow,
+html.ios :is(.dk-b.hl, .dk-b.ex-key.lit, .dk-b.ex-key.down) + .dk-bface + .dk-glow { opacity: 1; }
+html.ios .dk-w.ex-key.ok + .dk-glow { fill: url(#klGlowOkW); opacity: 1; }
+html.ios .dk-w.ex-key.bad + .dk-glow { fill: url(#klGlowBadW); opacity: 1; }
+html.ios .dk-b.ex-key.ok + .dk-bface + .dk-glow { fill: url(#klGlowOkW); opacity: 1; }
+html.ios .dk-b.ex-key.bad + .dk-bface + .dk-glow { fill: url(#klGlowBadW); opacity: 1; }
+html.ios .dk-name { fill: #4a4a52; }
+html.ios .dk-name.hl { fill: #2b1200; }
+html.ios .dk-name.bl { fill: #fff3e6; }
+html.ios .dk-fing { stroke: var(--left); }
+/* a key press is 45ms linear and moves 2px (the face and the glow move with it); the light it leaves decays over 260ms (opacity on a small rect, no blur) */
+html.ios .ex-key { transition: fill 260ms cubic-bezier(.22, 1, .36, 1), transform 45ms linear; transform-box: fill-box; }
+html.ios .dk-w.ex-key.down { fill: #d3cdc0; transition-duration: 0s, 45ms; }
+html.ios .dk-b.ex-key.down { transition-duration: 0s, 45ms; }
+html.ios .ex-key.down, html.ios .ex-key.down + .dk-glow, html.ios .dk-b.ex-key.down + .dk-bface, html.ios .dk-b.ex-key.down + .dk-bface + .dk-glow { transform: translateY(2px); }
+html.ios #onboarding .ob-keys i { transition: transform 45ms linear; }
+html.ios #onboarding .ob-keys i::before {
+  content: ""; position: absolute; left: -35%; right: -35%; bottom: 0; height: 130%; border-radius: 50% 50% 0 0 / 40% 40% 0 0; pointer-events: none;
+  background: radial-gradient(60% 70% at 50% 100%, var(--ob-left), transparent 72%); opacity: 0;
+  transition: opacity 260ms cubic-bezier(.22, 1, .36, 1);
+}
+html.ios #onboarding .ob-keys i.down { box-shadow: none; transform: translateY(2px); }
+html.ios #onboarding .ob-keys i.down::before { opacity: .55; transition-duration: 0s; }
+html.ios #onboarding .ob-keys i.down:nth-child(n+8)::before { background: radial-gradient(60% 70% at 50% 100%, var(--ob-right), transparent 72%); }
+html.ios #onboarding .ob-keys { box-shadow: inset 0 1px 0 var(--line); }
+html.ios #onboarding .ob-note-chip.hit { background: rgba(255, 138, 61, .16); box-shadow: inset 0 0 0 1.5px var(--right); }
+html.ios #onboarding .kb-glyph svg .lit { fill: var(--right); }
+
+/* progress, done and complete: ivory for progress, emerald for passed */
+html.ios .setting input[type="checkbox"]:checked { background: var(--switch-on); border-color: transparent; box-shadow: none; }
+html.ios :is(.progress-fill, .cr-bar i) { background: var(--ivory); box-shadow: none; }
+html.ios .cr-ring-fg, html.ios .goal-ring .gr-fill { filter: none; }
+html.ios .cr-ring-fg { stroke: var(--ivory); }
+html.ios .cr-ring.done .cr-ring-fg { stroke: var(--ok); }
+html.ios .lesson-tile .l-steps i.done { background: var(--ok); box-shadow: none; }
+html.ios .lesson-steps .step.done { background: rgba(var(--ok-rgb), .16); border-color: rgba(var(--ok-rgb), .5); }
+html.ios .cr-complete-mark { background: var(--ok); color: var(--ink); box-shadow: none; }
+html.ios .ex-slot.ok { background: rgba(var(--ok-rgb), .14); box-shadow: inset 0 0 0 1.5px rgba(var(--ok-rgb), .6); color: var(--ok); }
+html.ios .ex-slot.bad { background: rgba(217, 79, 87, .14); box-shadow: inset 0 0 0 1.5px rgba(217, 79, 87, .6); color: var(--alert-text); }
+html.ios #onboarding .ob-actions .primary { box-shadow: inset 0 1px 0 #fff, 0 2px 8px rgba(0, 0, 0, .45); }
+html.ios #onboarding .ob-steps li.done { background: rgba(242, 239, 232, .5); }
+
+/* motion: no staggered fade-ups, no stacked screen animations. A screen arrives through ios-motion.js (one Web Animation: drill in
+   24px to 0 in 280ms, back -16px to 0 in 220ms, tabs a 120ms fade, reduced motion a 100ms fade); sheets use the iOS curve. */
+html.ios .screen, html.ios #screen-home:not(.hidden), html.ios #screen-search:not(.hidden), html.ios #screen-play { animation: none; }
+html.ios #nav button.on svg, html.ios #nav button.on .ios-tab-icon { animation: none; }   /* the legacy mNavPop is off */
+html.ios :is(.rcard, .results-actions .primary, body[data-screen="play"] .player-bottom, .cr-fb) { animation-duration: 220ms; animation-delay: 0ms; }
+html.ios { --perfect: var(--ivory); }
+/* P5 the interactive back swipe (ios-motion.js): a 24px strip on the left edge, live only when the screen on show can go back (phones) */
+html.ios #swipeEdge { display: none; position: fixed; left: 0; top: var(--edge-top, 0); bottom: var(--edge-bottom, 0); width: 24px; z-index: 30; touch-action: none; -webkit-tap-highlight-color: transparent; }
+html.ios #swipeEdge.on { display: block; }
+html.ios.back-swiping #screen > .screen { transition: none !important; }
+html.ios.back-swiping #screen > .screen:not(.hidden) { background: var(--ebony); }   /* two opaque screens: the one leaving must not show the one below through it */
+/* P5 sheet depth: the ACTIVE screen (never #app, so the tab bar and the ambient field stay put) steps back to .95 with 16px corners while a sheet
+   is open, 340ms; --sheet-depth follows a sheet being dragged down (1 open, 0 gone) */
+html.ios #screen > .screen:not(#screen-play) { transition: transform var(--sheet-out), border-radius var(--sheet-out); }
+html.ios.sheet-open #screen > .screen:not(.hidden):not(#screen-play) {
+  transform: scale(calc(1 - .05 * var(--sheet-depth, 1))); transform-origin: 50% 0; border-radius: calc(16px * var(--sheet-depth, 1));
+  transition: transform var(--sheet-in), border-radius var(--sheet-in);
+}
+html.ios.sheet-tracking #screen > .screen { transition: none !important; }
+@media (prefers-reduced-motion: reduce) { html.ios.sheet-open #screen > .screen:not(.hidden):not(#screen-play) { transform: none; border-radius: 0; } }
+html.ios.reduce-motion.sheet-open #screen > .screen:not(.hidden):not(#screen-play) { transform: none; border-radius: 0; }
+/* P4 the course is a vertical light path: lessons done glow amber, the next node blooms once (600ms) into a steady halo, what is ahead stays dim.
+   The halo is a layer whose opacity and scale run once; nothing loops. */
+html.ios #screen-course .cr-level.st-done .cr-ring { color: var(--right); }
+html.ios #screen-course .cr-level.st-done .cr-ring-fg { stroke: var(--right); }
+html.ios #screen-course .cr-level.st-done .cr-ring-bg { stroke: rgba(255, 138, 61, .3); }
+html.ios #screen-course .cr-level.st-done:not(:last-child)::after { background: rgba(255, 138, 61, .55); }
+html.ios #screen-course .cr-level.st-ahead:not(:last-child)::after, html.ios #screen-course .cr-level.st-soon:not(:last-child)::after { background: var(--line); }
+html.ios #screen-course .cr-level:is(.st-ahead, .st-soon) .cr-node { opacity: .6; }
+html.ios #screen-course .cr-level.cur .cr-ring { color: var(--right); }
+html.ios #screen-course .cr-level.cur .cr-ring-fg { stroke: var(--right); }
+html.ios #screen-course .cr-level.cur .cr-node::before {
+  content: ""; position: absolute; inset: -12px; z-index: -1; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, rgba(255, 138, 61, .4), rgba(255, 138, 61, .12) 55%, transparent 72%);
+  animation: cr-bloom 600ms cubic-bezier(.22, 1, .36, 1) both;
+}
+@keyframes cr-bloom { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { html.ios #screen-course .cr-level.cur .cr-node::before { animation: none; } }
+html.ios.reduce-motion #screen-course .cr-level.cur .cr-node::before, html.ios.shot #screen-course .cr-level.cur .cr-node::before { animation: none; }   /* v3 R3-1: the teal "Perfect" is ivory on iPhone/iPad (the desktop keeps its palette) */
+html.ios .cr-hero:not(.rv), html.ios .cr-level:not(.rv), html.ios .cr-page:not(.rv) { animation: none; }
+/* P4 the light path, drawn: one 2px line runs down the node column of the map, from a level's ring through its lessons to the next level.
+   A segment is lit amber when the light has reached the node it leads to (a done lesson, or the next one); what is ahead is a dim hairline.
+   Lesson nodes sit on the line at the level ring's centre (--cr-x), solid and opaque so the line passes behind them; never dashed. */
+/* one ivory primary per screen: the course hero owns it, so the "Already play a little?" offer sits quietly in one row above it */
+@media (max-width: 699px) {
+  html.ios:not(.ts-large) .cr-place:not(.result, .inline) .cr-place-acts { flex-wrap: nowrap; }
+  html.ios #screen-course .cr-place:not(.result, .inline) .cr-place-acts > button { flex: 1 1 0; min-width: 0; height: auto; min-height: 44px; padding: var(--s2) var(--s3); font-size: var(--fs-sub); }
+}
+html.ios #screen-course .cr-place:not(.result, .inline) .cr-place-acts > .primary { background: var(--accent-soft); color: var(--accent); box-shadow: none; }
+html.ios #screen-course { --cr-x: calc(var(--cr-pad) + 22px); --cr-lit: rgba(255, 138, 61, .72); --cr-dim: rgba(242, 239, 232, .14); }
+html.ios #screen-course .cr-level:not(:last-child)::after { left: calc(var(--cr-x) - 1px); top: 100%; height: calc(var(--s3) + var(--cr-pad)); border-radius: 0; background: var(--cr-dim); z-index: 1; }
+html.ios #screen-course .cr-level.st-done:not(:last-child)::after { background: var(--cr-lit); }
+html.ios #screen-course .cr-level:is(.st-ahead, .st-soon):not(:last-child)::after { background: var(--cr-dim); }
+html.ios #screen-course .cr-top { position: relative; }
+html.ios #screen-course .cr-level:not(:last-child) .cr-top::after,
+html.ios #screen-course .cr-level:has(.cr-expand.open) .cr-top::after {
+  content: ""; position: absolute; left: calc(var(--cr-x) - 1px); top: calc(var(--cr-pad) + 44px); bottom: 0; width: 2px; background: var(--cr-dim); pointer-events: none;
+}
+html.ios #screen-course .cr-level:is(.st-done, .cur:has(.cr-expand.open)) .cr-top::after { background: var(--cr-lit); }
+html.ios #screen-course .cr-level:last-child:not(:has(.cr-expand.open)) .cr-top::after { content: none; }
+html.ios #screen-course .cr-lessons { padding: 0 var(--s2) var(--s2); border-top: 0; }
+html.ios #screen-course .cr-lessons li { position: relative; }
+html.ios #screen-course .cr-lessons li + li { border-top: 0; }
+html.ios #screen-course .cr-lessons li::before, html.ios #screen-course .cr-lessons li::after {
+  content: ""; position: absolute; left: calc(var(--cr-x) - var(--s2) - 1px); width: 2px; background: var(--cr-dim); pointer-events: none;
+}
+html.ios #screen-course .cr-lessons li::before { top: 0; height: 50%; }
+html.ios #screen-course .cr-lessons li::after { top: 50%; bottom: calc(-1 * var(--s2)); }
+html.ios #screen-course .cr-lessons li:not(:last-child)::after { bottom: 0; }
+html.ios #screen-course .cr-level:is(.st-done, .cur) .cr-lessons li:first-child::before,
+html.ios #screen-course .cr-lessons li:has(> .cr-lrow.done)::after,
+html.ios #screen-course .cr-lessons li:has(> .cr-lrow.done) + li::before { background: var(--cr-lit); }
+html.ios #screen-course .cr-level:last-child .cr-lessons li:last-child::after { content: none; }
+html.ios #screen-course .cr-lrow { padding-left: calc(var(--cr-x) - 16px - var(--s2)); }
+html.ios #screen-course .cr-si { position: relative; z-index: 1; border: 1.5px solid rgba(242, 239, 232, .22); border-style: solid; background: var(--chassis); color: var(--faint); }
+html.ios #screen-course .cr-lrow:not(.exam) .cr-si.ahead { border: 0; background: transparent; }
+html.ios #screen-course .cr-lrow:not(.exam) .cr-si.ahead::before { content: ""; width: 12px; height: 12px; border-radius: 50%; background: #55565a; box-shadow: 0 0 0 3px var(--chassis); }
+html.ios #screen-course .cr-si.done { border-color: transparent; background: #3e2b23; color: var(--right); }
+html.ios #screen-course .cr-si.open { border-color: rgba(255, 138, 61, .6); color: var(--right); }
+html.ios #screen-course .cr-lrow.cur .cr-si.open { border-color: transparent; background: var(--right); color: var(--ebony); box-shadow: 0 0 0 4px rgba(255, 138, 61, .16); }
+html.ios #screen-course .cr-lrow.cur .cr-si.open::after {
+  content: ""; position: absolute; inset: -14px; z-index: -1; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, transparent 44%, rgba(255, 138, 61, .3) 50%, rgba(255, 138, 61, .08) 64%, transparent 72%);
+  animation: cr-bloom 600ms cubic-bezier(.22, 1, .36, 1) both;
+}
+@media (prefers-reduced-motion: reduce) { html.ios #screen-course .cr-lrow.cur .cr-si.open::after { animation: none; } }
+html.ios.reduce-motion #screen-course .cr-lrow.cur .cr-si.open::after, html.ios.shot #screen-course .cr-lrow.cur .cr-si.open::after { animation: none; }
+@container course-path (min-width: 640px) {
+  html.ios #screen-course .cr-lessons li::before, html.ios #screen-course .cr-lessons li::after { content: none; }
+  html.ios #screen-course .cr-level:has(.cr-expand.open) .cr-top::after { content: none; }
+  html.ios #screen-course .cr-lrow { padding-left: var(--s2); }
+}
+/* a passed level's card is transparent (course.css): its nodes sit on ebony, not the chassis */
+html.ios #screen-course .cr-level.st-done .cr-si:not(.done) { background: var(--ebony); }
+html.ios #screen-course .cr-level.st-done .cr-lrow:not(.exam) .cr-si.ahead::before { box-shadow: 0 0 0 3px var(--ebony); }
+@media (max-width: 699px) {
+  html.ios dialog:not([open]):not(.confirm-dialog) {
+    transition: transform var(--sheet-out), opacity var(--sheet-out), overlay var(--sheet-out) allow-discrete, display var(--sheet-out) allow-discrete;
+  }
+  html.ios dialog[open]:not(.confirm-dialog) {
+    transition: transform var(--sheet-in), opacity 200ms var(--ease-out), overlay var(--sheet-in) allow-discrete, display var(--sheet-in) allow-discrete;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.ios .ex-key, html.ios #onboarding .ob-keys i { transition: none; transform: none !important; }
+  html.ios #onboarding .ob-keys i::before { transition: none; }
+}
+html.ios.reduce-motion .ex-key, html.ios.reduce-motion #onboarding .ob-keys i { transition: none; transform: none !important; }
+/* Results (results-motion.js): one choreography, over in 1.02s. The last struck key's light rises (0 to 200ms), then the ring and the
+   count-up run (200 to 800ms) with the stars landing 120ms apart (the --d on each star, shifted by the 200ms rise), then the stats
+   and the buttons fade in (800 to 1020ms). A tap, Space, Enter or "Skip animation" skips to the end. Nothing here loops; the legacy
+   starPop and rcardIn entrances are off so nothing stacks. */
+html.ios #results { --res-rail-h: 48px; }
+html.ios #results .rstar, html.ios #results .rcard, html.ios #results .results-best.is-new, html.ios #results .results-actions .primary { animation: none; }
+html.ios #results .results-inner { position: relative; z-index: 1; animation: none; }   /* the choreography is the entrance; a transformed parent would also unpin the X */
+/* the field: ebony, a faint cobalt pool; two or more stars warm it to amber over 600ms (opacity of a second static layer, never a colour animation) */
+html.ios #results { background: linear-gradient(180deg, #0d0f15 0%, #0a0b0f 60%, #08090c 100%); -webkit-backdrop-filter: none; backdrop-filter: none; }
+html.ios #results::before, html.ios #results::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+html.ios #results::before { background: radial-gradient(62% 44% at 50% 28%, rgba(134, 182, 255, .15), transparent 72%); }
+html.ios #results::after {
+  background: radial-gradient(62% 44% at 50% 28%, rgba(255, 138, 61, .2), transparent 72%); opacity: 0; transition: opacity 600ms cubic-bezier(.22, 1, .36, 1);
+}
+html.ios #results.tone-warm.playing::after, html.ios #results.tone-warm.played::after { opacity: 1; }
+html.ios.reduce-motion #results::after, html.ios.shot #results::after { transition: none; }
+@media (prefers-reduced-motion: reduce) { html.ios #results::after { transition-duration: 100ms; } }
+html.ios #results.playing .rstar.on { animation: ios-star-in 220ms cubic-bezier(.34, 1.56, .64, 1) calc(200ms + var(--d, 0ms)) both; }
+@keyframes ios-star-in { from { transform: scale(.85); color: var(--star-off); } to { transform: scale(1); color: var(--star); } }
+html.ios #results.playing :is(.rcard, .results-actions > :not(#resClose), .results-hands, .results-details) { animation: ios-res-in 220ms cubic-bezier(.22, 1, .36, 1) 800ms both; }
+@keyframes ios-res-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+html.ios #results .results-skip {
+  display: block; height: 0; margin: calc(-1 * var(--s4) + 1px) 0 0; font-size: var(--fs-caption); line-height: 1.2; color: var(--faint); opacity: 0;
+  pointer-events: none; transition: opacity 160ms linear;
+}
+html.ios #results.playing .results-skip { opacity: 1; transition-delay: 120ms; }
+/* big text: the number and "36 of 42 notes" must fit inside the ring */
+html.ios.ts-large #results .results-ring { width: 210px; height: 210px; }
+@media (max-height: 520px) and (orientation: landscape) { html.ios.ts-large #results .results-ring { width: 190px; height: 190px; } }
+html.ios #results .ring-fg { transition: stroke-dashoffset 360ms cubic-bezier(.16, 1, .3, 1); }
+/* the dim keyboard at the foot of the screen; light rises from it on a new best or the first three stars */
+html.ios #results .results-rail {
+  position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 220px; display: block; z-index: 0; pointer-events: none;
+  -webkit-mask-image: linear-gradient(to top, #000 0, #000 40%, transparent 100%); mask-image: linear-gradient(to top, #000 0, #000 40%, transparent 100%);
+}
+@media (max-height: 520px) and (orientation: landscape) {
+  html.ios #results { --res-rail-h: 36px; } html.ios #results .results-rail { height: 140px; }
+  /* a phone on its side: the buttons end above the dim keyboard, never on it */
+  html.ios #results:not(.watched) .results-lead { margin: 0 auto var(--s2); }
+  html.ios #results .results-inner { margin-block: 0 auto; }   /* top-aligned, not centred: no scroll (a scrolling box clips the fixed X in WebKit) */
+}
+@media (min-width: 700px) { html.ios #results { --res-rail-h: 64px; } }
+html.ios.fx-lite #results .results-rail { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  html.ios #results.playing :is(.rstar.on, .rcard, .results-actions > :not(#resClose), .results-hands, .results-details) { animation: none; }
+  html.ios #results .results-skip { display: none; }
+}
+html.ios.reduce-motion #results .results-skip, html.ios.shot #results .results-skip { display: none; }
+html.ios.shot #results .ring-fg, html.ios #results.skipped .ring-fg, html.ios #results.skipped::after, html.ios #results.skipped .results-skip { transition: none; }
+html.ios #results.skipped :is(.rstar, .rcard, .results-actions > :not(#resClose), .results-hands, .results-details) { animation: none; }
+/* the layout: a serif lead line under the ring, the three stats that matter in hairline columns (the rest behind Details), one ivory
+   primary with Practice and Watch quiet beside it, and an X to close. The eyebrow, the best pill and the accuracy line step aside. */
+html.ios #results .results-kicker, html.ios #results .results-best { display: none; }
+html.ios #results .results-head { margin-bottom: var(--s3); font-family: var(--title-serif); font-weight: 600; letter-spacing: -.015em; }
+/* one focal number: the ring carries the score; the serif line under it is its caption ("Up from 71%"), never the number again */
+html.ios #results:not(.watched) .results-lead {
+  display: block; margin: var(--s1) auto var(--s5); font-family: var(--title-serif); font-size: calc(var(--fs-headline) * 1.12); font-weight: 500;
+  line-height: 1.25; letter-spacing: -.005em; color: var(--muted); text-wrap: balance; max-width: 26ch;
+}
+html.ios #results .results-details { color: var(--muted); font-weight: 500; font-size: var(--fs-sub); }
+html.ios #results:not(.watched) .results-details { display: inline-flex; align-items: center; justify-content: center; }   /* iPad too: the iPhone layout hides Good, Early and Late behind it */
+html.ios #results .results-actions .res-spare { display: none; }   /* app.js openResults: one primary, at most two quiet buttons */
+html.ios #results .results-acc { display: none; }
+html.ios #results.show-details .results-acc { display: block; margin: var(--s1) 0 var(--s3); }
+html.ios #results .results-cards { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 0; margin-bottom: var(--s3); }
+html.ios #results .rcard { background: none; box-shadow: none; border-radius: 0; padding: var(--s2) var(--s2); }
+html.ios #results .rcard:not(.hidden) ~ .rcard:not(.hidden) { box-shadow: inset 1px 0 0 var(--line-strong); }
+html.ios #results .rcard b { font-family: var(--font); font-variant-numeric: tabular-nums; font-weight: 600; }
+html.ios #results:not(.show-details) .rcard:is(.k-good, .k-early, .k-late) { display: none; }
+html.ios #results.show-details .rcard { display: block; }
+html.ios #results.show-details .rcard.hidden { display: none; }
+html.ios #results .results-hands { color: var(--muted); }
+html.ios #results .results-hands.hidden { display: none; }
+html.ios #results .results-actions { gap: var(--s2); }
+html.ios #results .results-actions .primary { flex: 1 1 100%; order: -1; }   /* the one ivory primary leads, whichever button it is */
+html.ios #results .results-actions .ghost { flex: 1 1 calc(50% - var(--s2)); min-width: 0; background: var(--ebony); box-shadow: inset 0 0 0 1px var(--line-strong); }   /* opaque: the dim keyboard must not show through */
+html.ios #results .rcard.is-zero b { color: var(--text); }   /* no wrong keys or misses is not an alarm */
+html.ios #results .results-actions .ghost:not(:disabled):active { background: var(--accent-soft); }
+html.ios #results .results-actions #resClose {
+  position: fixed; top: calc(max(var(--sat), 12px) + var(--s2)); right: calc(var(--sar) + var(--s3)); flex: none; width: 44px; height: 44px; min-height: 44px;
+  padding: 0; display: grid; place-items: center; border-radius: 50%; background: var(--accent-soft); color: var(--muted);
+}
+html.ios #results #resClose .res-close-txt { display: none; }
+html.ios #results #resClose .res-close-x { display: block; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+html.ios #results #resSkipBtn { display: none; }
+html.ios #results.playing #resSkipBtn { display: block; }
+/* -KeylightScreenshotMode (the page gets ?shot=1, html.shot): a deterministic frame for store screenshots, nothing animates or transitions */
+html.ios.shot *, html.ios.shot *::before, html.ios.shot *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+html.ios #navBrand rect:nth-child(2) { fill: var(--right); }   /* the brand mark's lit key: amber, not mint */
+/* the course's dot separators read as a comma in the app (no middle-dot strings) */
+html.ios .cr-dot { display: inline; width: auto; height: auto; margin: 0; background: none; opacity: 1; border-radius: 0; vertical-align: baseline; }
+html.ios .cr-dot::before { content: ", "; white-space: pre; }
+html.ios #onboarding .ob-kicker, html.ios #onboarding[data-step="welcome"] .ob-kicker { display: none; }   /* no tracked-out eyebrow above the headline */
+/* big text: practice tiles stack so a long word never runs into its neighbour */
+html.ios.ts-large #screen-home .pr-rail { grid-template-columns: minmax(0, 1fr); }
+html.ios #screen-home .pr-chip b { overflow-wrap: anywhere; }
+html.ios :is(#screen-home .hero-title, #onboarding .ob-step-title, .cr-title, .cr-hero-title, .cc-title) { text-wrap: balance; }
+
+/* review fixes: spans and small buttons that wear .primary without being the key-shaped primary */
+html.ios #dropZone .dz-btn { box-shadow: none; border-radius: 0; background: none; color: inherit; }
+html.ios .cr-item .primary.cr-small { background: var(--accent-soft); color: var(--accent); box-shadow: none; }
+html.ios .cr-item .primary.cr-small:active:not(:disabled) { background: rgba(var(--accent-rgb), .16); }
+html.ios #onboarding .ob-actions .primary { border-radius: 14px; }
+html.ios #screen-home .cc-title { -webkit-line-clamp: 2; }
+html.ios .jam-h2 { text-transform: none; letter-spacing: 0; }
+html.ios .goal-ring.just, html.ios .goal-ring.just .gr-check { animation: none; }
+html.ios.fx-lite :is(.ex-key, #onboarding .ob-keys i),
+html.ios.fx-lite #onboarding .ob-keys i::before { transition: none; }
+html.ios.reduce-motion #onboarding .ob-keys i::before { transition: none; }
+
+/* ---------------------------------------------------------------- v3 P3 Home: Up next leads, Today is one line with a small ring */
+html.ios #screen-home .home-today-title { display: none; }
+html.ios #screen-home .course-card > .primary { display: none; }   /* Up next already holds the one Continue; See the course opens the map */
+html.ios #screen-home .home-today { margin-top: var(--s4); }
+html.ios #screen-home .home-stats { display: block; }
+html.ios #screen-home :is(#streakTile, .tt-min) { display: none; }
+html.ios #screen-home .goal-ring.today-tile {
+  display: flex; flex-direction: row; align-items: center; gap: var(--s3); width: auto; min-height: 44px; height: auto; padding: 0 var(--s2) 0 0;
+  background: none; box-shadow: none; border-radius: var(--r-sm); text-align: left;
+}
+html.ios #screen-home .goal-ring.done { background: none; box-shadow: none; }
+html.ios #screen-home .goal-ring svg { width: 28px; height: 28px; flex: none; }
+html.ios #screen-home .goal-ring .gr-text { display: none; }
+html.ios #screen-home .goal-ring .today-line { display: block; font-size: var(--fs-sub); line-height: 1.3; color: var(--muted); font-variant-numeric: tabular-nums; }
+/* the icon buttons say what they are: on an iPad the achievements and support buttons carry their name */
+@media (min-width: 700px) {
+  html.ios #screen-home :is(.home-ach, .home-support) { display: inline-flex; flex-direction: row; align-items: center; width: auto; height: 44px; padding: 0 var(--s4) 0 var(--s3); border-radius: var(--r-pill); gap: var(--s2); }
+  html.ios #screen-home :is(.home-ach, .home-support)::after { content: attr(aria-label); font-size: var(--fs-sub); font-weight: 500; color: var(--muted); }
+}
+
+/* ---------------------------------------------------------------- v3 P6 Songs: three rows (title, search with its filter, segments with the mood strip) and one menu */
+html.ios body[data-screen="search"] .top-search { position: relative; left: auto; top: auto; bottom: auto; transform: none; }
+html.ios body[data-screen="search"] .top-search .search-input { padding-right: 104px; }
+html.ios body[data-screen="search"] .top-search #openFilters:not(.hidden) {
+  position: absolute; right: 4px; top: 50%; transform: translateY(-50%); display: inline-flex; align-items: center; gap: var(--s1);
+  height: 36px; min-height: 36px; width: auto; padding: 0 var(--s3); border-radius: var(--r-xs); background: var(--surface-3); color: var(--text); box-shadow: none;
+}
+html.ios body[data-screen="search"] .top-search #openFilters::before { content: ''; position: absolute; inset: -4px 0; }   /* 44px hit area around the 36px pill */
+html.ios body[data-screen="search"] .top-search #openFilters svg { width: 18px; height: 18px; }
+html.ios body[data-screen="search"] .top-search #openFilters.active { color: var(--accent); }
+html.ios #searchChips { flex-direction: row; align-items: center; gap: var(--s3); overflow-x: auto; scrollbar-width: none; padding: 0; }
+html.ios #searchChips::-webkit-scrollbar { display: none; }
+html.ios #searchChips .song-segments { flex: none; display: inline-grid; grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(max-content, 1fr); }
+html.ios #searchChips .song-segments button { padding: 4px var(--s3); white-space: nowrap; }
+html.ios #searchChips #libBrowse:not(.hidden) { flex: none; padding: 0; overflow: visible; }
+/* the count stays for VoiceOver; sort, view, Favourites, Imported and Clear filters live in the menu behind the ... button */
+html.ios #libMeta:not(.hidden) { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+html.ios body:not([data-screen="search"]) #libMenuBtn { display: none; }
+html.ios #libMenuBtn:not(.hidden) { display: grid; place-items: center; width: 44px; height: 44px; min-height: 44px; flex: none; padding: 0; border-radius: 50%; background: var(--accent-soft); color: var(--accent); }
+html.ios #libMenuBtn svg { width: 22px; height: 22px; }
+html.ios .lib-menu {
+  position: fixed; top: var(--lm-top, 56px); right: var(--s3); z-index: 60; width: min(300px, calc(100vw - 2 * var(--s3))); padding: var(--s2);
+  display: flex; flex-direction: column; gap: var(--s1); border-radius: var(--r-md); background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--line-strong), 0 14px 36px rgba(0, 0, 0, .55);
+}
+html.ios .lib-menu.hidden { display: none; }
+html.ios .lib-menu .lm-row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s2); min-height: 44px; }
+html.ios .lib-menu .lm-row:empty { display: none; }
+html.ios .lib-menu .lm-l { min-width: 48px; color: var(--muted); font-size: var(--fs-sub); }
+html.ios .lib-menu button { min-height: 44px; }
+html.ios .lib-menu .lib-view { display: inline-flex; gap: var(--s1); }
+html.ios .lib-menu .sort { display: inline-flex; align-items: center; gap: var(--s1); }
+html.ios .lib-menu .song-shortcuts-item, html.ios .lib-menu [data-chip] { flex: none; }
+html.ios .lib-menu #clearFilters:not(.hidden) { color: var(--accent); }
+
+/* ---------------------------------------------------------------- v3 P10 hygiene: the keyboard chip shows its whole message when it fails */
+html.ios #kbStatus[data-state="failed"] { height: auto; min-height: 44px; padding-block: 6px; }
+html.ios #kbStatus[data-state="failed"] #kbStatusText { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.15; }

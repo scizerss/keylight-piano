@@ -1,0 +1,97 @@
+#lyricsEditor[open] {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  width: min(760px, calc(100% - var(--sal) - var(--sar) - 24px));
+  height: min(560px, calc(100dvh - var(--sat) - var(--sab) - 24px));
+  max-width: none;
+  max-height: none;
+  padding: var(--s4);
+  border-radius: var(--r-lg);
+  background: var(--bg-deep);
+  overflow: hidden;
+}
+#lyricsEditor[open]::before { content: none; }
+#lyricsEditor [hidden] { display: none !important; }   /* .ghost and .primary set display, which would beat [hidden] */
+#lyricsEditor section:not([hidden]) { display: flex; flex-direction: column; flex: 1; min-height: 0; gap: var(--s2); }
+#lyricsEditor button { min-width: 44px; min-height: 44px; padding-inline: var(--s3); white-space: nowrap; }
+#lyricsEditor button:disabled { cursor: default; }
+#lyricsEditor button:not(.primary):disabled { opacity: .38; }
+#lyricsEditor button:focus-visible { outline-offset: -3px; }
+#lyricsEditor h2 { margin: 0; font-size: var(--fs-headline); overflow-wrap: anywhere; }
+#lyricsEditor h2:focus { outline: none; }
+.le-header {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s2);
+  min-height: 44px; flex: none;
+}
+#lyricsEditor :is([data-step="paste"], [data-step="review"]) .le-header {
+  display: grid; grid-template-columns: 1fr auto 1fr;
+}
+#lyricsEditor :is([data-step="paste"], [data-step="review"]) .le-header > button:first-child { justify-self: start; }
+#lyricsEditor :is([data-step="paste"], [data-step="review"]) .le-header > button:last-child { justify-self: end; }
+.le-actions, .le-review-tools { display: flex; align-items: center; gap: var(--s2); }
+.le-review-tools { flex-wrap: wrap; }
+#lyricsText {
+  flex: 1; min-height: 0; width: 100%; resize: none; padding: var(--s3);
+  border: 1px solid var(--line-strong); border-radius: var(--r-md);
+  background: var(--surface); color: var(--text); font: inherit; font-size: max(16px, var(--fs-body));
+  -webkit-user-select: text; user-select: text;
+}
+.le-note { margin: 0; color: var(--muted); font-size: var(--fs-sub); }
+.le-error { color: var(--bad); }
+.le-warning { padding: var(--s2) var(--s3); border-radius: var(--r-sm); background: var(--surface-2); color: var(--warn); }
+.le-timing { display: grid; grid-template-rows: minmax(0, 1fr) minmax(60px, 28%); flex: 1; min-height: 0; gap: var(--s3); }
+.le-lines {
+  display: flex; flex-direction: column; justify-content: safe center; align-items: center;
+  gap: var(--s2); min-height: 0; min-width: 0; overflow: auto;
+  padding: var(--s3); border-radius: var(--r-md); background: var(--surface); text-align: center;
+}
+.le-line-context { flex: none; color: var(--muted); font-size: var(--fs-sub); width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#lyricsCurrent {
+  font-size: var(--fs-title); font-weight: 650; line-height: 1.25;
+  color: var(--accent); overflow-wrap: anywhere; width: 100%; overflow: auto; min-height: 0;
+}
+#lyricsPause { flex: none; }
+#lyricsTap {
+  width: 100%; height: 100%; border-radius: var(--r-md); font-size: var(--fs-title);
+  touch-action: manipulation; -webkit-user-select: none; user-select: none;
+}
+#lyricsReview { flex: 1; overflow: auto; overscroll-behavior: contain; margin: 0; padding: 0; list-style: none; }
+#lyricsReview li {
+  display: flex; align-items: center; gap: var(--s1); padding: var(--s1);
+  border-bottom: 1px solid var(--line);
+}
+#lyricsReview .ghost { padding-inline: var(--s2); font-size: var(--fs-caption); }
+#lyricsReview .le-preview {
+  flex: 1; min-width: 0; display: flex; align-items: center; text-align: left; gap: var(--s2); padding-inline: var(--s1);
+}
+#lyricsReview .le-preview:disabled { opacity: 1; }
+.le-preview:not(:disabled):hover { color: var(--accent); }
+.le-time { flex: none; min-width: 4.8ch; color: var(--muted); font-size: var(--fs-caption); font-variant-numeric: tabular-nums; }
+.le-words { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+@media (max-width: 520px) {
+  #lyricsEditor :is([data-step="paste"], [data-step="review"]) .le-header { grid-template-columns: auto 1fr auto; }
+  #lyricsEditor .le-header h2 { text-align: center; }
+  #lyricsEditor .le-header:has(.le-actions) { flex-wrap: wrap; }
+  .le-actions { width: 100%; }
+  .le-actions > button { flex: 1; }
+  #lyricsReview li { flex-wrap: wrap; }
+  #lyricsReview .le-preview { flex: 1 0 100%; }
+}
+@media (max-height: 520px) {
+  #lyricsEditor[open] {
+    inset: 0; width: 100%; height: 100dvh; border-radius: 0;
+    padding: max(var(--s2), var(--sat)) max(var(--s2), var(--sar)) max(var(--s2), var(--sab)) max(var(--s2), var(--sal));
+  }
+}
+@media (max-height: 520px) and (min-width: 521px) {
+  .le-timing { grid-template: minmax(0, 1fr) / minmax(0, 58fr) minmax(0, 42fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #lyricsEditor, #lyricsEditor button { transition: none; animation: none; }
+  #lyricsEditor button:active { transform: none; }
+}

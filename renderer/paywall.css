@@ -1,0 +1,39 @@
+.premium-dialog {
+  box-sizing: border-box;
+  max-height: calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+}
+.premium-dialog [hidden] { display: none; }
+.premium-dialog header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.premium-dialog header h2 { margin: 0; }
+.premium-dialog header .iconbtn { width: 44px; height: 44px; }
+.premium-dialog > p { margin-top: 10px; }
+.premium-dialog fieldset {
+  display: grid;
+  gap: 8px;
+  border: 0;
+  padding: 0;
+  margin: 16px 0;
+  min-width: 0;
+}
+.premium-dialog label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 12px;
+  min-height: 52px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.premium-dialog label:has(input:checked) { border-color: var(--accent-2); background: var(--surface-2); }
+.premium-dialog label input { grid-row: span 2; accent-color: var(--accent-2); margin: 0; }
+.premium-dialog label span, .premium-billing { color: var(--muted); font-size: var(--fs-sm, 14px); }
+.premium-billing p { margin: 0 0 8px; }
+.premium-message:empty { margin: 0; }
+.premium-dialog > button { width: 100%; min-height: 44px; justify-content: center; }
+.premium-dialog footer { display: flex; flex-wrap: wrap; align-items: center; gap: 0 16px; margin-top: 8px; }
+.premium-dialog footer > * { display: inline-flex; align-items: center; min-height: 44px; }
+
+.premium-song-lock { display: inline-flex; align-items: center; margin-inline-start: 5px; vertical-align: middle; color: var(--accent-2); }
+.premium-song-lock svg { width: 14px; height: 14px; }

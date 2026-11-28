@@ -1,0 +1,489 @@
+/* Keylight design tokens v2 + shell + shared component styles (docs/DESIGN-DIRECTION.md, Stage 1).
+   Linked after every other stylesheet (ios.css, iOS bundle only, comes after this one). It redefines the token names the older
+   files already use, so the whole app shifts at once, then restyles the shell (tab bar / sidebar, page header) and the shared
+   components (buttons, chips, segmented controls, cards, list rows, switches, sheets, toasts) that later stages build on.
+
+   Layout modes (one switch drives --side and --tabbar):
+     bottom bar  width < 700px and not a short landscape phone: flat tab bar docked to the bottom, large title that collapses.
+     sidebar     width >= 700px, or a phone on its side: #nav is a column on the left (84px rail; 240px from 900px wide; 72px on a phone).
+   New classes for later stages: .kl-group, .kl-row, .kl-card, .kl-caption, .kl-seg, .kl-sheet, .btn-l, .btn-s, .kl-empty, .kl-stars,
+   .kl-progress, html.apple (system font), body.scrolled (header collapsed, bottom-bar mode). */
+
+:root {
+  color-scheme: dark;
+
+  /* ---- surfaces: flat, deep ink with a slight blue ---- */
+  --bg-deep:      #04050d;
+  --bg:           #070914;
+  --bg-dark:      #04050d;
+  --surface:      #0e1120;
+  --surface-2:    #151a2e;
+  --surface-3:    #1e2440;
+  --list:         #0a0d1a;
+  --pane:         #0e1120;
+  --pane-line:    rgba(255, 255, 255, 0.08);
+  --line:         rgba(255, 255, 255, 0.08);
+  --line-strong:  rgba(255, 255, 255, 0.16);
+  --outline:      rgba(255, 255, 255, 0.22);
+  --hover:        rgba(255, 255, 255, 0.06);
+  --highlight:    rgba(255, 255, 255, 0.04);
+  --tooltip:      #151a2e;
+  --onboarding:   #070914;
+  --scrim:        rgba(2, 3, 10, 0.64);
+  --glass:        rgba(14, 17, 32, 0.72);
+  --glass-fill:   var(--surface);
+  --glass-edge:   inset 0 0 0 1px var(--pane-line);
+  --glass-blur:   blur(24px) saturate(1.5);
+  --glass-shadow: none;
+  --shadow:       rgba(0, 0, 0, 0.55);
+
+  /* ---- text ---- */
+  --text:   #f4f3ee;
+  --white:  #f4f3ee;
+  --muted:  rgba(244, 243, 238, 0.68);
+  --faint:  rgba(244, 243, 238, 0.50);
+  --ink:    #04130d;
+
+  /* ---- accents ---- */
+  --mint:         #7cf0c6;
+  --mint-2:       #2fc3a0;
+  --accent:       #7cf0c6;
+  --accent-rgb:   124, 240, 198;   /* the accent as r, g, b: tints in the other stylesheets read it (ios.css re-points it) */
+  --glow-rgb:     124, 240, 198;   /* the colour of the soft glows round accent elements (a dark shadow in the iOS app) */
+  --ok-rgb:       124, 240, 198;   /* success states; the iOS app gives them their own green */
+  --accent-hi:    #a8f7da;
+  --accent-2:     #a8f7da;
+  --accent-hover: #93f3d0;
+  --accent-deep:  #2fc3a0;
+  --accent-night: #0a2a2b;
+  --accent-soft:  rgba(124, 240, 198, 0.14);
+  --accent-line:  rgba(124, 240, 198, 0.45);
+  --accent-ink:   var(--ink);
+  --glow:         rgba(124, 240, 198, 0.45);
+  --glow-soft:    rgba(124, 240, 198, 0.2);
+  --grad-accent:  none;
+  --grad-accent-hi: none;
+  --focus-ring:   0 0 0 3px rgba(124, 240, 198, 0.45);
+  --violet:       #8f7bff;
+  --violet-soft:  rgba(143, 123, 255, 0.16);
+
+  /* ---- hands: brand ---- */
+  --right: #ff8a3d;  --right-soft: rgba(255, 138, 61, 0.16);
+  --left:  #86b6ff;  --left-soft:  rgba(134, 182, 255, 0.16);
+
+  /* ---- semantic ---- */
+  --ok: #7cf0c6;  --warn: #ffd08a;  --bad: #ff7a85;  --info: #86b6ff;
+  --alert-text: #ff7a85;
+  --star: #f6cf8a;  --star-off: rgba(255, 255, 255, 0.14);
+
+  /* ---- fonts ---- */
+  --serif: "New York", ui-serif, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --font-round: ui-rounded, "SF Pro Rounded", var(--font);
+
+  /* ---- type scale ---- */
+  --ts: min(calc(var(--ts-user, 1) * var(--ts-host, 1)), 1.8);   /* text scale: the Settings slider (--ts-user) times the system text size the iOS host pushes (--ts-host); the player caps it lower (below) */
+  /* base sizes per device class (the media queries below change only these), scaled by --ts into the --fs-* tokens */
+  --fs-display-0: 34px; --fs-title-0: 22px; --fs-headline-0: 17px; --fs-body-0: 16px; --fs-sub-0: 14px; --fs-caption-0: 12.5px; --fs-hero-0: 44px;
+  --fs-display:  calc(var(--fs-display-0) * var(--ts));
+  --fs-title:    calc(var(--fs-title-0) * var(--ts));
+  --fs-headline: calc(var(--fs-headline-0) * var(--ts));
+  --fs-body:     calc(var(--fs-body-0) * var(--ts));
+  --fs-sub:      calc(var(--fs-sub-0) * var(--ts));
+  --fs-caption:  calc(var(--fs-caption-0) * var(--ts));
+  --fs-hero:     calc(var(--fs-hero-0) * var(--ts));
+
+  /* ---- spacing ---- */
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 20px; --s6: 24px; --s7: 32px; --s8: 48px;
+  --gutter: 16px;
+  --row: 52px;
+  --tabbar: 56px;
+  --nav: var(--tabbar);
+  --side: 0px;
+  --bar: 44px;                              /* height of the header row */
+
+  /* ---- safe area (ios.css refines these from the host's --kl-* values) ---- */
+  --sat: env(safe-area-inset-top, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+
+  /* ---- radii ---- */
+  --r-xs: 8px; --r-sm: 12px; --r-md: 16px; --r-lg: 22px; --r-pill: 999px;
+  --radius-sm: var(--r-sm); --radius: var(--r-md); --radius-lg: var(--r-lg); --radius-xl: var(--r-lg);
+
+  /* ---- elevation ---- */
+  --e0: none;
+  --e1: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+  --e2: 0 10px 30px -12px rgba(0, 0, 0, 0.7), 0 0 0 1px var(--line);
+  --e3: 0 24px 60px -20px rgba(0, 0, 0, 0.85), 0 0 0 1px var(--line-strong);
+  --lift: var(--e2);
+  --glow-mint: 0 0 24px rgba(124, 240, 198, 0.45);
+
+  /* ---- motion ---- */
+  --d-fast: 120ms; --d-base: 220ms; --d-slow: 360ms; --d-hero: 700ms;
+  --dur-fast: var(--d-fast); --dur: var(--d-base);
+  --ease-out:    cubic-bezier(.22, 1, .36, 1);
+  --ease-in-out: cubic-bezier(.65, 0, .35, 1);
+  --ease-spring: cubic-bezier(.34, 1.56, .64, 1);
+  --ease-sheet:  cubic-bezier(.32, .72, 0, 1);
+}
+html.apple { --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif; }
+
+/* type sizes per device class: iPhone is the base above */
+@media (min-width: 700px) and (pointer: coarse) {
+  :root { --fs-display-0: 40px; --fs-title-0: 24px; --fs-headline-0: 18px; --fs-body-0: 17px; --fs-hero-0: 56px; --gutter: 28px; }
+}
+/* a mouse or trackpad (Mac, and an iPad with a trackpad): smaller bases, still scaled by --ts so the text size setting keeps working */
+@media (min-width: 700px) and (pointer: fine) {
+  :root { --fs-display-0: 34px; --fs-title-0: 20px; --fs-headline-0: 15px; --fs-body-0: 14px; --fs-sub-0: 13px; --fs-caption-0: 12px; --fs-hero-0: 52px; --gutter: 32px; }
+}
+/* the player stage must still fit a phone on its side: the text scale stops at 1.4 there. The --fs-* tokens are re-derived here
+   because a custom property is resolved where it is declared (:root), so changing --ts alone would not reach them. */
+body[data-screen="play"] {
+  --ts: min(calc(var(--ts-user, 1) * var(--ts-host, 1)), 1.4);
+  --fs-display:  calc(var(--fs-display-0) * var(--ts));
+  --fs-title:    calc(var(--fs-title-0) * var(--ts));
+  --fs-headline: calc(var(--fs-headline-0) * var(--ts));
+  --fs-body:     calc(var(--fs-body-0) * var(--ts));
+  --fs-sub:      calc(var(--fs-sub-0) * var(--ts));
+  --fs-caption:  calc(var(--fs-caption-0) * var(--ts));
+  --fs-hero:     calc(var(--fs-hero-0) * var(--ts));
+}
+/* layout mode: sidebar (tab bar leaves the bottom) */
+@media (min-width: 700px), (max-height: 600px) and (orientation: landscape) {
+  :root { --tabbar: 0px; --side: 84px; --gutter: 24px; }
+}
+@media (min-width: 900px) and (min-height: 601px) { :root { --side: 240px; --gutter: 32px; } }
+@media (max-height: 600px) and (orientation: landscape) { :root { --side: 72px; --gutter: 20px; } }
+@media (prefers-reduced-motion: reduce) {
+  :root { --d-fast: 1ms; --d-base: 1ms; --d-slow: 1ms; --d-hero: 1ms; }
+}
+@media (prefers-reduced-transparency: reduce) { :root { --glass: var(--pane); } }
+@media (prefers-contrast: more) { :root { --line: rgba(255, 255, 255, 0.28); --pane-line: rgba(255, 255, 255, 0.28); --muted: rgba(244, 243, 238, 0.9); --faint: rgba(244, 243, 238, 0.78); } }
+
+/* ============================ page ============================ */
+html { background: var(--bg-deep); }
+body {
+  background-color: var(--bg-deep); font-size: var(--fs-body); line-height: 1.4;
+  font-feature-settings: "tnum" 0; -webkit-text-size-adjust: 100%;
+}
+body::before {
+  background:
+    radial-gradient(700px 420px at 10% -10%, rgba(70, 76, 190, 0.35), transparent 65%),
+    radial-gradient(600px 420px at 100% 0%, rgba(112, 58, 168, 0.22), transparent 65%),
+    var(--bg);
+}
+::selection { background: rgba(var(--accent-rgb), 0.3); }
+.screen { padding: 12px var(--gutter) calc(var(--tabbar) + var(--sab) + 28px); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.score, .tabular, #goalNow, #goalTotal, #timeLabel, #scoreHud, .results-big, .rcard b { font-variant-numeric: tabular-nums; }
+
+/* ============================ shell: header ============================ */
+#topbar {
+  position: relative; z-index: 6; flex: none; height: auto; min-height: var(--bar);
+  display: flex; align-items: center; gap: var(--s2); padding: 0 var(--gutter);
+  background: transparent; border-bottom: 1px solid transparent;
+  transition: background-color var(--d-base) var(--ease-out), border-color var(--d-base) var(--ease-out);
+}
+.top-left { display: flex; align-items: center; gap: var(--s3); min-width: 0; flex: 1; }
+.top-actions { margin-left: auto; gap: var(--s2); }
+.titles { min-width: 0; }
+#title {
+  font-family: var(--serif); font-weight: 500; font-size: var(--fs-display); line-height: 1.08; letter-spacing: -.02em; color: var(--text);
+  white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere;
+}
+#subtitle { font-family: var(--font); font-style: normal; font-size: var(--fs-sub); color: var(--faint); margin-top: 4px; white-space: normal; overflow: visible; }
+.iconbtn {
+  width: 44px; height: 44px; background: var(--surface-2); border: 0; box-shadow: none; color: var(--text);
+}
+.iconbtn:hover { background: var(--surface-3); }
+.iconbtn:active { transform: scale(.94); }
+#openSettings { display: none; }
+.kb-chip, .pill, .stat-chip {
+  height: 36px; background: var(--surface-2); border: 0; box-shadow: none; color: var(--muted); font-size: var(--fs-caption); font-weight: 500;
+}
+.kb-chip.on { color: var(--text); }
+.kb-chip.on .dot { background: var(--mint); border-color: var(--mint); box-shadow: 0 0 0 3px var(--accent-soft); }
+.kb-chip .dot { border-color: var(--faint); }
+.kb-chip .kb-glyph { display: none; }
+
+/* ---- bottom-bar mode: a 44px row, the large title sits under it and collapses into it on scroll ---- */
+@media (max-width: 699px) and (min-height: 601px), (max-width: 699px) and (orientation: portrait) {
+  #topbar { padding-top: 0; }
+  body:not([data-screen="play"]) .titles {
+    position: absolute; left: var(--gutter); right: var(--gutter); top: 100%; z-index: 6; pointer-events: none;
+    padding-top: 2px; transition: opacity var(--d-base) var(--ease-out), transform var(--d-base) var(--ease-out);
+  }
+  body:not([data-screen="play"]) #subtitle { display: none; }
+  body:not([data-screen="play"]):not(:has(#title:empty)) .screen:not(#screen-play) { padding-top: calc(var(--fs-display) * 1.1 + 14px); }
+  body.scrolled:not([data-screen="play"]) #topbar { background: var(--glass); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); border-bottom-color: var(--line); }
+  body.scrolled:not([data-screen="play"]) .titles {
+    top: 0; left: calc(var(--gutter) + 52px); right: calc(var(--gutter) + 52px); height: var(--bar); padding: 0;
+    display: flex; align-items: center; justify-content: center; text-align: center;
+  }
+  body.scrolled:not([data-screen="play"]) #title { font-family: var(--font); font-size: var(--fs-headline); font-weight: 650; letter-spacing: -.01em; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+  /* the keyboard chip is a dot you can tap */
+  #kbStatus { width: 44px; height: 44px; padding: 0; justify-content: center; background: none; border-radius: 50%; }
+  #kbStatusText { position: absolute; width: 1px; height: 1px; min-width: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  #kbStatus { position: relative; }
+  #kbStatus .kb-glyph { display: block; width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  #kbStatus.on .kb-glyph { color: var(--text); }
+  #kbStatus .dot { position: absolute; right: 6px; bottom: 8px; width: 9px; height: 9px; border: 2px solid var(--bg, #000); background: var(--faint); box-shadow: none; }
+  #kbStatus.on .dot { background: var(--mint); border-color: var(--bg, #000); box-shadow: none; }
+  body[data-screen="home"] .top-left { display: none; }
+  .top-actions { flex: none; }
+}
+/* the title area under the bar on a phone the screen scrolls past; nothing to reserve on Home / Songs */
+body[data-screen="home"] #screen-home { padding-top: 4px; }
+
+/* ============================ shell: tab bar (bottom-bar mode) ============================ */
+#nav {
+  position: fixed; left: 0; right: 0; bottom: 0; top: auto; transform: none; width: auto; max-width: none;
+  display: flex; flex-direction: row; align-items: stretch; gap: 0; padding: 0 var(--s2) var(--sab);
+  height: calc(var(--tabbar) + var(--sab)); border-radius: 0; border: 0; border-top: 1px solid var(--line);
+  background: var(--glass); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); box-shadow: none; z-index: 20;
+}
+#nav .nav-brand { display: none; }
+#nav .nav-ind { display: none; }
+#nav button {
+  flex: 1 1 0; width: auto; min-width: 0; min-height: 0; padding: 6px 2px 0; border-radius: var(--r-sm);
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 3px;
+  font-size: 11.5px; font-weight: 500; letter-spacing: 0; line-height: 1.1; color: var(--faint); background: none; box-shadow: none;
+  white-space: nowrap; transition: color var(--d-base) var(--ease-out), transform var(--d-fast) var(--ease-out);
+}
+#nav button:hover { background: none; color: var(--muted); }
+#nav button:active { transform: scale(.92); }
+#nav button svg { width: 24px; height: 24px; stroke-width: 1.6; }
+#nav button.on, #nav.has-ind button.on { color: var(--accent); background: none; box-shadow: none; font-weight: 600; }
+#nav button.on svg { fill: currentColor; fill-opacity: .18; }
+#nav button:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+/* screens you play on (player, exercise, jam, note quiz) have their own Back; the tab bar / sidebar leaves and gives its space back */
+body:is([data-screen="play"], [data-screen="exercise"], [data-screen="jam"], [data-screen="quiz"]) #nav { display: none; }
+body:is([data-screen="exercise"], [data-screen="jam"], [data-screen="quiz"]) { --tabbar: 0px; --side: 0px; }
+
+/* ============================ shell: sidebar mode ============================ */
+@media (min-width: 700px), (max-height: 600px) and (orientation: landscape) {
+  #app { display: grid; grid-template-columns: var(--side) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  body[data-screen="play"] #app { --side: 0px; }
+  #topbar { grid-column: 2; grid-row: 1; }
+  #screen { grid-column: 2; grid-row: 2; }
+  #nav {
+    position: relative; inset: auto; grid-column: 1; grid-row: 1 / -1; height: auto; width: var(--side); flex-direction: column;
+    align-items: stretch; gap: 4px; padding: var(--s5) var(--s2) calc(var(--s4) + var(--sab));
+    border-top: 0; border-right: 1px solid var(--line); background: var(--bg-deep); -webkit-backdrop-filter: none; backdrop-filter: none; overflow-y: auto; scrollbar-width: none;
+  }
+  #nav .nav-brand { display: flex; align-items: center; gap: 10px; padding: 0 var(--s3) var(--s5); color: var(--text); }
+  #nav .nav-brand svg { width: 28px; height: 28px; stroke: none; color: rgba(255, 255, 255, 0.3); }
+  #nav .nav-brand b { font-family: var(--serif); font-weight: 500; font-size: 22px; letter-spacing: -.01em; }
+  #nav button {
+    flex: none; width: 100%; height: auto; min-height: 56px; padding: 8px 4px; justify-content: center; border-radius: var(--r-sm);
+    font-size: 10.5px; gap: 4px;
+  }
+  #nav button:hover { background: var(--hover); color: var(--text); }
+  #nav button.on, #nav.has-ind button.on { background: var(--accent-soft); }
+  .screen { padding: var(--s3) max(var(--gutter), calc((100% - 1100px) / 2)) var(--s7); }
+  #topbar { padding: var(--s5) max(var(--gutter), calc((100% - 1100px) / 2)) var(--s2); align-items: flex-end; }
+  body[data-screen="play"] #topbar { padding: 8px 12px; }
+  .top-left { align-items: flex-end; }
+  body[data-screen="play"] .top-left { align-items: center; }
+  .toast { left: calc(50% + var(--side) / 2); bottom: calc(var(--sab) + 20px); }
+  body[data-screen="play"] .toast { left: calc(20px + var(--sal, 0px)); bottom: auto; }
+}
+@media (min-width: 900px) and (min-height: 601px) {
+  #nav button {
+    flex-direction: row; justify-content: flex-start; gap: 12px; min-height: 44px; padding: 0 var(--s3); font-size: 15px; font-weight: 500;
+  }
+  #nav button svg { width: 22px; height: 22px; }
+  #nav button.on { font-weight: 600; }
+  #nav { padding-inline: var(--s3); }
+  /* the keyboard status sits at the foot of the wide sidebar (it stays in the top bar where the sidebar is hidden or narrow).
+     It lives in #topbar, a z-index 6 stacking context, so the sidebar drops under it; the two never overlap otherwise. */
+  body:not(:is([data-screen="play"], [data-screen="exercise"], [data-screen="jam"], [data-screen="quiz"])) #nav {
+    z-index: 5; padding-bottom: calc(var(--s4) + var(--sab) + 44px + var(--s3));
+  }
+  body:not(:is([data-screen="play"], [data-screen="exercise"], [data-screen="jam"], [data-screen="quiz"])) #kbStatus {
+    position: fixed; left: calc(var(--sal) + var(--s3)); bottom: calc(var(--s4) + var(--sab)); z-index: 1;
+    width: calc(var(--side) - var(--s3) * 2); max-width: none; height: 44px; min-height: 44px; padding: 0 var(--s3);
+    justify-content: flex-start; gap: 12px; border-radius: var(--r-sm); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line);
+  }
+  body:not(:is([data-screen="play"], [data-screen="exercise"], [data-screen="jam"], [data-screen="quiz"])) #kbStatus .dot { flex: none; }
+  body:not(:is([data-screen="play"], [data-screen="exercise"], [data-screen="jam"], [data-screen="quiz"])) #kbStatusText {
+    min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+}
+@media (max-height: 600px) and (orientation: landscape) {
+  #nav { padding: var(--s3) 6px var(--s3); }
+  #nav .nav-brand { display: none; }
+  #nav button { min-height: 48px; font-size: 9.5px; }
+  #nav button svg { width: 20px; height: 20px; }
+}
+@media (min-width: 700px) and (max-width: 899px), (min-width: 700px) and (max-height: 600px) { #nav .nav-brand b { display: none; } #nav .nav-brand { justify-content: center; padding-inline: 0; } }
+
+/* ============================ buttons ============================ */
+.primary {
+  height: 44px; padding: 0 var(--s6); border-radius: var(--r-pill); gap: 8px; font-size: var(--fs-headline); font-weight: 650; letter-spacing: -.005em;
+  background: var(--accent); color: var(--ink); border: 0; box-shadow: none;
+  transition: background-color var(--d-base) var(--ease-out), transform var(--d-fast) var(--ease-out), opacity var(--d-base);
+}
+.primary:hover:not(:disabled) { background: var(--accent-hover); box-shadow: none; }
+.primary:active:not(:disabled) { background: var(--accent-deep); transform: scale(.97); }
+.primary:disabled { background: var(--surface-3); color: var(--faint); opacity: 1; box-shadow: none; }
+.btn-l { height: 52px; font-size: var(--fs-headline); }
+.primary.btn-s, .ghost.btn-s { height: 36px; padding: 0 var(--s4); font-size: var(--fs-sub); }
+.ghost, .mini-btn, .chip-btn {
+  height: 44px; border-radius: var(--r-pill); border: 0; background: var(--surface-2); color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--line); font-weight: 600; font-size: var(--fs-sub);
+}
+.ghost { padding: 0 var(--s5); font-size: var(--fs-headline); }
+.mini-btn { height: 36px; padding: 0 var(--s4); }
+.ghost:hover:not(:disabled), .mini-btn:hover:not(:disabled), .chip-btn:hover { background: var(--surface-3); box-shadow: inset 0 0 0 1px var(--line-strong); }
+.ghost:active:not(:disabled), .mini-btn:active:not(:disabled) { transform: scale(.97); }
+.ghost:disabled, .mini-btn:disabled { color: var(--faint); background: var(--surface-2); opacity: .7; }
+.mini-btn.is-primary { background: var(--accent); color: var(--ink); box-shadow: none; }
+.mini-btn.is-primary:hover { background: var(--accent-hover); }
+.ghost.danger, .mini-btn.danger { color: var(--bad); box-shadow: inset 0 0 0 1px rgba(255, 122, 134, 0.35); background: var(--surface-2); height: 44px; }
+.ghost.danger:hover { background: rgba(255, 122, 134, 0.1); }
+.link { color: var(--accent); font-weight: 600; background: none; box-shadow: none; }
+.link:hover { color: var(--accent-hi); }
+button:focus-visible, .primary:focus-visible, .ghost:focus-visible { outline: 0; box-shadow: var(--focus-ring); }
+.hero-actions .primary, .hero-actions .ghost { height: 52px; }
+
+/* ============================ chips and segmented controls ============================ */
+.chips { gap: var(--s2); }
+.chips button, .chip-btn, .settings-jump button {
+  position: relative; height: 36px; min-width: 0; padding: 0 var(--s4); border-radius: var(--r-pill); border: 0; background: var(--surface-2);
+  color: var(--text); box-shadow: inset 0 0 0 1px transparent; font-size: calc(var(--fs-caption) * 1.04); font-weight: 500; white-space: nowrap;
+  transition: background-color var(--d-base) var(--ease-out), color var(--d-base), box-shadow var(--d-base);
+}
+.chips button::before, .settings-jump button::before { display: none; }   /* glass.css's pre-lit layer is replaced by the flat selected state below */
+.chips button::after, .chip-btn::after, .settings-jump button::after { content: ""; position: absolute; inset: -4px 0; }   /* 44px touch target around a 36px chip */
+@media (pointer: coarse) {
+  .chips button, .chip-btn, .settings-jump button, .level-chips button { min-height: 36px; }
+  .chips button::after, .chip-btn::after, .settings-jump button::after { left: 50%; right: auto; width: max(100%, 44px); transform: translateX(-50%); }   /* at least 44 x 44 even for a one-letter chip */
+  .level-chips { padding-block: 4px; margin-block: -4px; }   /* room inside a sideways scroller for the 44px hit areas */
+  .level-chips button { position: relative; }
+  .level-chips button::after { content: ""; position: absolute; top: -4px; bottom: -4px; left: 50%; width: max(100%, 44px); transform: translateX(-50%); }
+}
+.chips button:hover, .chip-btn:hover, .settings-jump button:hover { background: var(--surface-3); }
+.chips button.on, .chip-btn.on, .settings-jump button.on {
+  background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent-line); font-weight: 600;
+}
+.chips button.on svg { stroke: var(--accent); fill: var(--accent); }
+.seg, .kl-seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: var(--r-sm); border: 0; background: var(--surface-2); }
+.seg button, .kl-seg button {
+  min-height: 34px; padding: 0 var(--s4); border-radius: 9px; color: var(--muted); font-size: var(--fs-sub); font-weight: 500;
+  transition: background-color var(--d-base) var(--ease-out), color var(--d-base);
+}
+.seg button:hover, .kl-seg button:hover { background: none; color: var(--text); }
+.seg button.on, .seg button[aria-selected="true"], .kl-seg button.on, .kl-seg button[aria-selected="true"] {
+  background: var(--surface-3); color: var(--text); font-weight: 650; box-shadow: 0 0 0 1px var(--line-strong);
+}
+.chips, .level-chips, .settings-jump { scrollbar-width: none; }
+
+/* ============================ cards, rows, groups ============================ */
+.kl-card, .settings-card, .cover-tile, .lesson-tile, .game-card, .explore-card, .course-card, .tonics button {
+  background: var(--surface); border: 0; border-radius: var(--r-md); box-shadow: var(--e1), inset 0 0 0 1px var(--line);
+}
+.cover-tile { padding: 8px 8px 12px; border-radius: var(--r-md); }
+.cover { border-radius: var(--r-sm); box-shadow: none; }
+.cover-tile:hover, .lesson-tile:not(.locked):hover, .game-card:hover, .explore-card:hover { transform: none; }
+.cover-tile:active, .lesson-tile:not(.locked):active, .game-card:active, .explore-card:active { transform: scale(.98); }
+.tile-name { font-family: var(--font); font-weight: 600; font-size: calc(var(--fs-body) * .94); letter-spacing: -.005em; }
+.tile-sub { font-family: var(--font); font-style: normal; font-size: var(--fs-caption); color: var(--muted); }
+.lesson-tile .l-title, .lesson-title, .ex-title { font-family: var(--font); font-weight: 650; letter-spacing: -.01em; }
+.rail-head h2, .section-title { font-family: var(--font); font-weight: 650; font-size: var(--fs-title); letter-spacing: -.01em; }
+.hero-sub { font-family: var(--font); font-style: normal; font-size: var(--fs-sub); }
+.hero { border-radius: var(--r-lg); background: var(--surface); border: 0; box-shadow: inset 0 0 0 1px var(--line); }
+.greeting { font-size: var(--fs-display); letter-spacing: -.02em; }
+.greeting-sub { color: var(--faint); font-size: var(--fs-sub); }
+
+.kl-caption, .kl-group > h3, .settings-group > h3 { margin: var(--s5) var(--s4) var(--s2); color: var(--faint); font-size: var(--fs-caption); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.kl-group { margin: 0 0 var(--s6); background: var(--surface); border-radius: var(--r-md); overflow: hidden; box-shadow: inset 0 0 0 1px var(--line); }
+.kl-row, .setting, .setting-row {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s4); min-height: var(--row); padding: var(--s3) 0;
+  border-top: 1px solid var(--line); font-size: var(--fs-body); line-height: 1.3;
+}
+.kl-group > .kl-row { padding: var(--s3) var(--s4); }
+.kl-group > .kl-row:first-child { border-top: 0; }
+.kl-row .kl-glyph { width: 28px; height: 28px; border-radius: 7px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); flex: none; }
+.kl-row .kl-value { color: var(--muted); }
+
+.settings-grid { gap: var(--s4); }
+.settings-card { padding: var(--s4) var(--s4) var(--s2); }
+.settings-card h3, .settings-group h3 { font-family: var(--font); font-weight: 650; font-size: var(--fs-headline); letter-spacing: -.01em; margin: 0 0 var(--s2); }
+.setting-row > span:last-child { color: var(--muted); }
+.setting select, .fp-bar select, .ob-port select { background-color: var(--surface-2); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-pill); }
+.setting select:hover, .fp-bar select:hover, .ob-port select:hover { box-shadow: inset 0 0 0 1px var(--line-strong); }
+.setting input[type="range"] { accent-color: var(--accent); }
+.settings-jump { background: var(--bg); box-shadow: 0 1px 0 var(--line); }
+.danger-zone { border-color: rgba(255, 122, 134, 0.35); border-radius: var(--r-md); }
+/* iOS-style switch */
+.setting input[type="checkbox"] { width: 51px; height: 31px; border: 0; background: var(--surface-3); box-shadow: inset 0 0 0 1px var(--line-strong); }
+.setting input[type="checkbox"]::before { top: 2px; left: 2px; width: 27px; height: 27px; background: #fff; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4); transition: transform var(--d-base) var(--ease-out); }
+.setting input[type="checkbox"]:hover { box-shadow: inset 0 0 0 1px var(--line-strong); }
+.setting input[type="checkbox"]:checked { background: var(--accent); box-shadow: none; }
+.setting input[type="checkbox"]:checked::before { transform: translateX(20px); background: #fff; }
+/* the Bluetooth row is always there; its twin under "no keyboard found" said the same thing twice */
+#blePairHint { display: none !important; }
+
+/* progress, stars, empty states */
+.kl-progress { height: 6px; border-radius: var(--r-pill); background: var(--surface-3); overflow: hidden; }
+.kl-progress > i { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
+.kl-stars { display: inline-flex; gap: 2px; color: var(--star); }
+.kl-stars .off { color: var(--star-off); }
+.kl-empty { max-width: 280px; margin: var(--s8) auto; text-align: center; color: var(--muted); font-size: var(--fs-sub); }
+.kl-empty > svg { width: 56px; height: 56px; color: var(--faint); margin-bottom: var(--s3); }
+.kl-empty h3 { margin: 0 0 var(--s2); color: var(--text); font-size: var(--fs-headline); font-weight: 650; }
+.empty, .empty-recent { font-family: var(--font); color: var(--muted); font-size: var(--fs-sub); }
+.search-wrap { background: var(--surface-2); border-color: transparent; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-pill); }
+.search-wrap:focus-within { background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--accent-line), var(--focus-ring); }
+.search-input::placeholder { color: var(--faint); font-style: normal; }
+
+/* ============================ sheets and dialogs ============================ */
+dialog, .support-dialog { background: var(--surface); color: var(--text); border: 0; border-radius: var(--r-lg); box-shadow: var(--e3); padding: var(--s6); }
+dialog::backdrop, .support-dialog::backdrop { background: var(--scrim); }
+.sheet { background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--e3); animation-timing-function: var(--ease-out); }
+.sheet h2, .support-dialog h2, .confirm-dialog h2, dialog h2 { font-family: var(--font); font-weight: 650; font-size: var(--fs-title); letter-spacing: -.01em; margin: 0 0 var(--s3); }
+.confirm-dialog { border-radius: var(--r-md); }
+dialog[open] { opacity: 1; transform: none; transition: opacity var(--d-base) var(--ease-out), transform var(--d-slow) var(--ease-sheet), overlay var(--d-slow) allow-discrete, display var(--d-slow) allow-discrete; }
+@starting-style { dialog[open] { opacity: 0; transform: scale(.98); } }
+dialog:not([open]) { opacity: 0; }
+@media (max-width: 699px) {
+  dialog[open]:not(.confirm-dialog) {
+    margin: auto 0 0; width: 100%; max-width: 100%; max-height: 92dvh; border-radius: var(--r-lg) var(--r-lg) 0 0;
+    padding: var(--s6) var(--s5) calc(var(--sab) + var(--s4));
+  }
+  dialog[open]:not(.confirm-dialog)::before { content: ""; position: absolute; top: 8px; left: 50%; width: 36px; height: 5px; margin-left: -18px; border-radius: 3px; background: var(--line-strong); }
+  @starting-style { dialog[open]:not(.confirm-dialog) { opacity: 1; transform: translateY(100%); } }
+  dialog:not([open]):not(.confirm-dialog) { transform: translateY(100%); }
+  .support-dialog { width: 100%; }
+  .confirm-dialog[open] { width: min(320px, calc(100vw - 48px)); }
+}
+@media (min-width: 700px) { dialog[open] { max-width: min(640px, calc(100vw - 48px)); } .support-dialog { width: min(520px, calc(100vw - 48px)); } }
+
+/* ============================ toasts ============================ */
+.toast {
+  background: var(--glass); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  border: 0; box-shadow: var(--e2); border-radius: var(--r-pill); font-size: var(--fs-sub); color: var(--text);
+  bottom: calc(var(--tabbar) + var(--sab) + 12px); max-width: min(560px, calc(100vw - 32px));
+}
+.toast::before { box-shadow: none; background: var(--accent); }
+body[data-screen="play"] .toast { background: var(--chrome-raised); border: 0; box-shadow: inset 0 0 0 1px var(--chrome-line), 0 10px 26px rgba(0, 0, 0, 0.45); }
+.toast-action { background: var(--surface-3); border: 0; box-shadow: none; color: var(--accent); }
+
+@media (prefers-reduced-transparency: reduce) {
+  #nav, .toast, body.scrolled #topbar { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #nav button, #nav button.on svg, .titles, #topbar { transition: none !important; animation: none !important; }
+}
+@media (forced-colors: active) { #nav button.on { background: Highlight; color: HighlightText; } }
+
+/* ============================ Home header ============================ */
+.home-head { min-height: 0; margin: 0 0 var(--s4); padding-top: 0; }
+.home-head .greeting { margin: 0; }
+
+/* compact buttons keep their own size inside cards and rows */
+.primary.cr-small, .ghost.cr-small { height: 38px; padding: 0 var(--s4); font-size: var(--fs-sub); }
+.settings-jump { background: var(--bg-deep); }
+.level-chips { gap: var(--s2); } .level-chips button { height: 36px; padding: 0 var(--s4); }

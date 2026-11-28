@@ -25,8 +25,8 @@ APP="$APPS/$NAME.app"
 VERSION=$(plutil -extract version raw -o - "$ROOT/package.json")
 
 ELECTRON=$("$ROOT/scripts/find-electron.sh")
-ELECTRON_VERSION=$(plutil -extract CFBundleShortVersionString raw -o - "$ELECTRON/Contents/Info.plist")
 ARCHS=$(lipo -archs "$ELECTRON/Contents/MacOS/Electron")
+ELECTRON_VERSION=$(plutil -extract CFBundleShortVersionString raw -o - "$ELECTRON/Contents/Info.plist")
 echo "Building $NAME $VERSION from Electron $ELECTRON_VERSION ($ELECTRON)"
 
 STAGE=$(mktemp -d "${TMPDIR:-/tmp}/keylight-build.XXXXXX")
@@ -70,6 +70,9 @@ if [[ -x $BLOCKSD_DIR/blocksd ]]; then
 else
   echo "note: no bundled light daemon (run scripts/build-blocksd.sh first): this build lights keys only if blocksd is installed by hand" >&2
 fi
+# Piano cover models (tools/music2midi/fetch-and-build-onnx.sh): checked against their manifest, then copied. Without them the
+# build still works and keeps Basic Pitch for songs.
+node "$ROOT/scripts/cover-models.js" stage "$RES/music2midi-models"
 # licence notices travel with the binary
 cp "$ROOT/THIRD_PARTY_NOTICES.md" "$ROOT/LICENSE" "$RES/"
 cp -R "$ROOT/LICENSES" "$RES/"
@@ -91,8 +94,9 @@ set_string CFBundleVersion "$VERSION"
 set_string CFBundleShortVersionString "$VERSION"
 set_string LSApplicationCategoryType public.app-category.music
 set_string NSCameraUsageDescription "Keylight uses the camera for hand tracking"
-# Electron's stock plist asks for the microphone, audio capture and Bluetooth; Keylight uses none of them
-for key in NSMicrophoneUsageDescription NSAudioCaptureUsageDescription NSBluetoothAlwaysUsageDescription NSBluetoothPeripheralUsageDescription; do
+set_string NSMicrophoneUsageDescription "Keylight records a song you play or sing so it can write out the notes. Recordings stay on this device."
+# Keylight only captures audio from the microphone.
+for key in NSAudioCaptureUsageDescription NSBluetoothAlwaysUsageDescription NSBluetoothPeripheralUsageDescription; do
   plutil -remove "$key" "$PL" 2>/dev/null || true
 done
 # integrity entry for the removed default_app.asar; LSMinimumSystemVersion stays Electron's

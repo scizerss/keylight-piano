@@ -1,0 +1,350 @@
+/* First-run setup and the Connect screen (app.js openSetup / openConnect; index.html #onboarding).
+   One calm column: a lit keyboard hero, a serif headline, one primary button pinned at the bottom, Back at the top left.
+   Phone landscape puts the headline beside the content so Back and the button stay on screen without scrolling.
+   Linked after tokens.css and the older stage sheets (style.css, glass.css, responsive.css still carry the 2025 setup
+   rules); every rule here is scoped to #onboarding so it wins over them. ios.css adds the safe-area padding. */
+
+#onboarding {
+  --ob-left: #3D8BFF; --ob-right: #FF8A3D;        /* hand colours (theme.js) */
+  --ob-col: 560px;
+  display: flex; flex-direction: column; align-items: stretch; grid-template-columns: none;
+  overflow: hidden; color: var(--text);
+  background:
+    radial-gradient(70% 46% at 50% 0%, rgba(var(--accent-rgb), 0.10), transparent 70%),
+    radial-gradient(60% 40% at 12% 100%, rgba(61, 139, 255, 0.10), transparent 70%),
+    radial-gradient(60% 40% at 88% 100%, rgba(255, 138, 61, 0.08), transparent 70%),
+    var(--bg);
+}
+
+/* ---------- top bar: Back, progress, Close ---------- */
+#onboarding .ob-bar {
+  flex: none; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
+  min-height: 52px; padding: var(--s1) var(--s2) 0; position: relative; z-index: 3; order: -1;   /* above the hero */
+}
+#onboarding .ob-back {
+  justify-self: start; display: inline-flex; align-items: center; gap: 2px; min-width: 44px; min-height: 44px; padding: 0 var(--s3) 0 var(--s1);
+  border: 0; border-radius: var(--r-pill); background: none; color: var(--accent); font: inherit; font-size: var(--fs-body); font-weight: 500; cursor: pointer;
+}
+#onboarding .ob-back svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 2.2; }
+#onboarding .ob-back:hover { background: var(--hover, rgba(255, 255, 255, 0.06)); }
+#onboarding .ob-back:focus-visible, #onboarding .ob-link:focus-visible { outline: 0; box-shadow: var(--focus-ring, 0 0 0 2px var(--accent)); }
+#onboarding .ob-back[hidden] { display: inline-flex; visibility: hidden; }
+#onboarding .ob-close { position: static; justify-self: end; grid-column: 3; top: auto; right: auto; background: none; }
+#onboarding .ob-close:hover { background: var(--surface-2); }
+#onboarding .ob-steps { grid-column: 2; display: flex; gap: 6px; margin: 0; padding: 0; list-style: none; }
+#onboarding .ob-steps li { width: 8px; height: 8px; border-radius: 4px; background: var(--surface-3); transition: width var(--d-base) var(--ease-out), background-color var(--d-base); }
+#onboarding .ob-steps li::before { content: none; }
+#onboarding .ob-steps li.on { width: 24px; background: var(--accent); }
+#onboarding .ob-steps li.done { background: rgba(var(--accent-rgb), 0.45); }
+#onboarding .ob-steps li.hidden { display: none; }
+#onboarding[data-step="welcome"] .ob-bar { visibility: hidden; min-height: 0; height: 0; padding: 0; }
+
+/* ---------- the hero: a flat lit keyboard, notes falling into it ---------- */
+#onboarding .ob-stage {
+  flex: none; position: relative; display: flex; flex-direction: column; justify-content: flex-end; align-items: center;
+  height: 92px; overflow: hidden; perspective: none; transition: height var(--d-slow) var(--ease-out);
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 28%); mask-image: linear-gradient(180deg, transparent 0, #000 28%);
+}
+#onboarding[data-step="welcome"] .ob-stage { height: clamp(220px, 50vh, 460px); }
+#onboarding[data-step="pick"] .ob-stage { height: 0; }
+#onboarding .ob-keys {
+  --kw: min(30px, calc((100vw - 64px) / var(--white-keys, 14) - 4px));
+  display: flex; gap: 4px; padding: 10px 12px 0; transform: none; position: relative;
+  border-radius: 18px 18px 0 0; background: linear-gradient(180deg, #161a2e, #0b0e1c);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 -20px 60px -30px rgba(var(--glow-rgb), 0.35);
+}
+#onboarding .ob-keys.long { --kw: min(16px, calc((100vw - 56px) / var(--white-keys, 28) - 2px)); gap: 2px; padding: 8px 10px 0; }
+#onboarding .ob-keys i {
+  width: var(--kw); height: 64px; border-radius: 0 0 6px 6px; animation: none;
+  background: linear-gradient(180deg, #f2f1ec, #dcdbd4); box-shadow: inset 0 -5px 0 rgba(0, 0, 0, 0.14);
+  transition: background-color .1s, box-shadow .1s;
+}
+#onboarding .ob-keys.long i { height: 58px; border-radius: 0 0 4px 4px; }
+/* black keys: after C, D, F, G and A (the drawn keyboard starts on a C) */
+#onboarding .ob-keys i { position: relative; }
+#onboarding .ob-keys i:is(:nth-child(7n+1), :nth-child(7n+2), :nth-child(7n+4), :nth-child(7n+5), :nth-child(7n+6)):not(:last-child)::after {
+  content: ''; position: absolute; top: 0; right: calc(-0.3 * var(--kw) - 2px); z-index: 1; width: calc(0.6 * var(--kw)); height: 58%;
+  border-radius: 0 0 4px 4px; background: linear-gradient(180deg, #2a2f46, #0c0e1a); box-shadow: 0 2px 3px rgba(0, 0, 0, 0.5);
+}
+#onboarding .ob-keys.long i:is(:nth-child(7n+1), :nth-child(7n+2), :nth-child(7n+4), :nth-child(7n+5), :nth-child(7n+6)):not(:last-child)::after { right: calc(-0.3 * var(--kw) - 1px); }
+#onboarding[data-step="welcome"] .ob-keys i { height: clamp(84px, 13vh, 132px); }
+#onboarding[data-step="welcome"] .ob-keys { --kw: min(34px, calc((100vw - 64px) / var(--white-keys, 14) - 4px)); }
+#onboarding[data-step="welcome"] .ob-keys.long { --kw: min(22px, calc((100vw - 56px) / var(--white-keys, 28) - 2px)); }
+
+/* welcome: six notes fall in the hand colours and light the key they land on */
+#onboarding .ob-rain { position: absolute; left: 50%; top: 0; bottom: var(--keys-h, 104px); width: var(--rw, 0px); transform: translateX(-50%); display: none; pointer-events: none; z-index: 0; }
+#onboarding .ob-keys { z-index: 1; }
+#onboarding[data-step="welcome"] .ob-rain { display: block; }
+#onboarding .ob-rain i {
+  position: absolute; top: 0; width: 6.2%; height: 46px; border-radius: 8px; opacity: 0;
+  animation: obRain 4.2s cubic-bezier(.45, 0, .8, .6) infinite;
+}
+#onboarding .ob-rain i.l { background: var(--ob-left); box-shadow: 0 0 24px rgba(61, 139, 255, 0.7); }
+#onboarding .ob-rain i.r { background: var(--ob-right); box-shadow: 0 0 24px rgba(255, 138, 61, 0.7); }
+#onboarding .ob-rain i:nth-child(1) { left: 14.3%; animation-delay: 0s; }
+#onboarding .ob-rain i:nth-child(2) { left: 64.3%; animation-delay: .7s; height: 70px; }
+#onboarding .ob-rain i:nth-child(3) { left: 28.6%; animation-delay: 1.4s; }
+#onboarding .ob-rain i:nth-child(4) { left: 78.6%; animation-delay: 2.1s; height: 34px; }
+#onboarding .ob-rain i:nth-child(5) { left: 50%; animation-delay: 2.8s; }
+#onboarding .ob-rain i:nth-child(6) { left: 35.7%; animation-delay: 3.5s; height: 60px; }
+@keyframes obRain { 0% { top: -70px; opacity: 0; } 12% { opacity: 1; } 76% { top: calc(100% - 40px); opacity: 1; } 86%, 100% { top: calc(100% + 10px); opacity: 0; } }
+#onboarding[data-step="welcome"] .ob-stage { --keys-h: calc(clamp(84px, 13vh, 132px) + 10px); --rw: calc(14 * (min(34px, calc((100vw - 64px) / 14 - 4px)) + 4px)); }
+/* the key each note lands on glows as it arrives */
+#onboarding[data-step="welcome"] .ob-keys i:nth-child(3)  { animation: obLandL 4.2s infinite 0s; }
+#onboarding[data-step="welcome"] .ob-keys i:nth-child(10) { animation: obLandR 4.2s infinite .7s; }
+#onboarding[data-step="welcome"] .ob-keys i:nth-child(5)  { animation: obLandL 4.2s infinite 1.4s; }
+#onboarding[data-step="welcome"] .ob-keys i:nth-child(12) { animation: obLandR 4.2s infinite 2.1s; }
+#onboarding[data-step="welcome"] .ob-keys i:nth-child(8)  { animation: obLandR 4.2s infinite 2.8s; }
+#onboarding[data-step="welcome"] .ob-keys i:nth-child(6)  { animation: obLandL 4.2s infinite 3.5s; }
+@keyframes obLandL { 0%, 74%, 100% { background: #ecebe5; box-shadow: inset 0 -5px 0 rgba(0, 0, 0, 0.14); } 78%, 92% { background: var(--ob-left); box-shadow: 0 0 28px var(--ob-left); } }
+@keyframes obLandR { 0%, 74%, 100% { background: #ecebe5; box-shadow: inset 0 -5px 0 rgba(0, 0, 0, 0.14); } 78%, 92% { background: var(--ob-right); box-shadow: 0 0 28px var(--ob-right); } }
+
+/* keys you press (setupKeysTick), the end key to press (key range), and the light sweep on connect */
+#onboarding .ob-keys i.down { animation: none; background: var(--ob-left); box-shadow: 0 0 26px var(--ob-left); }
+#onboarding .ob-keys i.down:nth-child(n+8) { background: var(--ob-right); box-shadow: 0 0 26px var(--ob-right); }
+#onboarding .ob-keys.long i.down:nth-child(-n+15) { background: var(--ob-left); box-shadow: 0 0 26px var(--ob-left); }
+#onboarding .ob-keys i.guide { animation: obGuide 1.1s ease-in-out infinite; }
+#onboarding .ob-keys.sweep i { animation: obSweep .62s ease-out calc(var(--i, 0) * 30ms) both; }
+
+/* ---------- the column ---------- */
+#onboarding .ob-side {
+  flex: 1 1 auto; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+  display: flex; justify-content: center; align-self: stretch; padding: 0 var(--gutter, 16px); color: var(--text); width: auto; max-width: none; margin: 0;
+}
+#onboarding .ob-card {
+  width: min(var(--ob-col), 100%); min-height: 100%; display: flex; flex-direction: column;
+  margin: 0; padding: var(--s5) 0 0; background: none; border: 0; border-radius: 0; box-shadow: none;
+  backdrop-filter: none; -webkit-backdrop-filter: none; animation: none;
+}
+#onboarding .ob-head { text-align: left; }
+#onboarding .ob-kicker { display: none; color: var(--accent); letter-spacing: .14em; font-size: var(--fs-caption); font-weight: 650; margin-bottom: var(--s2); }
+#onboarding .ob-step-title {
+  margin: 0; font-family: var(--serif); font-weight: 500; letter-spacing: -.02em; line-height: 1.08;
+  font-size: calc(30px * var(--ts, 1)); outline: none;
+}
+#onboarding .ob-step-copy { margin: var(--s2) 0 0; color: var(--muted); font-size: var(--fs-body); line-height: 1.45; max-width: 34em; }
+#onboarding .ob-body { flex: 1 0 auto; padding: var(--s5) 0 var(--s4); }
+#onboarding .ob-panel { margin: 0; }
+#onboarding .ob-panel.hidden { display: none; }
+
+/* welcome: centred, the biggest headline */
+#onboarding[data-step="welcome"] .ob-card { padding-top: var(--s5); }
+#onboarding[data-step="welcome"] .ob-head { text-align: center; }
+#onboarding[data-step="welcome"] .ob-kicker { display: block; }
+#onboarding[data-step="welcome"] .ob-step-title { font-size: calc(38px * var(--ts, 1)); }
+#onboarding[data-step="welcome"] .ob-step-copy { margin-inline: auto; max-width: 22em; }
+#onboarding[data-step="welcome"] .ob-body { padding: 0; flex-grow: 1; min-height: var(--s4); }
+
+/* ---------- buttons: one primary pinned at the bottom, a quiet text link under it ---------- */
+#onboarding .ob-actions {
+  position: sticky; bottom: 0; z-index: 2; display: flex; flex-direction: column; align-items: stretch; gap: var(--s1);
+  margin: 0 calc(-1 * var(--gutter, 16px)); padding: var(--s4) var(--gutter, 16px) max(var(--s4), env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(180deg, rgba(7, 9, 20, 0), var(--bg) 34%);
+}
+html.ios #onboarding .ob-actions { padding-bottom: var(--s4); }   /* #onboarding already pads the home indicator */
+#onboarding .ob-actions .primary {
+  flex: none; width: 100%; height: 54px; border-radius: var(--r-pill); font-size: var(--fs-headline); font-weight: 650;
+  background: var(--accent); color: var(--ink); box-shadow: 0 10px 30px -12px rgba(var(--accent-rgb), 0.65);
+}
+#onboarding .ob-actions .primary:disabled { background: var(--surface-3); color: var(--faint); box-shadow: none; }
+#onboarding .ob-actions .primary.hidden, #onboarding .ob-actions .hidden { display: none; }
+#onboarding .ob-link {
+  min-height: 44px; padding: 0 var(--s3); border: 0; border-radius: var(--r-pill); background: none; box-shadow: none;
+  color: var(--accent); font: inherit; font-size: var(--fs-sub); font-weight: 600; cursor: pointer;
+}
+#onboarding .ob-link:hover { background: var(--hover, rgba(255, 255, 255, 0.06)); }
+#onboarding .ob-skip { align-self: center; color: var(--muted); font-weight: 500; }
+#onboarding .ob-skip:hover { color: var(--text); }
+#onboarding #obMidiRetry { align-self: center; }
+
+/* ---------- step 2: how will you play ---------- */
+#onboarding .kb-pick { display: flex; flex-direction: column; gap: var(--s3); margin: 0; background: none; box-shadow: none; border-radius: 0; }
+#onboarding .kb-opt {
+  width: 100%; min-height: 84px; display: flex; align-items: center; gap: var(--s4); padding: var(--s4); text-align: left;
+  border: 0; border-radius: var(--r-md); background: var(--surface-2); color: var(--text); font: inherit; cursor: pointer;
+  box-shadow: inset 0 0 0 1px var(--line);
+  transition: background-color var(--d-base) var(--ease-out), box-shadow var(--d-base) var(--ease-out), transform var(--d-fast) var(--ease-out);
+}
+#onboarding .kb-opt:hover { background: var(--surface-3); }
+#onboarding .kb-opt:active { transform: scale(.985); }
+#onboarding .kb-opt[aria-checked="true"] { background: linear-gradient(160deg, rgba(var(--accent-rgb), 0.14), rgba(var(--accent-rgb), 0.05)); box-shadow: inset 0 0 0 1.5px var(--accent); }
+#onboarding .kb-opt:focus-visible { outline: 0; box-shadow: inset 0 0 0 2px var(--accent); }
+#onboarding .kb-glyph { width: 52px; height: 52px; flex: none; display: grid; place-items: center; border-radius: 14px; background: var(--surface-3); color: var(--muted); }
+#onboarding .kb-glyph svg { width: 36px; height: 36px; fill: currentColor; stroke: currentColor; }
+#onboarding .kb-glyph svg .lit { fill: var(--accent); }
+#onboarding .kb-glyph svg .seam { fill: var(--accent); opacity: .5; }
+#onboarding .kb-opt[aria-checked="true"] .kb-glyph { background: rgba(var(--accent-rgb), 0.16); color: var(--text); }
+#onboarding .kb-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+#onboarding .kb-text b { font-size: var(--fs-body); font-weight: 650; letter-spacing: -.005em; }
+#onboarding .kb-text small { color: var(--muted); font-size: var(--fs-sub); line-height: 1.35; }
+#onboarding .kb-text em { display: none; }
+#onboarding .kb-go { width: 18px; height: 18px; flex: none; color: var(--faint); stroke: currentColor; fill: none; stroke-width: 2.2; }
+#onboarding .kb-opt[aria-checked="true"] .kb-go { color: var(--accent); }
+
+/* the optional "Need a keyboard?" shop row (partykeys.js): under a hairline, quiet, never a bright card */
+.kb-affiliate { margin-top: var(--s3); padding: var(--s3) var(--s4); border: 1px solid var(--line); border-radius: 12px; display: flex; flex-direction: column; gap: var(--s2); text-align: left; }
+.kb-affiliate .kb-aff-title { font-size: var(--fs-sub); font-weight: 650; color: var(--text); }
+.kb-affiliate .kb-aff-offer { margin: 2px 0 0; font-size: var(--fs-caption); font-weight: 650; color: var(--accent); }
+.kb-affiliate .kb-aff-body, .kb-affiliate .kb-aff-note { margin: 0; color: var(--muted); font-size: var(--fs-caption); line-height: 1.45; }
+.kb-affiliate .kb-aff-action { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s2) var(--s3); }
+.kb-affiliate .kb-aff-action .mini-btn { min-height: 44px; }
+.kb-affiliate .kb-aff-note { flex: 1 1 14em; min-width: 0; }
+.kb-affiliate.compact { margin: var(--s2) var(--s4) var(--s3); }
+#onboarding #obPartyKeys { margin-top: var(--s5); padding: var(--s4) 0 0; border: 0; border-top: 1px solid var(--line); border-radius: 0; }
+#onboarding #obPartyKeys .kb-aff-title { color: var(--muted); }
+#onboarding #obPartyKeys .mini-btn { background: none; box-shadow: inset 0 0 0 1px var(--line-strong); color: var(--text); }
+
+/* ---------- step 3: connect ---------- */
+#onboarding .ob-search { display: flex; align-items: center; gap: var(--s4); padding: var(--s4); border-radius: var(--r-md); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line); }
+#onboarding .ob-search.hidden { display: none; }
+#onboarding .ob-search b { display: block; font-size: var(--fs-body); font-weight: 600; }
+#onboarding .ob-search small { display: block; color: var(--muted); font-size: var(--fs-sub); margin-top: 2px; }
+#onboarding .ob-pulse { position: relative; width: 36px; height: 36px; flex: none; display: grid; place-items: center; }
+#onboarding .ob-pulse::before, #onboarding .ob-pulse::after { content: ''; position: absolute; inset: 0; border-radius: 50%; border: 2px solid var(--accent); opacity: 0; animation: obPulse 2s ease-out infinite; }
+#onboarding .ob-pulse::after { animation-delay: 1s; }
+#onboarding .ob-pulse i { width: 12px; height: 12px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 16px var(--accent); }
+@keyframes obPulse { 0% { transform: scale(.35); opacity: .9; } 100% { transform: scale(1.15); opacity: 0; } }
+
+#onboarding .ob-devices { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s2); }
+#onboarding .ob-devices:empty { display: none; }
+#onboarding .ob-search:not(.hidden) + .ob-devices:not(:empty) { margin-top: var(--s3); }
+#onboarding .ob-dev { display: flex; align-items: center; gap: var(--s3); min-height: 68px; padding: var(--s3) var(--s3) var(--s3) var(--s4); border-radius: var(--r-md); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line); }
+#onboarding .ob-dev[data-tone="ok"] { background: linear-gradient(160deg, rgba(var(--ok-rgb), 0.12), rgba(var(--ok-rgb), 0.03)); box-shadow: inset 0 0 0 1px rgba(var(--ok-rgb), 0.4); }
+#onboarding .ob-dot { width: 10px; height: 10px; flex: none; border-radius: 50%; background: var(--faint); }
+#onboarding .ob-dev[data-tone="ok"] .ob-dot { background: var(--ok); box-shadow: 0 0 10px var(--ok); }
+#onboarding .ob-dev[data-tone="warn"] .ob-dot { background: var(--warn); }
+#onboarding .ob-dev[data-tone="wait"] .ob-dot { background: none; border: 2px solid var(--line-strong); border-top-color: var(--accent); width: 16px; height: 16px; animation: obSpin .8s linear infinite; }
+@keyframes obSpin { to { transform: rotate(360deg); } }
+#onboarding .ob-dev-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+#onboarding .ob-dev-text b { font-weight: 600; font-size: var(--fs-body); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#onboarding .ob-dev-text small { color: var(--muted); font-size: var(--fs-sub); }
+#onboarding .ob-dev[data-tone="warn"] .ob-dev-text small { color: var(--warn); }
+#onboarding .ob-dev .mini-btn { flex: none; min-height: 44px; padding: 0 var(--s4); }
+#onboarding .ob-dev .mini-btn.go { background: var(--accent); color: var(--ink); box-shadow: none; font-weight: 650; }
+
+/* connected: what you played, volume, a test note */
+#onboarding .ob-live { display: grid; grid-template-columns: auto 1fr; grid-template-areas: "chip vol" "chip test"; align-items: center; gap: var(--s2) var(--s4); margin-top: var(--s3); padding: var(--s4); border-radius: var(--r-md); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line); }
+#onboarding .ob-live.hidden { display: none; }
+#onboarding .ob-note-chip { grid-area: chip; width: 84px; height: 84px; border-radius: 20px; display: grid; place-content: center; text-align: center; background: var(--surface-3); transition: background-color var(--d-base), box-shadow var(--d-base); }
+#onboarding .ob-note-chip small { color: var(--faint); font-size: 11px; letter-spacing: .04em; }
+#onboarding .ob-note-chip b { font-family: var(--serif); font-weight: 500; font-size: 30px; line-height: 1.1; }
+#onboarding .ob-note-chip.hit { background: rgba(var(--accent-rgb), 0.16); box-shadow: inset 0 0 0 1.5px var(--accent); }
+#onboarding .ob-volume { grid-area: vol; display: flex; align-items: center; gap: var(--s3); min-width: 0; font-size: var(--fs-sub); flex: none; }
+#onboarding .ob-volume svg { width: 20px; height: 20px; flex: none; fill: var(--muted); }
+#onboarding .ob-volume input { flex: 1; min-width: 0; accent-color: var(--accent); min-height: 44px; }
+#onboarding .ob-volume output { min-width: 4ch; text-align: right; color: var(--muted); }
+#onboarding #obTestNote { grid-area: test; justify-self: start; min-height: 44px; }
+
+#onboarding .ob-side-pick { display: flex; flex-direction: column; gap: 2px; margin-top: var(--s3); padding: var(--s4); border-radius: var(--r-md); background: rgba(61, 139, 255, 0.12); box-shadow: inset 3px 0 0 var(--ob-left); }
+#onboarding .ob-side-pick.hidden { display: none; }
+#onboarding .ob-side-pick span { color: var(--muted); font-size: var(--fs-sub); }
+#onboarding .ob-hint { margin: var(--s3) 0 0; color: var(--muted); font-size: var(--fs-sub); line-height: 1.45; }
+#onboarding .ob-hint .ob-link { padding: 0 var(--s2); }
+#onboarding .ob-range { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s2); color: var(--muted); font-size: var(--fs-sub); }
+#onboarding .ob-range.hidden, #onboarding .ob-hint.hidden, #onboarding .ob-link.hidden { display: none; }
+#onboarding .ob-range .ob-link { padding-left: 0; }
+#onboarding .ob-check { margin: 0 0 var(--s3); min-height: 52px; border-radius: var(--r-md); background: var(--surface-2); font-size: var(--fs-sub); }
+#onboarding .ob-check.hidden { display: none; }
+#onboarding .ob-note { margin-top: var(--s3); }
+#onboarding .ob-note.hidden, #onboarding .ob-port.hidden, #onboarding .ob-install.hidden { display: none; }
+#onboarding .ob-port { margin-top: var(--s3); }
+
+#onboarding .ob-trouble { margin-top: var(--s4); border-top: 1px solid var(--line); padding-top: var(--s2); }
+#onboarding .ob-trouble > summary { min-height: 44px; display: flex; align-items: center; gap: var(--s2); cursor: pointer; color: var(--muted); font-size: var(--fs-sub); font-weight: 600; list-style: none; }
+#onboarding .ob-trouble > summary::-webkit-details-marker { display: none; }
+#onboarding .ob-trouble > summary::after { content: ''; width: 7px; height: 7px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg) translateY(-2px); transition: transform var(--d-base); }
+#onboarding .ob-trouble[open] > summary::after { transform: rotate(225deg) translateY(-2px); }
+#onboarding .ob-tips { margin: 0 0 var(--s3); padding-left: 1.2em; color: var(--muted); font-size: var(--fs-sub); line-height: 1.5; }
+#onboarding .ob-tips li { margin: 2px 0; }
+#onboarding .ob-tips li.hidden { display: none; }
+#onboarding .ob-trouble-actions { display: flex; flex-wrap: wrap; gap: var(--s2); }
+#onboarding .ob-trouble-actions .mini-btn { min-height: 44px; display: inline-flex; align-items: center; text-decoration: none; }
+#onboarding .ob-trouble-actions .hidden { display: none; }
+#onboarding .ob-install { margin-top: var(--s3); }
+
+/* ---------- step 4: ready ---------- */
+#onboarding .ob-summary { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--s2); }
+#onboarding .ob-summary li { display: inline-flex; align-items: center; gap: var(--s2); min-height: 40px; padding: 0 var(--s4) 0 var(--s2); border: 0; border-radius: var(--r-pill); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line); font-size: var(--fs-sub); }
+#onboarding .ob-summary li:first-child { padding-top: 0; }
+#onboarding .ob-summary .ob-mark { width: 26px; height: 26px; }
+#onboarding .ob-summary li[data-state="skip"] .ob-mark { box-shadow: inset 0 0 0 2px var(--line-strong); }
+#onboarding .ob-summary li[data-state="skip"] { color: var(--muted); }
+
+/* ---------- step changes: a short slide and fade ---------- */
+#onboarding .ob-card.enter { animation: obEnter var(--d-slow) var(--ease-out) both; }
+#onboarding .ob-card.enter.back { animation-name: obEnterBack; }
+@keyframes obEnter { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
+@keyframes obEnterBack { from { opacity: 0; transform: translateX(-24px); } to { opacity: 1; transform: none; } }
+
+/* ---------- iPad and Mac: more room, the hero a little bigger ---------- */
+@media (min-width: 700px) and (min-height: 600px) {
+  #onboarding { --ob-col: 600px; }
+  #onboarding .ob-bar { padding: var(--s3) var(--s4) 0; }
+  #onboarding .ob-stage { height: 120px; }
+  #onboarding[data-step="pick"] .ob-stage { height: 64px; }
+  #onboarding[data-step="welcome"] .ob-stage { height: clamp(260px, 42vh, 440px); }
+  #onboarding .ob-step-title { font-size: calc(40px * var(--ts, 1)); }
+  #onboarding[data-step="welcome"] .ob-step-title { font-size: calc(54px * var(--ts, 1)); }
+  #onboarding .ob-card { padding-top: var(--s6); }
+  #onboarding .ob-actions { margin: 0; padding-inline: 0; background: none; }
+  #onboarding .ob-actions .primary { width: auto; min-width: 280px; align-self: center; padding: 0 var(--s8); }
+}
+
+/* ---------- phone on its side: headline on the left, the step on the right, the button always visible ---------- */
+@media (orientation: landscape) and (max-height: 560px) {
+  #onboarding { --ob-col: 900px; }
+  #onboarding .ob-bar { min-height: 44px; padding-top: 0; }
+  #onboarding:not([data-step="welcome"]) .ob-stage { height: 0; }
+  #onboarding .ob-card { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); grid-template-rows: 1fr auto; column-gap: var(--s7); padding-top: var(--s2); }
+  #onboarding .ob-head { grid-column: 1; grid-row: 1 / span 2; align-self: start; position: sticky; top: var(--s2); }
+  #onboarding .ob-body { grid-column: 2; grid-row: 1; padding-top: 0; }
+  #onboarding .ob-actions { grid-column: 2; grid-row: 2; margin: 0; padding-inline: 0; padding-top: var(--s3); }
+  #onboarding .ob-step-title { font-size: calc(28px * var(--ts, 1)); }
+  #onboarding .ob-actions .primary { height: 48px; }
+  #onboarding .kb-opt { min-height: 68px; padding: var(--s3); }
+  #onboarding .kb-glyph { width: 44px; height: 44px; }
+  /* welcome: the hero on the left, the words and button on the right */
+  #onboarding[data-step="welcome"] { flex-direction: row; }
+  #onboarding[data-step="welcome"] .ob-stage { height: auto; flex: 1 1 50%; justify-content: flex-end; }
+  #onboarding[data-step="welcome"] .ob-keys i { height: 96px; }
+  #onboarding[data-step="welcome"] .ob-keys { --kw: min(26px, calc((50vw - 48px) / var(--white-keys, 14) - 4px)); }
+  #onboarding[data-step="welcome"] .ob-keys.long { --kw: min(14px, calc((50vw - 40px) / var(--white-keys, 28) - 2px)); }
+  #onboarding[data-step="welcome"] .ob-stage { --keys-h: 106px; --rw: calc(14 * (min(26px, calc((50vw - 48px) / 14 - 4px)) + 4px)); }
+  #onboarding[data-step="welcome"] .ob-side { flex: 1 1 50%; align-items: center; }
+  #onboarding[data-step="welcome"] .ob-card { display: flex; justify-content: center; min-height: 0; }
+  #onboarding[data-step="welcome"] .ob-body { flex-grow: 0; }
+  #onboarding[data-step="welcome"] .ob-head { position: static; }
+  #onboarding[data-step="welcome"] .ob-step-title { font-size: calc(32px * var(--ts, 1)); }
+  #onboarding[data-step="welcome"] .ob-actions { position: static; background: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #onboarding .ob-keys i, #onboarding .ob-rain i, #onboarding .ob-pulse::before, #onboarding .ob-pulse::after, #onboarding .ob-card.enter, #onboarding .ob-dev[data-tone="wait"] .ob-dot { animation: none !important; }
+  #onboarding[data-step="welcome"] .ob-rain i { opacity: .9; top: 40%; }
+  #onboarding .kb-opt, #onboarding .ob-steps li, #onboarding .ob-stage { transition: none; }
+}
+html.reduce-motion #onboarding .ob-keys i, html.reduce-motion #onboarding .ob-rain i, html.reduce-motion #onboarding .ob-card.enter { animation: none !important; }
+html.reduce-motion #onboarding[data-step="welcome"] .ob-rain i { opacity: .9; top: 40%; }
+
+/* ---------- the connection banner (conn-banner.js): under the status bar, never a modal ---------- */
+#connBanner {
+  position: fixed; left: 12px; right: 12px; margin-inline: auto; width: fit-content; top: calc(var(--sat, 0px) + 10px); z-index: 120; transform: translateY(-140%);
+  display: flex; align-items: center; gap: var(--s3); max-width: 560px; min-height: 44px; box-sizing: border-box; padding: var(--s2) var(--s4) var(--s2) var(--s3);
+  border: 0; border-radius: var(--r-pill); background: rgba(21, 26, 46, 0.94); color: var(--text); font: inherit; font-size: var(--fs-sub); text-align: left;
+  box-shadow: 0 0 0 1px var(--line-strong), 0 16px 40px -12px rgba(0, 0, 0, 0.8); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  transition: transform var(--d-slow) var(--ease-out), opacity var(--d-slow); opacity: 0; pointer-events: none; cursor: pointer;
+}
+#connBanner.show { transform: none; opacity: 1; pointer-events: auto; }
+#connBanner .cb-dot { width: 10px; height: 10px; flex: none; border-radius: 50%; background: var(--warn); }
+#connBanner[data-tone="ok"] .cb-dot { background: var(--ok); box-shadow: 0 0 10px var(--ok); }
+#connBanner[data-tone="wait"] .cb-dot { width: 16px; height: 16px; background: none; border: 2px solid var(--line-strong); border-top-color: var(--accent); animation: obSpin .8s linear infinite; }
+@media (prefers-reduced-motion: reduce) { #connBanner { transition: opacity var(--d-base); } #connBanner[data-tone="wait"] .cb-dot { animation: none; } }
+
+/* ---------- the level question (first run): three cards and an optional daily goal ---------- */
+#onboarding .kb-opt .kb-glyph b { font-size: 22px; font-weight: 750; color: inherit; }
+#onboarding .ob-goal { margin-top: var(--s4); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s2); color: var(--muted); font-size: var(--fs-sub); }
+#onboarding .ob-goal small { color: var(--faint); }
+#onboarding .ob-goal-chips { display: flex; gap: var(--s2); }
+#onboarding .ob-goal-chips button { min-height: 40px; padding: 0 var(--s3); border: 0; border-radius: var(--r-pill); background: var(--surface-2); color: var(--text); font: inherit; cursor: pointer; box-shadow: inset 0 0 0 1px var(--line); }
+#onboarding .ob-goal-chips button[aria-checked="true"] { box-shadow: inset 0 0 0 1.5px var(--accent); background: rgba(var(--accent-rgb), 0.1); }
+#onboarding #obAlt { align-self: stretch; min-height: 48px; border-radius: var(--r-pill); }

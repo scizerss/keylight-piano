@@ -42,7 +42,7 @@ function send(port, body) {
 
 /* ---------- documented config commands ---------- */
 
-// Brightness 0..100% (wire value is percent/4, max 0x19).
+// Brightness, config item 36: 0..100 on the wire (the 0x19 here is just the 7-bit packing of 100).
 export function setBrightnessPct(port, pct) {
   const v = Math.round((Math.max(0, Math.min(100, pct)) / 100) * 25)
   send(port, [0x10, 0x40, 0x04, v, 0, 0, 0, 0])
@@ -78,25 +78,9 @@ export function setColorModeNamed(port, name) {
   send(port, [0x10, 0x40, COLOR_MODE[name] ?? COLOR_MODE.piano, 0, 0, 0, 0, 0])
 }
 
-// Without a light service the keyboard's own program keeps every in-scale key lit, so a key
-// asked for by note can't be told from the rest. These commands turn its own colours off and
-// back on (rainbow, the factory mode: it can't be asked which mode it was in). Keyboards are
-// reported to answer on either address, and ignore the one that isn't theirs.
-function sendBoth(port, make) {
-  if (!port) return
-  for (const dev of [0x00, 0x37]) {
-    const body = make()
-    port.send([0xf0, ...ROLI_MFR, 0x77, dev, ...body, checksum(body), 0xf7])
-  }
-}
-export function blankOwnColours(port) {
-  sendBoth(port, () => [0x10, 0x40, COLOR_MODE.scale, 0, 0, 0, 0, 0])
-  sendBoth(port, () => [0x10, 0x20, 0x04, 0, 0, 0, 0x7e, 0x03])
-  sendBoth(port, () => [0x10, 0x30, 0x04, 0, 0, 0, 0x7e, 0x03])
-}
-export function restoreOwnColours(port) {
-  sendBoth(port, () => [0x10, 0x40, COLOR_MODE.rainbow, 0, 0, 0, 0, 0])
-}
+// The keyboard's own colours (blank while Keylight lights it, restore afterwards) are not done here
+// any more: those writes stay in the keyboard's flash, so blocks.js reads and saves them first and
+// puts back exactly what was there. The old blank-without-saving left keyboards black.
 
 // A key lit by note takes its colour from the velocity: a fixed sweep through the hues in the
 // keyboard's program, approximated here by these points. 127 is white.
@@ -133,29 +117,31 @@ export function velocityForColour(rgb) {
             3 set-key-off(note), 5 set-lighting-mode(mode, immediate), 11 brightness.
 */
 
-function sendPacket(port, fields) {
+// dev: the block's topology index (blocks.js); 0 is the block on the cable. Joined blocks each
+// need their own copy of a per-key command.
+function sendPacket(port, fields, dev = 0) {
   if (!port) return
   const body = pack7(fields)
-  port.send([0xf0, ...ROLI_MFR, 0x77, 0x00, ...body, checksum(body), 0xf7])
+  port.send([0xf0, ...ROLI_MFR, 0x77, dev & 0x3f, ...body, checksum(body), 0xf7])
 }
 
-export function beginApiMode(port) { sendPacket(port, [[0x01, 7], [0x00, 9]]) }
-export function endApiMode(port) { sendPacket(port, [[0x01, 7], [0x02, 9]]) }
-export function ping(port) { sendPacket(port, [[0x01, 7], [0x03, 9]]) }
+export function beginApiMode(port, dev = 0) { sendPacket(port, [[0x01, 7], [0x00, 9]], dev) }
+export function endApiMode(port, dev = 0) { sendPacket(port, [[0x01, 7], [0x02, 9]], dev) }
+export function ping(port, dev = 0) { sendPacket(port, [[0x01, 7], [0x03, 9]], dev) }
 
-export function programEvent(port, action, arg1, arg2) {
-  sendPacket(port, [[0x03, 7], [action, 32], [arg1 >>> 0, 32], [arg2 >>> 0, 32]])
+export function programEvent(port, action, arg1, arg2, dev = 0) {
+  sendPacket(port, [[0x03, 7], [action, 32], [arg1 >>> 0, 32], [arg2 >>> 0, 32]], dev)
 }
 
 export const LIGHTING_MODE = { default: 0, playingSong: 1, failed: 6, singleColor: 14 }
-export function setLightingMode(port, mode, immediately = 1) {
-  programEvent(port, 5, mode, immediately)
+export function setLightingMode(port, mode, immediately = 1, dev = 0) {
+  programEvent(port, 5, mode, immediately, dev)
 }
-export function setKeyOn(port, midiNote, argb) { programEvent(port, 2, midiNote, argb) }
-export function setKeyOff(port, midiNote) { programEvent(port, 3, midiNote, 0) }
-export function turnOffAllKeys(port) { programEvent(port, 0, 0, 0) }
-export function setAllKeysToColor(port, argb) { programEvent(port, 1, 0, argb) }
-export function setProgramBrightness(port, value) { programEvent(port, 11, value, 0) }
+export function setKeyOn(port, midiNote, argb, dev = 0) { programEvent(port, 2, midiNote, argb, dev) }
+export function setKeyOff(port, midiNote, dev = 0) { programEvent(port, 3, midiNote, 0, dev) }
+export function turnOffAllKeys(port, dev = 0) { programEvent(port, 0, 0, 0, dev) }
+export function setAllKeysToColor(port, argb, dev = 0) { programEvent(port, 1, 0, argb, dev) }
+export function setProgramBrightness(port, value, dev = 0) { programEvent(port, 11, value, 0, dev) }
 
 /* ---------- note-driven key lighting (fallback transport) ---------- */
 
@@ -175,10 +161,21 @@ export function setKeyColor(port, id, r, g, b) {
   else noteOn(port, 48 + id, 127)
 }
 
+// Notes 0-127 as a few multi-message buffers: 128 separate sends in one tick overflow the iOS bridge's queue (64
+// requests), so the last keys and the CC 123 never arrived. 32 messages (96 bytes) per send fits every transport.
+export function noteBursts(status, velocity, per = 32) {
+  const out = []
+  for (let from = 0; from < 128; from += per) {
+    const bytes = []
+    for (let p = from; p < Math.min(128, from + per); p++) bytes.push(status, p, velocity)
+    out.push(bytes)
+  }
+  return out
+}
 export function clearLights(port) {
   if (!port) return
   port.send([0xb0, 64, 0])
-  for (let p = 0; p < 128; p++) port.send([0x80, p, 0])
+  for (const bytes of noteBursts(0x80, 0)) port.send(bytes)
   port.send([0xb0, 123, 0])
 }
 

@@ -26,7 +26,15 @@ const POWERSHELL = JSON.stringify([
 
 async function main() {
   const ds = await import('../renderer/device-support.js')
+  const { readGenericEndKeys } = await import('../renderer/keyboard-profiles.js')
   await probe.ready()
+
+  assert.deepEqual(readGenericEndKeys(null, 21), { low: 21 }, 'an 88-key piano starts on A')
+  assert.deepEqual(readGenericEndKeys(21, 108), { done: true, keys: 88 })
+  assert.deepEqual(readGenericEndKeys(36, 96), { done: true, keys: 61 })
+  assert.deepEqual(readGenericEndKeys(37, 61), { done: true, keys: 25 }, 'the first key need not be C')
+  assert.deepEqual(readGenericEndKeys(21, 44), { done: true, keys: 24 }, 'generic 24-key keyboards stay supported')
+  for (const high of [12, 21, 43, 109, 128]) assert.deepEqual(readGenericEndKeys(21, high), { low: null, wrong: high })
 
   // ---- identity reply parser ----
   const one = ds.parseIdentityReply([0xf0, 0x7e, 0x00, 0x06, 0x02, 0x41, 0x01, 0x02, 0x03, 0x04, 0x01, 0x00, 0x00, 0x00, 0xf7])
@@ -122,6 +130,32 @@ async function main() {
     'https://github.com.evil.example/scizerss/keylight-piano/issues/new?title=a', 'https://evil.example/scizerss/keylight-piano/issues/new?title=a', 'http://github.com/scizerss/keylight-piano/issues/new?title=a',
     'https://github.com/scizerss/other/issues/new?title=a', 'https://github.com/scizerss/keylight-piano/issues/new?title=' + 'a'.repeat(2100), url + '#frag', 'https://user@github.com/scizerss/keylight-piano/issues/new?title=a'])
     assert.equal(isAllowedExternalUrl(bad), false, bad)
+
+  // ---- the iPhone/iPad mail to support: what the wizard writes passes the page rules, and nothing else does ----
+  const { isAllowedLink } = await import('../renderer/host-policy.js')
+  const mail = ds.buildSupportMailto(dirty)
+  assert.ok(mail.startsWith('mailto:support@keylightpiano.app?subject=Keyboard%20support%3A%20'), mail.slice(0, 80))
+  assert.ok(mail.length <= 1800, String(mail.length))
+  assert.deepEqual([...new URL(mail).searchParams.keys()], ['subject', 'body'])
+  assert.equal(isAllowedLink(mail), true)
+  assert.ok(!mail.includes('SECRET') && !/%25/.test(mail), 'no twice-encoded value, nothing private')
+  const longMail = ds.buildSupportMailto({ about: { name: 'é&?#= '.repeat(60) }, os: { platform: 'x'.repeat(200) }, ports: { inputs: Array(24).fill({ name: 'p' }) } })
+  assert.ok(longMail.length <= 1800 && isAllowedLink(longMail), String(longMail.length))
+  assert.equal(isAllowedLink(ds.buildSupportMailto({})), true, 'an empty report still makes a valid mail')
+  assert.equal(isAllowedLink(ds.buildSupportMailto({ about: { name: 'Piano\u2028X\u0085Y\u2029Z' } })), true, 'a typed line separator is stripped, not refused')
+  const MAIL = 'mailto:support@keylightpiano.app', MAIL_OK = MAIL + '?subject=a&body=b'
+  assert.equal(isAllowedLink(MAIL_OK), true); assert.equal(isAllowedLink(MAIL + '?body=b&subject=a'), true, 'either order')
+  // a line break in the body is the wizard's own: it passes. Any other encoded control byte, a line separator, or
+  // bytes that are not UTF-8 do not (header injection, or a mail app reading them as a new header line).
+  assert.equal(isAllowedLink(MAIL + '?subject=a&body=b%0Aline'), true, 'a newline in the body is fine')
+  for (const bad of [MAIL, MAIL + '?', MAIL + '?subject=a', MAIL + '?body=b', MAIL + '?subject=a&body=b&cc=evil%40example.com', MAIL + '?bcc=evil%40example.com&subject=a&body=b',
+    MAIL + '?subject=a&body=b&to=x', MAIL + '?subject=a&Subject=b', MAIL + '?subject=a&body=b&body=c', MAIL + '?subject=&body=b', MAIL + '?subject=a&body=',
+    MAIL + '?subject=a&body=b c', MAIL + '?subject=a&body=b&c=d', MAIL + '?subject=a&body=b#x', MAIL + '?subject=a&body=%2525', MAIL + '?subject=a&body=b%0D%0ABcc%3A%20x%40y',
+    MAIL + '?subject=a%0ABcc%3A%20x%40y&body=b', MAIL + '?subject=a%00b&body=b', MAIL + '?subject=a%E2%80%A8b&body=b', MAIL + '?subject=a&body=b%00c',
+    MAIL + '?subject=%FF&body=b', MAIL + '?subject=a&body=%C0%AF', MAIL + '?subject=a%0Db&body=b',
+    MAIL + '?subject=a&body=b\\@evil.com', 'mailto:evil@example.com?subject=a&body=b', 'mailto:support@keylightpiano.app.evil.example?subject=a&body=b',
+    'mailto:SUPPORT@keylightpiano.app?subject=a&body=b', MAIL + '?subject=a&body=' + 'a'.repeat(2000)])
+    assert.equal(isAllowedLink(bad), false, bad)
 
   // ---- free text: whole paths, serial aliases, machine names ----
   const clean = (t, redact = []) => ds.sanitizeText(t, 400, { redact })

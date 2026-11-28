@@ -7,8 +7,9 @@
 //   deps.audio: { init(), now(), click(accent, when), cancelClicks() }   the audio clock and the click sound
 //   deps.createClock, deps.setTimer, deps.clearTimer, deps.tapNow   (optional) for tests
 // mountPractice(root, deps) -> { refresh(), stopMetronome(), metronomeRunning(), metronome(), destroy() }
-import { ACTIVITIES, suggestLevel, bestAt, parseStats, recordUse, tempoFromTaps, isExercise } from './registry.js'
+import { ACTIVITIES, suggestLevel, bestAt, parseStats, recordUse, tempoFromTaps, isExercise, HARDER_AT } from './registry.js'
 import { createClock } from '../jam/clock.js'
+import { dot } from '../studio-copy.js'
 
 const BAR_SIZES = [2, 3, 4, 6]
 const pct = (x) => Math.round(x * 100) + '%'
@@ -25,6 +26,38 @@ function el(tag, props = {}, ...kids) {
   for (const kid of kids) if (kid) e.append(kid)
   return e
 }
+
+const SVGNS = 'http://www.w3.org/2000/svg'
+// 24x24 line icons, one list of path strings each (built with createElementNS, no markup strings)
+const ICONS = {
+  playground: ['M4 17V8l5 3 3-6 3 6 5-3v9', 'M4 20h16'],
+  jam: ['M4 12a8 8 0 0 1 14-5.3', 'M20 12a8 8 0 0 1-14 5.3', 'M18 3v4h-4', 'M6 21v-4h4'],
+  ear: ['M7 9a5 5 0 0 1 10 0c0 3-3 3.5-3 6.5a2.5 2.5 0 0 1-5 0', 'M12 9a1.5 1.5 0 0 1 1.5 1.5'],
+  echo: ['M4 12h3l3-6v12l-3-6', 'M14 9a4 4 0 0 1 0 6', 'M17 6.5a8 8 0 0 1 0 11'],
+  rhythm: ['M8 3h8l2 18H6z', 'M12 17 16 7', 'M9.5 12h5'],
+  sight: ['M3 7h18M3 11h18M3 15h18M3 19h18', 'M9 3v18'],
+  toolbox: ['M3 5h18v14H3z', 'M8 5v14M13 5v14M18 5v14', 'M6 5v8M11 5v8M16 5v8'],
+  games: ['M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z', 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z', 'M12 12h.01'],
+  metronome: ['M9 3h6l3 18H6z', 'M12 17 15 8', 'M10 13h4']
+}
+function icon(id, cls = 'pr-ic') {
+  const svg = document.createElementNS(SVGNS, 'svg')
+  svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('class', cls); svg.setAttribute('aria-hidden', 'true'); svg.setAttribute('focusable', 'false')
+  for (const d of ICONS[id] || ICONS.games) { const path = document.createElementNS(SVGNS, 'path'); path.setAttribute('d', d); svg.append(path) }
+  return svg
+}
+// Hub sections, in screen order. Cards stay in registry order in the page (the order screen readers and tests see);
+// the layout places them by `order` in the grid.
+const GROUPS = [
+  { name: 'Create', ids: ['jam', 'playground'], note: 'Make something, no score' },
+  { name: 'Ear', ids: ['ear', 'echo'], note: 'Listen, then answer or play it back' },
+  { name: 'Rhythm', ids: ['rhythm'] },
+  { name: 'Reading', ids: ['sight'] },
+  { name: 'Technique', ids: ['toolbox'] },
+  { name: 'Games', ids: ['games'] },
+  { name: 'Tools', ids: ['metronome'] }
+]
+const FEATURED = ['jam', 'playground']
 
 export function mountPractice(root, deps) {
   const activities = deps.activities || ACTIVITIES
@@ -127,17 +160,21 @@ export function mountPractice(root, deps) {
     const slider = el('input', { type: 'range', min: 40, max: 220, step: 1, class: 'pr-slider', 'aria-label': 'Tempo slider, 40 to 220 beats per minute' })
     const bars = BAR_SIZES.map((n) => el('button', { type: 'button', class: 'pr-seg', 'data-n': n, 'aria-pressed': 'false', 'aria-label': `${n} beats per bar`, text: String(n), onclick: () => setBar(n) }))
     const accent = el('input', { type: 'checkbox', id: 'prAccent', checked: true })
-    const toggle = el('button', { type: 'button', class: 'primary pr-start', onclick: () => (metro.running ? stopMetro() : startMetro()), text: 'Start' })
+    const toggle = el('button', { type: 'button', class: 'ghost pr-start', onclick: () => (metro.running ? stopMetro() : startMetro()), text: 'Start' })
     const dotRow = el('div', { class: 'pr-dots', 'aria-hidden': 'true' })
     const beatText = el('span', { class: 'pr-beattext', text: 'Stopped' })
+    const step = (d, label, glyph) => el('button', { type: 'button', class: 'pr-step', 'aria-label': label, text: glyph, onclick: () => setTempo(metro.bpm + d) })
     const panel = el('div', { class: 'pr-metro', role: 'group', 'aria-label': 'Metronome controls' },
-      el('div', { class: 'pr-row' },
-        el('label', { for: 'prTempo', class: 'pr-lab', text: 'Tempo (beats per minute)' }), tempo,
+      el('div', { class: 'pr-tempo' },
+        el('label', { for: 'prTempo', class: 'pr-lab', text: 'Tempo (beats per minute)' }),
+        el('div', { class: 'pr-dial' }, step(-1, 'Slower by one beat per minute', '\u2212'), tempo, step(1, 'Faster by one beat per minute', '+')),
+        el('span', { class: 'pr-unit', 'aria-hidden': 'true', text: 'BPM' }),
         el('button', { type: 'button', class: 'ghost pr-tap', text: 'Tap tempo', 'aria-label': 'Tap tempo: tap along with the beat', onclick: tap })),
       slider,
-      el('div', { class: 'pr-row' }, el('span', { class: 'pr-lab', id: 'prBarsLab', text: 'Beats per bar' }), el('div', { class: 'pr-segs', role: 'group', 'aria-labelledby': 'prBarsLab' }, ...bars)),
-      el('label', { class: 'pr-check' }, accent, el('span', { text: 'Accent on beat one' })),
-      el('div', { class: 'pr-row pr-beatrow' }, dotRow, beatText),
+      el('div', { class: 'pr-dots-wrap' }, dotRow, beatText),
+      el('div', { class: 'pr-opts' },
+        el('div', { class: 'pr-row' }, el('span', { class: 'pr-lab', id: 'prBarsLab', text: 'Beats per bar' }), el('div', { class: 'pr-segs', role: 'group', 'aria-labelledby': 'prBarsLab' }, ...bars)),
+        el('label', { class: 'pr-check' }, accent, el('span', { text: 'Accent on beat one' }))),
       el('div', { class: 'pr-acts' }, toggle))
     tempo.addEventListener('change', () => setTempo(tempo.value))
     slider.addEventListener('input', () => setTempo(slider.value))
@@ -149,45 +186,103 @@ export function mountPractice(root, deps) {
   }
 
   /* ----- the hub ----- */
+  const meters = new Map()                 // activity id -> the best-result bar
   function bestLine(a, level) {
     const best = bestAt(stats(), a.id, level)
     return best === null ? 'Not played at this level yet' : `Best at this level: ${pct(best)}`
   }
+  function paintBest(a, level) {
+    const p = picks.get(a.id)
+    if (!p) return
+    p.best.textContent = bestLine(a, level)
+    const best = bestAt(stats(), a.id, level)
+    const bar = meters.get(a.id)
+    if (bar) { bar.firstChild.style.width = best === null ? '0%' : pct(best); bar.classList.toggle('done', best !== null && best >= HARDER_AT) }
+  }
+  const head = (a) => el('div', { class: 'pr-head' },
+    el('span', { class: 'pr-tile', 'aria-hidden': 'true' }, icon(a.id)),
+    el('div', { class: 'pr-headtext' }, el('h3', { class: 'pr-title', text: a.title }), el('p', { class: 'pr-blurb', text: a.blurb })))
   function card(a) {
-    const head = [el('h3', { class: 'pr-title', text: a.title }), el('p', { class: 'pr-blurb', text: a.blurb })]
-    if (a.panel === 'metronome') return el('article', { class: 'pr-card pr-wide', 'data-id': a.id }, ...head, buildMetronome(a))
+    const feature = FEATURED.includes(a.id)
+    const cls = `pr-card${feature ? ' pr-feature' : ''}`
+    if (a.panel === 'metronome') return el('article', { class: 'pr-card pr-wide', 'data-id': a.id }, head(a), buildMetronome(a))
     if (!isExercise(a)) {
-      const go = el('button', { type: 'button', class: 'primary', 'data-act': 'start', 'aria-label': `Open ${a.title}`, text: 'Open', onclick: () => launch(a, 0) })
-      return el('article', { class: 'pr-card', 'data-id': a.id }, ...head, el('div', { class: 'pr-acts' }, go))
+      const go = el('button', { type: 'button', class: 'ghost pr-go', 'data-act': 'start', 'aria-label': `Open ${a.title}`, text: 'Open', onclick: (e) => { e.stopPropagation(); launch(a, 0) } })
+      const art = el('article', { class: cls, 'data-id': a.id, onclick: () => launch(a, 0) }, head(a), el('div', { class: 'pr-acts' }, go))
+      return art
     }
     const selId = `prLevel-${a.id}`
     const select = el('select', { id: selId, class: 'pr-select', 'data-act': 'level' })
     for (let l = 1; l <= a.levels; l++) select.append(el('option', { value: String(l), text: `Level ${l}` }))
     const best = el('p', { class: 'pr-best' })
-    const go = el('button', { type: 'button', class: 'primary', 'data-act': 'start', 'aria-label': `Start ${a.title}`, text: 'Start', onclick: () => launch(a, Number(select.value)) })
-    select.addEventListener('change', () => { best.textContent = bestLine(a, Number(select.value)) })
+    const meter = el('div', { class: 'pr-meter', 'aria-hidden': 'true' }, el('i'))
+    meters.set(a.id, meter)
+    const go = el('button', { type: 'button', class: 'ghost pr-go', 'data-act': 'start', 'aria-label': `Start ${a.title}`, text: 'Start', onclick: () => launch(a, Number(select.value)) })
+    select.addEventListener('change', () => { paintBest(a, Number(select.value)); paintReco() })
     picks.set(a.id, { select, best, activity: a })
-    return el('article', { class: 'pr-card', 'data-id': a.id }, ...head,
-      el('div', { class: 'pr-pick' }, el('label', { for: selId, class: 'pr-lab', text: 'Level' }), select), best,
-      el('div', { class: 'pr-acts' }, go))
+    return el('article', { class: cls, 'data-id': a.id }, head(a),
+      el('div', { class: 'pr-pick' }, el('label', { for: selId, class: 'pr-lab', text: 'Level' }), select, go),
+      el('div', { class: 'pr-bestwrap' }, best, meter))
   }
   const launch = (a, level) => deps.launch(a, level)
+
+  /* the recommended card: the exercise played least (registry order breaks ties), else the one not played for longest */
+  function recommend() {
+    const s = stats()
+    const list = activities.filter(isExercise)
+    if (!list.length) return null
+    const plays = (a) => (s.items[a.id] ? s.items[a.id].plays : 0)
+    const at = (a) => (s.items[a.id] ? s.items[a.id].lastAt : 0)
+    return list.reduce((best, a) => (plays(a) < plays(best) || (plays(a) === plays(best) && plays(a) > 0 && at(a) < at(best)) ? a : best), list[0])
+  }
+  const reco = { box: el('section', { class: 'pr-reco', 'aria-label': 'Recommended next' }), a: null }
+  function paintReco() {
+    const a = recommend()
+    reco.box.hidden = !a
+    if (!a) return
+    reco.a = a
+    const level = suggestLevel(stats(), a.id)
+    const played = (stats().items[a.id] || {}).plays > 0
+    const go = el('button', { type: 'button', class: 'primary btn-l pr-reco-go', 'data-act': 'reco', 'aria-label': `Start ${a.title}, level ${level}`, text: 'Start', onclick: () => launch(a, suggestLevel(stats(), a.id)) })
+    reco.box.replaceChildren(
+      el('span', { class: 'pr-tile pr-tile-l', 'aria-hidden': 'true' }, icon(a.id)),
+      el('div', { class: 'pr-reco-text' },
+        el('span', { class: 'kl-caption pr-reco-cap', text: played ? 'Up next' : 'Try this first' }),
+        el('h2', { class: 'pr-reco-title', text: a.title }),
+        el('p', { class: 'pr-reco-sub', text: `Level ${level}${dot()}about 5 minutes` })),
+      go)
+  }
 
   /** Repaint the suggested levels and best results from the stored stats (the metronome keeps running and keeps its settings). */
   function refresh() {
     const s = stats()
     for (const [id, p] of picks) {
       const suggested = suggestLevel(s, id)
-      for (const o of p.select.options) o.textContent = Number(o.value) === suggested ? `Level ${o.value} (suggested)` : `Level ${o.value}`
+      for (const o of p.select.options) { const is = Number(o.value) === suggested; o.textContent = is ? `Level ${o.value} ★` : `Level ${o.value}`; o.setAttribute('aria-label', is ? `Level ${o.value}, suggested` : `Level ${o.value}`) }   // short enough for a phone's select
       p.select.value = String(suggested)
-      p.best.textContent = bestLine(p.activity, suggested)
+      paintBest(p.activity, suggested)
     }
+    paintReco()
   }
 
-  const grid = el('div', { class: 'pr-grid' }, ...activities.map(card))
+  const cards = activities.map(card)
+  // place sections: each card and each section heading gets a grid `order`
+  const grid = el('div', { class: 'pr-grid' })
+  const placed = new Set()
+  GROUPS.forEach((g, gi) => {
+    const mine = cards.filter((c) => g.ids.includes(c.dataset.id))
+    if (!mine.length) return
+    const hd = el('h2', { class: 'pr-sec', text: g.name }, g.note ? el('span', { class: 'pr-sec-note', text: g.note }) : null)
+    hd.style.order = String(gi * 10)
+    grid.append(hd)
+    mine.forEach((c) => { c.style.order = String(gi * 10 + 1 + g.ids.indexOf(c.dataset.id)); placed.add(c) })
+  })
+  cards.forEach((c) => { if (!placed.has(c)) c.style.order = '900' })
+  // registry order in the DOM: cards first as built, headings are separate nodes
+  cards.forEach((c) => grid.append(c))
   root.replaceChildren(el('div', { class: 'pr-page' },
-    el('p', { class: 'pr-lead', text: 'Pick something and start. Practice never changes your course progress, and every minute counts toward today’s goal.' }),
-    grid))
+    el('p', { class: 'pr-lead', text: 'Practice never changes your course progress, and every minute counts toward today\u2019s goal.' }),
+    reco.box, grid))
   refresh()
 
   return {

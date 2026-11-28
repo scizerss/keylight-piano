@@ -5,6 +5,10 @@
 /* ---------- touch: no hover-only states, no double-tap zoom, no text selection on the playing surfaces ---------- */
 html.touch, html.touch body { -webkit-tap-highlight-color: transparent; }
 html.touch button, html.touch [role="button"], html.touch select, html.touch label, html.touch .cover-tile, html.touch .cr-level { touch-action: manipulation; }
+/* the app's chrome is not text to select (a long press raised Copy / Look Up over the buttons); fields, licences and lyrics stay selectable */
+html.touch body, html.touch body * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+html.touch input, html.touch textarea, html.touch [contenteditable], html.touch .notices-body, html.touch .notices-body *, html.touch .about-url,
+html.touch .kl-lyrics, html.touch .kl-lyrics *, html.touch .lyrics, html.touch .lyrics *, html.touch #dsPreview, html.touch #diagText { -webkit-user-select: text; user-select: text; }
 #stage, .ex-padsvg, .rx-pad { touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 @media (pointer: coarse) {
   .iconbtn, .hudbtn, .kb-chip, .mini-btn, .ghost, .chips button, .chip-btn, .settings-jump button, .toast-action, .oct-mini,
@@ -39,14 +43,7 @@ html.android .ob-install { display: none !important; }       /* the desktop ligh
   body[data-screen="play"] .hud-actions { gap: 2px; }
   body[data-screen="play"] .hud-octave { min-width: 80px; }
 }
-@media (max-width: 900px) {
-  body[data-screen="home"] #topbar {
-    left: 0; right: 0; top: 0; padding: 8px var(--gutter); justify-content: flex-end; height: auto;
-    background: linear-gradient(180deg, var(--bg-deep) 72%, rgba(5, 7, 22, 0));
-  }
-  body[data-screen="home"] #screen-home { padding-top: 64px; }
-  .home-stats { justify-content: flex-start; }
-}
+@media (max-width: 900px) { .home-stats { justify-content: flex-start; } }
 @media (pointer: coarse) { .cover-tile .heart, .heart { min-width: 44px; min-height: 44px; margin: -9px -9px -9px 0; display: inline-grid; place-items: center; } }
 
 /* programmatic focus (a heading after a screen change) is not a tap target: no ring on touch */
@@ -75,10 +72,7 @@ html.touch [tabindex="-1"]:focus-visible { outline: 0; box-shadow: none; }
   #nav button { flex: none; width: 100%; height: 50px; min-height: 50px; border-radius: 19px; font-size: 9px; padding: 0; gap: 2px; }
   #nav button svg { width: 20px; height: 20px; }
   .nav-ind { display: none; }
-  #nav.has-ind button.on { background: linear-gradient(180deg, rgba(124, 240, 198, 0.17), rgba(124, 240, 198, 0.05)); box-shadow: inset 0 0 0 1px rgba(124, 240, 198, 0.24); }
-  body:not([data-screen="play"]) .screen, body:not([data-screen="play"]) #topbar { padding-left: calc(92px + env(safe-area-inset-left, 0px)); }
-  body[data-screen="home"] #topbar { padding-left: 0; }
-  .screen { padding-bottom: 28px; }
+  #nav.has-ind button.on { background: linear-gradient(180deg, rgba(var(--accent-rgb), 0.17), rgba(var(--accent-rgb), 0.05)); box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.24); }
 }
 
 /* 360px phones: the screen title ("Settings") shares a row with back, the keyboard chip and settings, so it gets a size that fits */
@@ -93,9 +87,6 @@ html.touch [tabindex="-1"]:focus-visible { outline: 0; box-shadow: none; }
 
 /* tablet in portrait: the centred search pill was 280px and cut its own placeholder */
 @media (min-width: 701px) and (max-width: 900px) { .top-search { width: 340px; } }
-
-/* 7-inch tablet on its side (521 to 600px high): a shorter sheet strip, so the falling notes keep room */
-@media (min-height: 521px) and (max-height: 600px) and (orientation: landscape) { body[data-screen="play"] .sheet-strip:not(.sheet-only) { height: 104px; } }
 
 /* Home on a narrow portrait phone: the hero card stacks (cover art across the top, then the title and two full-width buttons)
    instead of a small cover floating beside a three-line title */
@@ -118,20 +109,9 @@ html.touch [tabindex="-1"]:focus-visible { outline: 0; box-shadow: none; }
   html.ios body[data-screen="play"] .hud-octave { height: auto; min-height: 48px; padding-block: 2px 3px; }
 }
 
-/* Home's top bar is fixed to the screen edge, so it ignored the notch: keep it below the status bar and Dynamic Island */
-@media (max-width: 900px) {
-  html.ios body[data-screen="home"] #topbar { padding-top: calc(8px + env(safe-area-inset-top, 0px)); }
-}
-
 /* a phone on its side: the player runs edge to edge, so keep it clear of the Dynamic Island / notch and the rounded corners
    (the other screens already clear them through the nav rail's padding) */
 html.ios body[data-screen="play"] #app { padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
-
-/* dialogs stay between the status bar / Dynamic Island and the home indicator */
-html.ios dialog[open] {
-  max-height: calc(100dvh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
-  margin-top: calc(12px + env(safe-area-inset-top, 0px)); margin-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-}
 
 /* the first-run setup is a full-screen layer outside #app: clear the status bar, Dynamic Island, rounded corners and home indicator */
 html.ios #onboarding {
@@ -147,3 +127,6 @@ html.ios #onboarding {
   html.android .quiz-help { min-height: 0; margin-bottom: 6px; font-size: 14px; }
   html.android .quiz-pad { max-width: 330px; }
 }
+
+/* The iOS stylesheet reveals the label only for Course and Exercise back navigation. */
+#back :is(.ios-course-back, .ios-exercise-back) { display: none; }

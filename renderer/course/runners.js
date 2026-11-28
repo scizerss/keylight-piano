@@ -5,7 +5,7 @@ import { assignFingering } from '../fingering.js'
 import { findLesson, findLevel } from './course-engine.js'
 
 /** Item types the app can run. Every type the schema knows has a runner; a type from a newer course file that is not here shows as a quiet optional row. */
-export const SUPPORTED = new Set(['five-finger', 'scale', 'arpeggio', 'chord', 'notegame', 'piece', 'theory', 'echo', 'rhythm', 'ear', 'sight'])
+export const SUPPORTED = new Set(['five-finger', 'scale', 'arpeggio', 'chord', 'notegame', 'piece', 'theory', 'echo', 'rhythm', 'ear', 'sight', 'hand-intro'])
 export const isRunnable = (item) => SUPPORTED.has(item.type)
 
 /** Types that run in their own exercise screen (exercise-ui.js). */
@@ -16,7 +16,8 @@ export const PLAYER_TYPES = new Set(['five-finger', 'scale', 'arpeggio', 'chord'
 
 export const TYPE_LABEL = {
   'five-finger': 'Five-finger pattern', scale: 'Scale', arpeggio: 'Arpeggio', chord: 'Chords', notegame: 'Note game',
-  piece: 'Tune', echo: 'Echo', rhythm: 'Rhythm', ear: 'Ear training', sight: 'Sight reading', theory: 'Quiz'
+  piece: 'Tune', echo: 'Echo', rhythm: 'Rhythm', ear: 'Ear training', sight: 'Sight reading', theory: 'Quiz',
+  'hand-intro': 'Hand placement'
 }
 
 /**
@@ -87,7 +88,7 @@ export function noteGameAccuracy(rounds, right, wrong) {
 
 /** Short line for a row: what the learner must reach. */
 export const passText = (item) => {
-  const p = item.passAt || {}
+  const p = item.passAt === 1 ? { accuracy: 1 } : item.passAt || {}
   const parts = []
   if (p.accuracy !== undefined) parts.push(Math.round(p.accuracy * 100) + '%')
   else if (!p.stars) parts.push('80%')

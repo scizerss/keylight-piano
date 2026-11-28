@@ -73,11 +73,7 @@ function log(...args) {
 // the old address is then only ever bound for that move.
 
 // ---- blocksd ------------------------------------------------------------------
-// The keyboard's per-key lighting is driven by the blocksd daemon. The app starts
-// it when it is not running, so it works after a reboot without manual steps, and
-// a watchdog brings the keyboard back when it drops off a running daemon.
-// blocksd runs on macOS and Linux only, so on Windows none of this runs (openWindow):
-// the keys light from plain MIDI notes there (renderer/app.js, "Tier-B light fallback").
+// Optional blocksd supervision for diagnosis on macOS and Linux (KEYLIGHT_BLOCKSD=1).
 
 const BLOCKSD = path.join(os.homedir(), '.local/bin/blocksd' + (IS_WIN ? '.exe' : ''))
 let daemonWindow = null   // the page that gets the daemon's status
@@ -455,13 +451,15 @@ function handleTakeDownloads(origin) {
 // that does not say within 2 s whether it has a take is closed anyway.
 function saveTakeOnClose(win, takes) {
   let asked = false
+  let allowClose = false
   const page = async (code, ms, fallback) => {
     try { return await Promise.race([win.webContents.executeJavaScript(code, true), sleep(ms).then(() => fallback)]) } catch (_e) { return fallback }
   }
   win.on('close', (e) => {
+    if (allowClose) return
+    e.preventDefault()
     if (asked) return
     asked = true
-    e.preventDefault()
     const since = takes.finished()
     ;(async () => {
       if (await page('typeof window.keylightTakeBusy === "function" && window.keylightTakeBusy()', 2000, false)) {
@@ -472,6 +470,7 @@ function saveTakeOnClose(win, takes) {
         log('[take] the window is closing: letting the last take finish saving')
         await takes.idle(since, 0, 60000)
       }
+      allowClose = true
       app.quit()
     })()
   })
@@ -480,6 +479,14 @@ function saveTakeOnClose(win, takes) {
 function numberEnv(name, fallback, min, max) {
   const v = Number(process.env[name])
   return Number.isFinite(v) && v > 0 ? Math.min(max, Math.max(min, v)) : fallback
+}
+
+// Piano cover model files (Music2MIDI as ONNX): tools/music2midi/.cache/onnx in a checkout, the app's resources folder when
+// packaged (scripts/package.sh, scripts/package-win.js). KEYLIGHT_COVER_MODELS points a run somewhere else.
+function coverModelRoot() {
+  // a packaged release serves its own models only; the override is for development and the self-test
+  if (process.env.KEYLIGHT_COVER_MODELS && !app.isPackaged) return process.env.KEYLIGHT_COVER_MODELS
+  return app.isPackaged ? path.join(process.resourcesPath, 'music2midi-models') : path.join(__dirname, 'tools', 'music2midi', '.cache', 'onnx')
 }
 
 // ---- app ------------------------------------------------------------------------
@@ -508,6 +515,10 @@ function startApp() {
   })
   // keylight://app must be known before the app is ready (renderer/app-scheme.cjs)
   protocol.registerSchemesAsPrivileged([{ scheme: appScheme.SCHEME, privileges: appScheme.PRIVILEGES }])
+  // Headless Ozone otherwise starts with a 1 x 1 display and clamps the test window to it.
+  if (process.env.LUMI_SELFTEST && app.commandLine.getSwitchValue('ozone-platform') === 'headless' && !app.commandLine.hasSwitch('screen-info')) {
+    app.commandLine.appendSwitch('screen-info', '{1280x820}')
+  }
   app.whenReady().then(openWindow)
   // The daemon in the app goes down with it: wait (up to ~2 s) for it to exit, then quit for real.
   // app.exit() paths (self-test, errors) skip before-quit, so 'exit' signals it too.
@@ -555,15 +566,10 @@ function watchSelfTest() {
 }
 
 async function openWindow() {
-  // blocksd runs on macOS and Linux only: on Windows it is never started or restarted, and
-  // the keys light over MIDI. The page still uses a blocksd that is already running on
-  // port 9010. LUMI_NO_KEYBOARD runs (tests, clips) keep off the keyboard and blocksd.
-  // The packaged Mac app carries its own blocksd (renderer/blocksd-supervisor.cjs): the page gets its
-  // port as ?daemonPort=. Unpackaged runs and a blocksd someone installed keep working as before.
+  // The app lights the keys over MIDI by default. The page still checks for an external
+  // blocksd on port 9010. LUMI_NO_KEYBOARD runs (tests, clips) skip both.
   let daemonQuery = ''
-  if (IS_WIN) log('[daemon] Windows: blocksd is not started (it runs on macOS and Linux); the keys light over MIDI')
-  else if (process.env.LUMI_NO_KEYBOARD === '1') log('[daemon] LUMI_NO_KEYBOARD: not checking blocksd')
-  else {
+  if (!IS_WIN && process.env.LUMI_NO_KEYBOARD !== '1' && process.env.KEYLIGHT_BLOCKSD === '1') {
     const bundled = bundledBlocksd()
     if (bundled || fs.existsSync(BLOCKSD)) {
       blocksdSupervisor = createBlocksdSupervisor({ spawn, executable: bundled || BLOCKSD, log,
@@ -571,27 +577,35 @@ async function openWindow() {
         env: { PATH: process.env.PATH || '/usr/bin:/bin', HOME: os.homedir(), LANG: 'en_US.UTF-8' },
         onState: (st) => sendDaemonStatus(st) })
       const started = await blocksdSupervisor.start()
-      if (bundled) daemonQuery = `bundledDaemon=1&daemonStart=${blocksdSupervisor.state}` + (started.mode === 'bundled' ? `&daemonPort=${started.port}` : '')
+      daemonQuery = `daemonExpected=1&daemonStart=${blocksdSupervisor.state}`
+      if (bundled) daemonQuery += '&bundledDaemon=1'
+      if (started.mode === 'bundled') daemonQuery += `&daemonPort=${started.port}`
+      startLedWatchdog(blocksdSupervisor)
     } else log('[daemon] blocksd is not installed at ' + BLOCKSD)
-    startLedWatchdog(blocksdSupervisor)
   }
   const { Readable } = require('node:stream')
-  protocol.handle(appScheme.SCHEME, appScheme.createAppHandler({ root: ROOT, Readable }))
+  protocol.handle(appScheme.SCHEME, appScheme.createAppHandler({ root: ROOT, Readable, modelRoot: coverModelRoot() }))
   // Web MIDI + SysEx, the camera (hand tracking) and the rest are granted to this app's
   // own page only, never to another origin
   const own = appScheme.isAppUrl
-  session.defaultSession.setPermissionRequestHandler((wc, _permission, cb, details) => cb(own((details && details.requestingUrl) || (wc && wc.getURL()))))
-  session.defaultSession.setPermissionCheckHandler((_wc, _permission, origin) => own(origin))
+  session.defaultSession.setPermissionRequestHandler((wc, permission, cb, details) => {
+    cb(appScheme.permissionAllowed(permission, details?.requestingUrl ?? wc?.getURL(), details))
+  })
+  session.defaultSession.setPermissionCheckHandler((_wc, permission, origin, details) => {
+    return appScheme.permissionAllowed(permission, origin, details, { check: true })
+  })
   const takes = handleTakeDownloads(appScheme.APP_ORIGIN)
   // Test, screenshot and self-test runs must not take the screen from whatever the
   // user is doing (a game, say): no Dock icon, and the window is shown invisible and
   // without activating the app. capturePage still sees the page at full opacity.
   const QUIET = !!(process.env.LUMI_SHOT || process.env.LUMI_FRAMES || process.env.LUMI_SELFTEST || process.env.LUMI_USERDATA)
   if (QUIET && app.dock) app.dock.hide()
+  // Keep the compositor active on Ozone's virtual display.
+  const headlessSelfTest = !!process.env.LUMI_SELFTEST && app.commandLine.getSwitchValue('ozone-platform') === 'headless'
   const win = new BrowserWindow({
     width: 1280, height: 820, backgroundColor: '#151245',
     title: BUILD?.title || 'Keylight',
-    show: !QUIET,
+    show: !QUIET || headlessSelfTest,
     ...(IS_WIN ? windowsWindowOptions(QUIET) : {}),
     webPreferences: { contextIsolation: true, nodeIntegration: false, backgroundThrottling: false,
       preload: path.join(ROOT, 'preload.cjs') }
@@ -624,11 +638,13 @@ async function openWindow() {
   ipcMain.handle('device:usb', createProbeHandler({ own, collect: createCachedCollect(() => collectUsb({ spawn })) }))
   win.on('closed', () => { airwave.stop(); ipcMain.removeHandler('airwave:start'); ipcMain.removeHandler('airwave:stop'); ipcMain.removeHandler('airwave:diagnostics'); ipcMain.removeHandler('device:usb') })
   if (QUIET) {
-    win.setOpacity(0)
-    win.once('ready-to-show', () => win.showInactive())
+    if (!headlessSelfTest) {
+      win.setOpacity(0)
+      win.once('ready-to-show', () => win.showInactive())
+    }
     // and silent, unless a run asks for sound (LUMI_SOUND=1)
     if (!process.env.LUMI_SOUND) win.webContents.setAudioMuted(true)
-    log('[quiet] hidden window, sound ' + (win.webContents.isAudioMuted() ? 'muted' : 'on (LUMI_SOUND)'))
+    log('[quiet] ' + (headlessSelfTest ? 'virtual window' : 'hidden window') + ', sound ' + (win.webContents.isAudioMuted() ? 'muted' : 'on (LUMI_SOUND)'))
   }
   let query = process.env.LUMI_SELFTEST ? '?selftest=1' : ''
   if (process.env.LUMI_QUERY) query = '?' + process.env.LUMI_QUERY

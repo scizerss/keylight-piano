@@ -9,6 +9,7 @@
 // notes that are no longer played. A built-in song is never changed in place: its
 // edit is saved as a new copy (no id).
 import { NoteDraft, pitchName } from './editor-model.js'
+import { dot } from './studio-copy.js'
 export { NoteDraft, pitchName, parsePitch, checkNote, checkNotes, MAX_SECONDS, MAX_NOTES } from './editor-model.js'
 const PAGE = 50
 
@@ -52,6 +53,7 @@ export function mountEditor({ getSong, saveSong, notice, root = document.body })
     els.tempo = h('input', { type: 'number', min: 20, max: 400, step: 'any', className: 'ed-input', id: 'edTempo' })
     els.tempoErr = h('span', { className: 'ed-err', id: 'edTempoErr' })
     els.undo = h('button', { type: 'button', className: 'ghost ed-tool', textContent: 'Undo' })
+    els.redo = h('button', { type: 'button', className: 'ghost ed-tool', textContent: 'Redo' })
     els.add = h('button', { type: 'button', className: 'ghost ed-tool', textContent: 'Add note' })
     els.sub = h('p', { className: 'ed-sub', id: 'edSub' })
     els.rows = h('ol', { className: 'ed-rows', ariaLabel: 'Notes' })
@@ -66,7 +68,7 @@ export function mountEditor({ getSong, saveSong, notice, root = document.body })
         h('h2', { id: 'edTitle', textContent: 'Correct notes' }), els.sub,
         h('div', { className: 'ed-tools' }, [
           h('label', { className: 'ed-field ed-tempo', htmlFor: 'edTempo' }, [h('span', { textContent: 'Tempo (beats a minute)' }), els.tempo, els.tempoErr]),
-          els.undo, els.add
+          els.undo, els.redo, els.add
         ])
       ]),
       h('div', { className: 'ed-body' }, [els.rows, h('nav', { className: 'ed-pager', ariaLabel: 'Pages of notes' }, [els.prev, els.range, els.next])]),
@@ -81,11 +83,13 @@ export function mountEditor({ getSong, saveSong, notice, root = document.body })
     // keys typed here stay here: the player's shortcuts must not fire under the dialog
     dlg.addEventListener('keydown', (e) => {
       e.stopPropagation()
-      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
+      const key = e.key.toLowerCase()
+      const redoKey = (e.metaKey || e.ctrlKey) && ((e.shiftKey && key === 'z') || (!e.shiftKey && !e.metaKey && key === 'y'))
+      if ((e.metaKey || e.ctrlKey) && (redoKey || (!e.shiftKey && key === 'z'))) {
         const t = e.target
         if (t instanceof HTMLInputElement && t.value !== t.defaultValue) return   // the field's own typing undo
         e.preventDefault()
-        undo()
+        if (redoKey) redo(); else undo()
       }
     })
     dlg.addEventListener('cancel', (e) => { e.preventDefault(); cancel() })
@@ -98,6 +102,7 @@ export function mountEditor({ getSong, saveSong, notice, root = document.body })
     els.form.addEventListener('submit', (e) => { e.preventDefault(); save() })
     els.cancel.onclick = cancel
     els.undo.onclick = undo
+    els.redo.onclick = redo
     els.add.onclick = () => {
       const key = draft.add(lastKey)
       say('Note added')
@@ -156,8 +161,9 @@ export function mountEditor({ getSong, saveSong, notice, root = document.body })
   const say = (text) => { els.status.textContent = text }
   function refreshTools() {
     els.undo.disabled = !draft.canUndo
-    els.sub.textContent = `${draft.original.title || 'This song'} · ${draft.notes.length} ${draft.notes.length === 1 ? 'note' : 'notes'}` +
-      (draft.copy ? ' · built-in songs are saved as your own copy' : '')
+    els.redo.disabled = !draft.canRedo
+    els.sub.textContent = `${draft.original.title || 'This song'}${dot()}${draft.notes.length} ${draft.notes.length === 1 ? 'note' : 'notes'}` +
+      (draft.copy ? dot() + 'built-in songs are saved as your own copy' : '')
   }
 
   function row(n, i) {
@@ -219,6 +225,12 @@ export function mountEditor({ getSong, saveSong, notice, root = document.body })
     if (!draft.undo()) { say('Nothing to undo'); return }
     render()
     say('Undone')
+    focusFirst()
+  }
+  function redo() {
+    if (!draft.redo()) { say('Nothing to redo'); return }
+    render()
+    say('Redone')
     focusFirst()
   }
   function close() {

@@ -1,11 +1,9 @@
 // What the page needs from the device it runs on and the browser alone does not give: opening a link, copying text,
 // reading the USB descriptors for "Support my device". On the desktop these are the browser and the preload bridge;
 // on Android they go through the host bridge, which checks everything again (HostTools.java, LinkPolicy.java).
-import { IS_ANDROID } from './platform.js'
+import { IS_ANDROID, IS_NATIVE_HOST } from './platform.js'
 import { nativeRequest } from './android-midi.js'
 import { isAllowedLink, cleanUsb } from './host-policy.js'
-// the iPhone/iPad app's host (ios-host.js) sets this before the page loads; both apps speak the same bridge
-const IS_NATIVE_HOST = IS_ANDROID || !!globalThis.__keylightIOS
 
 export async function copyText(text) {
   let browserFailed = false
@@ -23,10 +21,18 @@ export async function copyText(text) {
 }
 
 export function openExternal(url) {
-  if (!isAllowedLink(url)) return false
+  if (!isAllowedLink(url, { native: IS_NATIVE_HOST })) return false
   if (IS_NATIVE_HOST) { nativeRequest('openLink', { url }).catch(() => {}); return true }
   window.open(url, '_blank', 'noopener')
   return true
+}
+
+// The same, but it waits for the host's answer: did an app really take the address (the iPhone/iPad mail flow needs
+// this, to say "no mail app opened"). Outside a native host the browser gives no answer, so the fire-and-forget path stands.
+export async function openExternalAsync(url) {
+  if (!IS_NATIVE_HOST) return openExternal(url)
+  if (!isAllowedLink(url)) return false
+  try { return (await nativeRequest('openLink', { url })) !== false } catch (_e) { return false }
 }
 
 export async function usbProbe() {

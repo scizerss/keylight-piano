@@ -39,6 +39,17 @@ function metronomeBpm(met) {
   return n > 0 ? n * q : 0
 }
 
+// The first verse's syllable on a note: { text, cont } (cont: the word goes on in the next note), or null.
+// <lyric number="1"> (or no number) is verse 1; syllabic begin and middle carry on, single and end finish the word.
+function readLyric(note) {
+  const verse = kids(note, 'lyric').find((l) => { const n = (l.getAttribute('number') || '1').trim(); return n === '1' })
+  if (!verse) return null
+  const text = clean(kids(verse, 'text').map((t) => t.textContent).join(''))
+  if (!text) return null
+  const syllabic = clean(kid(verse, 'syllabic')?.textContent)
+  return { text, cont: syllabic === 'begin' || syllabic === 'middle' }
+}
+
 // One measure of one part: notes and tempo marks at offsets (quarter notes) from
 // its start, how far it reaches, and its repeat / volta / jump marks.
 // st carries divisions and staff count from measure to measure.
@@ -111,6 +122,7 @@ function readMeasure(measure, st) {
           if (digit) { finger = Number(digit[0]); break }
         }
         m.notes.push({
+          lyric: readLyric(el),
           pitch: (octave + 1) * 12 + (STEPS[step] ?? 0) + alter, off: start, dur: d, staff,
           voice: clean(kid(el, 'voice')?.textContent) || '1', ties: kids(el, 'tie').map((t) => t.getAttribute('type')), finger
         })
@@ -330,7 +342,7 @@ export function parseMusicXml(text) {
           tied.delete(openKey)
           if (ev.ties.includes('start')) tied.set(tieKey, open)
         } else {
-          const note = { pitch: ev.pitch, vel: 100, startBeat: start, endBeat: start + ev.dur, staff: ev.staff, finger: ev.finger }
+          const note = { pitch: ev.pitch, vel: 100, startBeat: start, endBeat: start + ev.dur, staff: ev.staff, finger: ev.finger, lyric: ev.lyric }
           notes.push(note)
           if (ev.ties.includes('start')) tied.set(tieKey, note)
         }
@@ -338,6 +350,8 @@ export function parseMusicXml(text) {
     })
     placed.push(notes)
   })
+  // lyrics: the first part that has any (a vocal part, or a piano part with words under it), in played order
+  const lyricNotes = placed.find((notes) => notes.some((n) => n.lyric)) || []
 
   // tempo map: at the same beat the first part wins over later parts; within a
   // part a <sound tempo> wins over a bare metronome mark, then the last mark
@@ -373,10 +387,20 @@ export function parseMusicXml(text) {
     }
   })
   const tempo = map[0].bpm
+  const lyrics = []
+  for (const n of lyricNotes) {
+    if (!n.lyric) continue
+    const t = Math.round(secAt(n.startBeat) * 1000) / 1000
+    const prev = lyrics[lyrics.length - 1]
+    if (prev && prev.t === t && prev.text === n.lyric.text) continue   // a chord with the same word on each note
+    lyrics.push(n.lyric.cont ? { t, text: n.lyric.text, cont: true } : { t, text: n.lyric.text })
+  }
+  lyrics.sort((a, b) => a.t - b.t)
   if (!all.length) throw new Error('No notes found in MusicXML')
   all.sort((a, b) => a.start - b.start)
   return {
     notes: all,
+    lyrics,
     duration: all.reduce((m, n) => Math.max(m, n.start + n.dur), 0),
     tempo,
     title: scoreTitle(doc),

@@ -2,7 +2,7 @@ import { assignFingering } from './fingering.js'
 
 export const MAX_SECONDS = 4 * 60 * 60
 export const MAX_NOTES = 100000
-const MIN_DUR = 0.05
+export const MIN_DUR = 0.05
 const UNDO_DEPTH = 200
 const SOURCE_NUMBERS = ['part', 'track', 'channel', 'program']
 const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
@@ -46,7 +46,13 @@ export function checkNotes(notes) {
 }
 const shape = (note) => `${note.pitch}:${Math.round(note.start * 1000)}:${Math.round(note.dur * 1000)}:${note.hand}`
 const playedShape = (notes) => notes.map(shape).sort().join('|')
-const fullShape = (notes) => notes.map((note) => shape(note) + ':' + (note.finger || '')).sort().join('|')
+// every editable field of a note (velocity and finger too), so nothing the editor can change goes unnoticed
+const fullShape = (notes) => notes.map((note) => shape(note) + ':' + (note.finger || '') + ':' + (note.vel ?? 100)).sort().join('|')
+const syncedLines = (song) => (song.lyrics && Array.isArray(song.lyrics.synced) ? song.lyrics.synced.map((l) => ({ ...l })) : null)
+const copyWords = (words) => (Array.isArray(words) ? words.map((w) => ({ ...w })) : null)
+// The whole editable state as one string: notes, tempo, bar lines, grid offset, lyric times and whether the recording is dropped.
+const stateSignature = (st) => fullShape(st.notes) + '#' + st.tempo + '#' + JSON.stringify(st.bars) + '#' + st.gridOffset + '#' +
+  (st.lyrics ? JSON.stringify(st.lyrics) : '') + '#' + (st.lyricWords ? JSON.stringify(st.lyricWords) : '') + '#' + (st.detachAudio ? 'x' : '')
 const validTempo = (tempo) => isNum(tempo) && tempo >= 20 && tempo <= 400
 
 export class NoteDraft {
@@ -57,6 +63,13 @@ export class NoteDraft {
     this.notes = song.notes.map((note) => this.keyed(note))
     this.tempo = validTempo(song.tempo) ? song.tempo : 120
     this.history = []
+    this.future = []                        // undone states, for redo; any new change empties it
+    this.group = null                       // { base, pushed }: one drag or one command is one undo step
+    this.bars = Array.isArray(song.bars) ? song.bars.slice() : null
+    this.gridOffset = 0                     // seconds; the roll editor's grid (kept here so undo restores it with the notes)
+    this.lyrics = syncedLines(song)         // song.lyrics.synced, retimed together with the notes
+    this.lyricWords = copyWords(song.lyricWords)
+    this.detachAudio = false                // the recording no longer fits the edited song and is dropped when saved
     this.start = this.signature()
     this.sort()
   }
@@ -65,22 +78,65 @@ export class NoteDraft {
     if (!note.hand) note.hand = note.pitch < 60 ? 'left' : 'right'
     return note
   }
-  signature() { return fullShape(this.notes) + '#' + this.tempo }
+  signature() { return stateSignature(this) }
+  resetBaseline() { this.start = this.signature() }
   get dirty() { return this.signature() !== this.start }
   get canUndo() { return this.history.length > 0 }
+  get canRedo() { return this.future.length > 0 }
+  snapshot() {
+    return { notes: this.notes.map((note) => ({ ...note })), tempo: this.tempo, bars: this.bars ? this.bars.slice() : null, gridOffset: this.gridOffset,
+      lyrics: this.lyrics ? this.lyrics.map((l) => ({ ...l })) : null, lyricWords: copyWords(this.lyricWords), detachAudio: this.detachAudio }
+  }
   sort() { this.notes.sort((a, b) => a.start - b.start || a.pitch - b.pitch || a.key - b.key) }
   indexOf(key) { return this.notes.findIndex((note) => note.key === key) }
   change(action) {
-    this.history.push({ notes: this.notes.map((note) => ({ ...note })), tempo: this.tempo })
-    if (this.history.length > UNDO_DEPTH) this.history.shift()
+    const g = this.group
+    if (!g || !g.pushed) {
+      this.history.push(g ? g.base : this.snapshot())
+      if (this.history.length > UNDO_DEPTH) this.history.shift()
+      if (g) g.pushed = true
+    }
+    this.future = []
     action()
     this.sort()
+  }
+  // Grouping: changes between beginGroup() and endGroup() are one undo step (a drag, a command
+  // that touches many notes). restoreBase() puts the notes back to where the group began, so a
+  // drag can recompute from its start on every move instead of piling up deltas.
+  beginGroup() { if (!this.group) this.group = { base: this.snapshot(), pushed: false } }
+  // make the notes as they are now the group's start (a drag that began by adding a note resizes from there)
+  rebase() { if (this.group) this.group.base = this.snapshot() }
+  restoreBase() { if (this.group) this.restore(this.group.base, true) }
+  endGroup() {
+    const g = this.group
+    this.group = null
+    if (g && g.pushed && this.history.length && this.history[this.history.length - 1] === g.base && stateSignature(g.base) === this.signature()) {
+      this.history.pop()                    // nothing really changed: no undo step
+    }
+  }
+  restore(state, copy) {
+    this.notes = copy ? state.notes.map((note) => ({ ...note })) : state.notes
+    this.tempo = state.tempo
+    this.bars = state.bars ? state.bars.slice() : null
+    this.gridOffset = state.gridOffset || 0
+    this.lyrics = state.lyrics ? state.lyrics.map((l) => ({ ...l })) : null
+    this.lyricWords = copyWords(state.lyricWords)
+    this.detachAudio = !!state.detachAudio
   }
   undo() {
     const previous = this.history.pop()
     if (!previous) return false
-    this.notes = previous.notes
-    this.tempo = previous.tempo
+    this.group = null
+    this.future.push(this.snapshot())
+    this.restore(previous)
+    return true
+  }
+  redo() {
+    const next = this.future.pop()
+    if (!next) return false
+    this.group = null
+    this.history.push(this.snapshot())
+    this.restore(next)
     return true
   }
   set(key, field, raw) {
@@ -135,20 +191,31 @@ export class NoteDraft {
     const checked = checkNotes(this.notes)
     if (checked.error) return { error: checked.error }
     const notes = checked.notes
+    const notesChanged = fullShape(notes) !== fullShape(this.original.notes)
     assignFingering(notes, { tempo: this.tempo })
     const source = this.original
     const played = playedShape(notes) !== playedShape(source.notes)
     const end = notes.reduce((maximum, note) => Math.max(maximum, note.start + note.dur), 0)
-    const duration = !played && isNum(source.duration) ? Math.max(source.duration, end) : Math.max(end, source.source === 'audio' && isNum(source.duration) ? source.duration : 0)
+    // a detached recording no longer sets the length: the song ends with its last note (as every parser writes it)
+    const duration = this.detachAudio ? end : !played && isNum(source.duration) ? Math.max(source.duration, end) : Math.max(end, source.source === 'audio' && isNum(source.duration) ? source.duration : 0)
     const song = { ...source, notes, tempo: this.tempo, duration }
+    if (notesChanged) {
+      delete song.coverRaw
+      delete song.coverModelDifficulty
+      delete song.coverArrangement
+    }
+    // retimed lyrics replace the stored ones; untouched lyrics stay exactly as they were
+    if (this.lyrics && JSON.stringify(this.lyrics) !== JSON.stringify(source.lyrics.synced)) song.lyrics = { ...source.lyrics, synced: this.lyrics.map((l) => ({ ...l })) }
+    if (this.lyricWords && JSON.stringify(this.lyricWords) !== JSON.stringify(source.lyricWords)) song.lyricWords = copyWords(this.lyricWords)
     if (played) {
       song.score = null
-      if (Array.isArray(source.bars)) song.bars = source.bars.filter((time) => time <= duration)
+      if (Array.isArray(this.bars)) song.bars = this.bars.filter((time) => time <= duration)
     }
     if (this.copy) {
       Object.assign(song, { id: undefined, importedId: undefined, file: undefined, added: undefined, source: 'score', title: `${source.title || 'Song'} (my copy)` })
       song.audio = typeof Blob !== 'undefined' && source.audio instanceof Blob ? source.audio : null
     } else song.id = source.importedId
+    if (this.detachAudio) song.audio = null      // the recording was made for the old timing: never play it against the edited notes
     return { song }
   }
 }

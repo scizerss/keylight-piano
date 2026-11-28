@@ -63,3 +63,88 @@ Summary: 24 scaled, 19 left alone, 14 uncertain (left alone).
 | Elite Syncopations (joplin-elite-syncopations) | 60 | 3:20 | 1.48 | 3:20 | 11.2 | ~3:15 typical (file flat 60) |
 | A Breeze from Alabama (joplin-breeze-from-alabama) | 82 | - | 1 | 4:12 | 11.7 | file tempo is already close to a typical performance |
 | Magnetic Rag (joplin-magnetic-rag) | 60 | 4:50 | 2.62 | 4:50 | 10.4 | ~4:45 typical (file flat 60 = 12.7 min) |
+
+## Added with the library growth (78 pieces)
+
+Same method as above. Pieces whose file duration already sits between 25 s and 12 min with a plausible tempo are left at 1; only the ones marked with a scale were adjusted.
+
+| Title (id) | file tempo BPM | target length | scale | resulting duration | notes/s | notes |
+|---|---|---|---|---|---|---|
+| Menuet, BWV Anh. 113 (bach-menuet-anh113) | 120 | - | 1 | 0:48 | 5.4 | file tempo is already close to a typical performance |
+| Menuet in G, BWV Anh. 114 (bach-menuet-anh114) | 140 | - | 1 | 0:41 | 5.0 | file tempo is already close to a typical performance |
+| Menuet, BWV Anh. 116 (bach-menuet-anh116) | 125 | - | 1 | 0:58 | 5.4 | file tempo is already close to a typical performance |
+| Minuet in B-flat, BWV Anh. 118 (bach-minuet-anh118) | 60 | - | 1 | 1:18 | 2.9 | file tempo is already close to a typical performance |
+| Minuet in C minor, BWV Anh. 121 (bach-minuet-anh121) | 108 | - | 1 | 0:40 | 3.7 | file tempo is already close to a typical performance |
+| Polonaise in F, BWV Anh. 117a (bach-polonaise-anh117a) | 60 | - | 1 | 0:48 | 4.9 | file tempo is already close to a typical performance |
+| Invention No. 4 (bach-invention-4) | 90 | - | 1 | 0:52 | 8.5 | file tempo is already close to a typical performance |
+| Invention No. 8 (bach-invention-8) | 90 | - | 1 | 1:07 | 9.0 | file tempo is already close to a typical performance |
+| Little Prelude, BWV 928 (bach-little-prelude-928) | 69 | - | 1 | 1:23 | 7.9 | file tempo is already close to a typical performance |
+| Prelude in C-sharp minor (WTC I) (bach-wtc1-prelude-4) | 108 | 2:42 | 0.8 | 2:42 | 5.1 | Andante-ish; typical ~2:40, kept a little slow |
+| Bourrée I (English Suite No. 1) (bach-english-suite-1-bourree) | 184 | - | 1 | 1:05 | 8.8 | file tempo is already close to a typical performance |
+| Sonata No. 20, 1st mvt. (beethoven-sonata-20-1) | 142 | - | 1 | 3:25 | 7.9 | file tempo is already close to a typical performance |
+| Sonata No. 20, Tempo di Menuetto (beethoven-sonata-20-2) | 134 | - | 1 | 2:41 | 8.0 | file tempo is already close to a typical performance |
+| Sonata No. 19, 1st mvt. (beethoven-sonata-19-1) | 98 | - | 1 | 2:14 | 9.5 | uncertain; unsure of a typical length against this file; left unscaled |
+| Sonata No. 19, Rondo (beethoven-sonata-19-2) | 124 | - | 1 | 3:58 | 8.4 | file tempo is already close to a typical performance |
+| Sonata No. 25, Andante (beethoven-sonata-25-2) | 72 | - | 1 | 2:06 | 6.4 | file tempo is already close to a typical performance |
+| Pathétique, 2nd mvt. (beethoven-pathetique-2) | 36 | - | 1 | 4:03 | 6.7 | file tempo is already close to a typical performance |
+| Menuett, WoO 82 (beethoven-menuett-woo82) | 112 | - | 1 | 3:16 | 5.9 | uncertain; unsure of a typical length against this file; left unscaled |
+| Sonata K. 331, Menuetto (mozart-sonata-331-menuetto) | 134 | 4:26 | 1.25 | 4:26 | 8.0 | Menuetto with trio, ~4:25 typical (file 5:33) |
+| Sonata K. 331, Theme (mozart-sonata-331-theme) | 56 | - | 1 | 1:55 | 4.2 | file tempo is already close to a typical performance |
+| Sonata Facile, 2nd mvt. (mozart-sonata-facile-2) | 60 | - | 1 | 3:41 | 6.0 | file tempo is already close to a typical performance |
+| Sonata Facile, 3rd mvt. (mozart-sonata-facile-3) | 104 | - | 1 | 1:24 | 10.4 | uncertain; unsure of a typical length against this file; left unscaled |
+| Gigue, K. 574 (mozart-gigue-574) | 140 | - | 1 | 0:49 | 9.4 | file tempo is already close to a typical performance |
+| Marche funèbre, K. 453a (mozart-marche-funebre-453a) | 60 | - | 1 | 1:03 | 4.2 | file tempo is already close to a typical performance |
+| Menuetto (Sonata Hob. XVI:27) (haydn-menuetto-27) | 92 | - | 1 | 2:09 | 5.0 | file tempo is already close to a typical performance |
+| Menuetto (Sonata Hob. XVI:28) (haydn-menuetto-28) | 60 | - | 1 | 2:24 | 3.0 | file tempo is already close to a typical performance |
+| Sonatina Op. 20 No. 1, Allegro (kuhlau-sonatina-20-1-1) | 120 | - | 1 | 2:39 | 6.7 | file tempo is already close to a typical performance |
+| Sonatina Op. 20 No. 1, Andante (kuhlau-sonatina-20-1-2) | 72 | - | 1 | 0:40 | 6.8 | file tempo is already close to a typical performance |
+| Menuet (handel-menuet-161) | 84 | - | 1 | 0:60 | 4.7 | file tempo is already close to a typical performance |
+| Gavotte (handel-gavotte-151) | 92 | - | 1 | 0:52 | 4.6 | file tempo is already close to a typical performance |
+| Sonatina, HWV 585 (handel-sonatina-hwv585) | 120 | - | 1 | 0:38 | 6.1 | file tempo is already close to a typical performance |
+| Allemande (handel-allemande-166) | 72 | - | 1 | 0:60 | 6.6 | file tempo is already close to a typical performance |
+| Sonata K. 11 (scarlatti-sonata-k11) | 120 | - | 1 | 0:58 | 9.6 | uncertain; unsure of a typical length against this file; left unscaled |
+| Sonata in C (scarlatti-sonata-in-c) | 120 | - | 1 | 2:18 | 5.8 | file tempo is already close to a typical performance |
+| Kinderszenen: Of Foreign Lands (schumann-kinderszenen-1) | 72 | - | 1 | 0:37 | 6.1 | uncertain; unsure of a typical length against this file; left unscaled |
+| Kinderszenen: Curious Story (schumann-kinderszenen-2) | 112 | - | 1 | 1:04 | 9.7 | file tempo is already close to a typical performance |
+| Kinderszenen: Pleading Child (schumann-kinderszenen-4) | 60 | - | 1 | 0:33 | 6.7 | uncertain; unsure of a typical length against this file; left unscaled |
+| Kinderszenen: Happy Enough (schumann-kinderszenen-5) | 84 | - | 1 | 0:35 | 11.6 | uncertain; unsure of a typical length against this file; left unscaled |
+| Kinderszenen: An Important Event (schumann-kinderszenen-6) | 120 | - | 1 | 0:36 | 12.2 | uncertain; unsure of a typical length against this file; left unscaled |
+| Album for the Young: Melody (schumann-album-melodie) | 60 | - | 1 | 1:36 | 3.2 | file tempo is already close to a typical performance |
+| Album for the Young: The Merry Farmer (schumann-album-merry-farmer) | 100 | - | 1 | 0:48 | 7.3 | file tempo is already close to a typical performance |
+| Prelude Op. 28 No. 4 (chopin-prelude-4) | 56 | - | 1 | 1:48 | 5.5 | file tempo is already close to a typical performance |
+| Prelude Op. 28 No. 6 (chopin-prelude-6) | 45 | - | 1 | 1:41 | 4.0 | file tempo is already close to a typical performance |
+| Prelude Op. 28 No. 7 (chopin-prelude-7) | 120 | 0:40 | 0.6 | 0:40 | 7.0 | file is 24 s; ~0:40 is typical for this Andantino |
+| Prelude Op. 28 No. 20 (chopin-prelude-20) | 42 | - | 1 | 1:14 | 3.9 | file tempo is already close to a typical performance |
+| Mazurka Op. 6 No. 1 (chopin-mazurka-6-1) | 60 | 2:49 | 1.3 | 2:49 | 4.0 | file sits at a flat 60; ~2:50 is typical with repeats |
+| Prelude Op. 28 No. 1 (chopin-prelude-1) | 60 | - | 1 | 0:34 | 9.7 | file tempo is already close to a typical performance |
+| Morning Prayer (Op. 39) (tchaikovsky-morning-prayer) | 62 | - | 1 | 1:10 | 3.5 | file tempo is already close to a typical performance |
+| March of the Wooden Soldiers (Op. 39) (tchaikovsky-wooden-soldiers) | 140 | - | 1 | 0:40 | 7.9 | file tempo is already close to a typical performance |
+| Old French Song (Op. 39) (tchaikovsky-old-french-song) | 70 | - | 1 | 0:55 | 3.4 | file tempo is already close to a typical performance |
+| La Candeur (Op. 100) (burgmuller-la-candeur) | 152 | - | 1 | 0:36 | 6.6 | file tempo is already close to a typical performance |
+| Innocence (Op. 100) (burgmuller-innocence) | 112 | - | 1 | 0:27 | 8.0 | file tempo is already close to a typical performance |
+| Progrès (Op. 100) (burgmuller-progres) | 132 | - | 1 | 0:29 | 7.3 | file tempo is already close to a typical performance |
+| La Gracieuse (Op. 100) (burgmuller-la-gracieuse) | 100 | - | 1 | 0:29 | 11.0 | file tempo is already close to a typical performance |
+| La Chasse (Op. 100) (burgmuller-la-chasse) | 200 | - | 1 | 0:51 | 10.4 | file tempo is already close to a typical performance |
+| Tendre Fleur (Op. 100) (burgmuller-tendre-fleur) | 152 | - | 1 | 0:37 | 7.2 | file tempo is already close to a typical performance |
+| L'Adieu (Op. 100) (burgmuller-ladieu) | 184 | - | 1 | 0:53 | 11.3 | file tempo is already close to a typical performance |
+| Douce Plainte (Op. 100) (burgmuller-douce-plainte) | 126 | - | 1 | 0:34 | 7.8 | file tempo is already close to a typical performance |
+| Melodic Study Op. 840 No. 1 (czerny-op840-1) | 140 | - | 1 | 0:55 | 8.2 | file tempo is already close to a typical performance |
+| Gymnopédie No. 1 (satie-gymnopedie-1) | 60 | 2:56 | 0.8 | 2:56 | 2.0 | Lent et douloureux; ~3:00 typical (file 2:21) |
+| Gymnopédie No. 2 (satie-gymnopedie-2) | 60 | - | 1 | 3:15 | 1.9 | file tempo is already close to a typical performance |
+| Gymnopédie No. 3 (satie-gymnopedie-3) | 60 | - | 1 | 3:00 | 1.8 | file tempo is already close to a typical performance |
+| Gnossienne No. 1 (satie-gnossienne-1) | 100 | - | 1 | 3:17 | 4.2 | file tempo is already close to a typical performance |
+| Gnossienne No. 2 (satie-gnossienne-2) | 60 | 2:46 | 1.2 | 2:46 | 1.9 | flat 60 in the file; ~2:45 typical |
+| Gnossienne No. 3 (satie-gnossienne-3) | 40 | 3:22 | 1.6 | 3:22 | 1.9 | file at 40 BPM is 5:24; ~3:20 typical |
+| Arabesque No. 2 (debussy-arabesque-2) | 120 | 2:36 | 1.4 | 2:36 | 8.3 | ~2:35 typical (file 3:38) |
+| The Easy Winners (joplin-easy-winners) | 60 | 3:22 | 1.5 | 3:22 | 8.3 | file flat 60 = 5 min; ~3:20 typical with repeats |
+| Peacherine Rag (joplin-peacherine-rag) | 80 | - | 1 | 2:13 | 10.7 | file tempo is already close to a typical performance |
+| Solace (joplin-solace) | 72 | - | 1 | 4:06 | 8.8 | file tempo is already close to a typical performance |
+| Sugar Cane (joplin-sugar-cane) | 100 | - | 1 | 2:53 | 15.1 | file tempo is already close to a typical performance |
+| Hungarian Melody (schubert-hungarian-melody) | 76 | - | 1 | 2:43 | 8.9 | file tempo is already close to a typical performance |
+| Impromptu Op. 90 No. 3 (schubert-impromptu-90-3) | 120 | - | 1 | 5:54 | 7.7 | file tempo is already close to a typical performance |
+| Song Without Words Op. 85 No. 1 (mendelssohn-song-without-words-85-1) | 60 | - | 1 | 1:40 | 7.4 | file tempo is already close to a typical performance |
+| Venetian Gondola Song Op. 19 No. 6 (mendelssohn-gondola-song-19-6) | 60 | - | 1 | 2:18 | 4.3 | uncertain; unsure of a typical length against this file; left unscaled |
+| Lualåt (Mountaineer's Song) (grieg-lualat) | 120 | - | 1 | 2:30 | 3.5 | file tempo is already close to a typical performance |
+| Åse's Death (grieg-ases-death) | 50 | - | 1 | 3:36 | 3.5 | file tempo is already close to a typical performance |
+| Rumores de la Caleta (albeniz-rumores-de-la-caleta) | 60 | - | 1 | 4:22 | 5.5 | uncertain; unsure of a typical length against this file; left unscaled |
+| Waltz Op. 39 No. 15 (brahms-waltz-39-15) | 116 | - | 1 | 1:08 | 10.6 | file tempo is already close to a typical performance |

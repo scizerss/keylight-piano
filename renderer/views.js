@@ -14,6 +14,21 @@ export const noteName = (p) => NOTE_NAMES[((p % 12) + 12) % 12] + (Math.floor(p 
 const BAR_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B']
 const pcOf = (p) => ((p % 12) + 12) % 12
 
+export function formatWaitNotes(notes) {
+  const hands = ['left', 'right'].flatMap((hand) => {
+    const pitches = [...new Set(notes.filter((note) => (note.hand === 'left' ? 'left' : 'right') === hand).map((note) => note.pitch))].sort((a, b) => a - b)
+    if (!pitches.length) return []
+    const names = pitches.map((pitch) => NOTE_NAMES[pcOf(pitch)])
+    const spoken = names.map((name, index) => {
+      const pitch = pitches[index]
+      const label = name.replace('#', ' sharp')
+      return names.indexOf(name) === names.lastIndexOf(name) ? label : `${label} ${Math.floor(pitch / 12) - 1}`
+    })
+    return [`${spoken.join(' ')}, ${hand} hand`]
+  })
+  return hands.length ? `Next: ${hands.join('; ')}` : ''
+}
+
 /* ------------------------------------------------------------------ palette */
 // The stage colours are the CSS tokens in style.css :root (read once the stylesheet is in);
 // the literals here are the defaults. Hand colours always come from theme.js.
@@ -52,6 +67,9 @@ const OLD_STAGE = {
 }
 let palReady = false
 let palTries = 0
+// How strongly lit keys throw light up the lane. 1 is the phone player; the TV page asks for more (scene.glow) because it is
+// seen from across a room.
+let glowGain = 1
 // true when the palette changed (cached layers, gradients and tones must be rebuilt)
 function readPalette() {
   if (palReady || typeof document === 'undefined' || !document.documentElement) return false
@@ -66,13 +84,24 @@ function readPalette() {
   palReady = true
   return true
 }
-const FONT = '"Outfit", -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif'
+const FONT = (typeof document !== 'undefined' && document.documentElement.classList.contains('apple') ? '' : '"Outfit", ') +
+  '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif'
 const SCORING_FALLBACK = { perfect: '#A3FFEB', good: '#FFCE48', early: '#B28EF3', late: '#FFA0C5', missed: '#E16E73' }
 const PLAYGROUND_FALLBACK = ['#F47676', '#F39271', '#F2B363', '#F0D665', '#F0F36E', '#AAF089',
   '#6DE8A5', '#47CEE1', '#7A9AE6', '#A390EE', '#C386DF', '#F189BE']
 const WORDS = { perfect: 'Perfect', good: 'Good', early: 'Early', late: 'Late', missed: 'Miss' }
 
-const scoringColor = (kind) => (COLORS && COLORS.scoring && COLORS.scoring[kind]) || SCORING_FALLBACK[kind] || PAL.cream
+// On the TV page and under html.ios the feedback light is ivory with a trace of amber, never the desktop teal (R2-6, R3-1),
+// and the hands skip HAND_SOFT to keep the Illuminated Studio amber and cobalt. Desktop keeps its own palette.
+const STUDIO_PERFECT = '#FFF3DC'
+const STUDIO_HAND = { right: '#ff8a3d', left: '#86b6ff' }
+let isStudio = false
+function studioPalette() {
+  if (typeof document === 'undefined' || !document.documentElement) return false
+  return document.documentElement.classList.contains('ios') || (typeof document.getElementById === 'function' && !!document.getElementById('tvRoot'))
+}
+const isIOSPage = () => typeof document !== 'undefined' && !!document.documentElement && document.documentElement.classList.contains('ios')
+export const scoringColor = (kind) => (kind === 'perfect' && studioPalette() ? STUDIO_PERFECT : (COLORS && COLORS.scoring && COLORS.scoring[kind]) || SCORING_FALLBACK[kind] || PAL.cream)
 const playgroundColor = (pc) => (COLORS && COLORS.playground && COLORS.playground[pc]) || PLAYGROUND_FALLBACK[pc]
 
 function hslHex(h, s, l) {
@@ -145,10 +174,11 @@ function tone(c) {
   return t
 }
 
-function noteColor(n, view) {
+export function noteColor(n, view, studio = studioPalette()) {
   const pc = pcOf(n.pitch)
   if (view === 'RAINBOW') return RAINBOW[pc]
   if (view === 'COLORNOTE') return playgroundColor(pc)
+  if (studio) return n.hand === 'left' ? STUDIO_HAND.left : STUDIO_HAND.right
   return n.hand === 'left' ? PAL.left : PAL.right
 }
 
@@ -192,7 +222,7 @@ function keyTones() {
 keyTones()
 
 /* --------------------------------------------------------- keyboard layout */
-const MAX_KEYS = 49
+const MAX_KEYS = 128  // the full MIDI range, including wide on-screen course pieces
 const IS_BLACK = [false, true, false, true, false, false, true, false, true, false, true, false]
 // Black-key centre offset from the white-key boundary it sits on, in white-key widths (real piano spacing).
 const BLACK_SHIFT = [0, -0.08, 0, 0.08, 0, 0, -0.1, 0, 0, 0, 0.1, 0]
@@ -298,7 +328,7 @@ function layout(ctx, W, H, ws, flat, dpr) {
   }
   G.span = wx + (IS_BLACK[pcOf(ws + keys.length - 1)] ? 0.5 : 0)
   G.nWhite = nWhite
-  G.kbH = Math.round(Math.min(Math.max(110, H * 0.225), H * 0.5))
+  G.kbH = Math.min(Math.round(Math.max(110, H * 0.225)), H * 0.5)
   G.kbTop = H - G.kbH
   if (flat) layoutFlat(ctx, W, H)
   else layout3D(ctx, W, H)
@@ -310,7 +340,7 @@ function layout(ctx, W, H, ws, flat, dpr) {
 // now line at kbTop, and the lanes shrink to RHO of their width by the top edge.
 function layout3D(ctx, W, H) {
   const yN = G.kbTop
-  const margin = Math.max(8, Math.round(W * 0.01))
+  const margin = Math.min(W / 4, Math.max(8, Math.round(W * 0.01)))
   const wf = (W - 2 * margin) / (G.span + 2 * M.cheek)    // one white key, at the front edge
   // a = distance from the vanishing point down to the now line; on a wide, short canvas it is
   // stretched so the outer lanes don't lean over too far
@@ -475,7 +505,6 @@ const kFb = new Array(MAX_KEYS).fill(null)
 const kFbA = new Float32Array(MAX_KEYS)
 const kHeld = new Uint8Array(MAX_KEYS)
 const kPrevHeld = new Uint8Array(MAX_KEYS)
-const kNextBubble = new Float64Array(MAX_KEYS)
 // what each key looks like this frame, before the animated overlays (wait pulse, judgement flash)
 const kFill = new Array(MAX_KEYS).fill('')
 const kLit = new Uint8Array(MAX_KEYS)
@@ -540,60 +569,232 @@ function drawSparks(ctx, t) {
   if (any) ctx.restore()
 }
 
-const BUBBLES = []
-for (let i = 0; i < 180; i++) BUBBLES.push({ t0: -99, life: 0, x: 0, y: 0, r: 0, vy: 0, drift: 0, ph: 0, color: '#fff' })
-let bubbleHead = 0
-function spawnBubble(k, t, big) {
-  const b = BUBBLES[bubbleHead]; bubbleHead = (bubbleHead + 1) % BUBBLES.length
-  const r = (big ? 0.42 : 0.16 + Math.random() * 0.22) * G.farWW
-  b.t0 = t; b.life = 2.6 + Math.random() * 1.6
-  b.r = Math.max(6, Math.min(r, 46))
-  b.x = k.farCx + (Math.random() - 0.5) * k.farW * 0.9
-  b.y = G.kbTop - b.r * 0.6
-  b.vy = 60 + Math.random() * 70 + (big ? 10 : 0)
-  b.drift = 8 + Math.random() * 22
-  b.ph = Math.random() * Math.PI * 2
-  b.color = playgroundColor(k.pc)
+/* ------------------------------------------------------------ Playground studio
+   Rising light bars, a piano roll going up: a key you press starts a bar above it that grows
+   while you hold, then lifts off and drifts up and away. Bars live in a fixed pool (no
+   allocation per frame); colours come from a small cache. */
+// bass to treble; a pale step before the amber keeps the blend from going through lime green
+const STUDIO_STOPS = ['#6a6df0', '#4b8bff', '#25c4e8', '#6fdcd0', '#f3e4bb', '#f5b45a']
+const STUDIO_OUT = '#7b8aa6'          // a note outside the chosen scale
+const STUDIO_TOP = '#05060b'
+const studioCache = new Map()
+function studioFill(pitch, black, outside) {
+  const id = pitch * 4 + (black ? 2 : 0) + (outside ? 1 : 0)
+  let c = studioCache.get(id)
+  if (c) return c
+  const p = clamp01((pitch - 36) / 60) * (STUDIO_STOPS.length - 1)
+  const i = Math.min(STUDIO_STOPS.length - 2, Math.floor(p))
+  c = outside ? STUDIO_OUT : mix(STUDIO_STOPS[i], STUDIO_STOPS[i + 1], p - i)
+  if (black) c = mix(c, '#05060c', outside ? 0.3 : 0.2)   // deeper than the white keys' bars
+  studioCache.set(id, c)
+  return c
 }
-function updateBubbles(s, t) {
+const reduceMotionMq = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null
+// the system setting, or the app's own Reduce motion switch (a class on <html>)
+const reducedMotion = () => !!((reduceMotionMq && reduceMotionMq.matches) ||
+  (typeof document !== 'undefined' && document.documentElement && document.documentElement.classList.contains('reduce-motion')))
+
+const BAR_CAP = 256
+const BARS = []
+for (let i = 0; i < BAR_CAP; i++) BARS.push({ on: false, pitch: 0, black: false, t0: 0, t1: -1, vel: 0.7, sus: false, color: '#fff' })
+const kBar = new Int16Array(MAX_KEYS).fill(-1)   // the bar a pitch is holding or sustaining
+const kPrevPitch = new Uint8Array(MAX_KEYS)      // was the pitch held last frame (by pitch: the window can scroll)
+let barHead = 0
+function spawnBar(k, t, vel, outside) {
+  if (!(k.pitch >= 0 && k.pitch < MAX_KEYS)) return
+  const bi = barHead; barHead = (barHead + 1) % BAR_CAP
+  const b = BARS[bi]
+  if (b.on && kBar[b.pitch] === bi) kBar[b.pitch] = -1   // the pool wrapped onto a live bar
+  b.on = true; b.pitch = k.pitch; b.black = k.black
+  b.t0 = t; b.t1 = -1; b.sus = false
+  b.vel = vel
+  b.color = studioFill(k.pitch, k.black, outside)
+  kBar[k.pitch] = bi
+}
+function releaseBar(pitch, t) {
+  if (!(pitch >= 0 && pitch < MAX_KEYS)) return
+  const bi = kBar[pitch]
+  if (!(bi >= 0)) return
+  BARS[bi].t1 = t   // sus stays as it was, so a sustained bar doesn't jump brighter when the pedal lifts
+  kBar[pitch] = -1
+}
+function updateBars(s, t) {
+  const pedal = !!s.sustain
+  const set = scaleSetOf(s.scale)
   for (let i = 0; i < keys.length; i++) {
-    const held = kHeld[i]
-    if (held) {
-      if (!kPrevHeld[i]) { spawnBubble(keys[i], t, true); kNextBubble[i] = t + 0.14 }
-      else {
-        let c = 0
-        while (t >= kNextBubble[i] && c < 2) { spawnBubble(keys[i], t, false); kNextBubble[i] += 0.13 + Math.random() * 0.1; c++ }
-        if (t >= kNextBubble[i]) kNextBubble[i] = t + 0.13
-      }
+    const k = keys[i], p = k.pitch
+    if (!(p >= 0 && p < MAX_KEYS)) continue
+    const held = kHeld[i], bi = kBar[p]
+    if (held && !kPrevPitch[p]) {
+      releaseBar(p, t)   // a struck-again key closes its sustained bar
+      const v = s.heldVel && typeof s.heldVel.get === 'function' ? s.heldVel.get(p) : 0
+      spawnBar(k, t, v > 0 ? clamp01(v / 127) : 0.7, !!set && !set.has(k.pc))
+    } else if (!held && bi >= 0) {
+      const b = BARS[bi]
+      if (kPrevPitch[p] && pedal) b.sus = true               // let go under the pedal: keeps ringing, dimmer
+      else if (!b.sus || !pedal) releaseBar(p, t)            // let go, or the pedal came up
     }
-    kPrevHeld[i] = held
+    kPrevPitch[p] = held
+  }
+  // a pitch that scrolled off the keyboard (octave change) lets its bar go
+  for (let p = 0; p < MAX_KEYS; p++) {
+    const idx = p - G.ws
+    if (idx >= 0 && idx < keys.length) continue
+    kPrevPitch[p] = 0
+    if (kBar[p] >= 0) releaseBar(p, t)
   }
 }
-function drawBubbles(ctx, t) {
-  let alive = 0
-  for (let i = 0; i < BUBBLES.length; i++) {
-    const b = BUBBLES[i]
-    const age = t - b.t0
-    if (age < 0 || age > b.life) continue
-    alive++
-    const k = age / b.life
-    const y = b.y - b.vy * age - 10 * age * age
-    if (y < -b.r * 2) continue
-    const x = b.x + b.drift * Math.sin(age * 1.8 + b.ph)
-    const r = b.r * (0.55 + 0.45 * Math.min(1, age * 4)) * (1 + 0.15 * k)
-    const a = Math.min(1, age * 6) * Math.pow(1 - k, 1.3)
-    ctx.globalAlpha = a * 0.8
-    ctx.fillStyle = b.color
-    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill()
-    ctx.globalAlpha = a * 0.85
-    ctx.strokeStyle = b.color; ctx.lineWidth = 1.5
-    ctx.stroke()
-    ctx.globalAlpha = a * 0.35
-    ctx.fillStyle = PAL.cream
-    ctx.beginPath(); ctx.arc(x - r * 0.35, y - r * 0.38, r * 0.22, 0, Math.PI * 2); ctx.fill()
+
+// bar shape with a short, allocation-free path
+function barPath(ctx, x, y, w, h, r) {
+  if (!(w > 0) || !(h > 0)) { ctx.beginPath(); return }
+  r = Math.max(0, Math.min(r, w / 2, h / 2))
+  ctx.beginPath()
+  ctx.moveTo(x + r, y)
+  ctx.arcTo(x + w, y, x + w, y + h, r)
+  ctx.arcTo(x + w, y + h, x, y + h, r)
+  ctx.arcTo(x, y + h, x, y, r)
+  ctx.arcTo(x, y, x + w, y, r)
+  ctx.closePath()
+}
+
+const STUDIO = { canvas: null, key: '', fade: null, fadeH: 0 }
+// Background: a deep studio gradient, a faint pool of light above the keys, a hairline at each C.
+function studioLayer() {
+  const studio = studioPalette()
+  const key = G.id + ':' + G.flat + ':' + (studio ? 1 : 0)
+  if (STUDIO.key === key && STUDIO.canvas) return STUDIO.canvas
+  const c = STUDIO.canvas || (STUDIO.canvas = document.createElement('canvas'))
+  const cw = Math.max(1, Math.round(G.W * G.dpr)), ch = Math.max(1, Math.round(G.H * G.dpr))
+  if (c.width !== cw || c.height !== ch) { c.width = cw; c.height = ch }
+  const g = c.getContext('2d')
+  g.setTransform(G.dpr, 0, 0, G.dpr, 0, 0)
+  const W = G.W, H = G.H, yN = G.kbTop
+  let gr = g.createLinearGradient(0, 0, 0, yN)
+  if (studio) {
+    gr.addColorStop(0, '#0d0f15'); gr.addColorStop(1, '#07080b')
+  } else {
+    gr.addColorStop(0, STUDIO_TOP); gr.addColorStop(0.55, '#0a0d1b'); gr.addColorStop(1, '#10152b')
+  }
+  g.fillStyle = gr
+  g.fillRect(0, 0, W, H)
+  gr = g.createRadialGradient(W / 2, yN, 0, W / 2, yN, Math.max(W * 0.6, 10))
+  if (studio) {
+    gr.addColorStop(0, 'rgba(242,239,232,0.045)'); gr.addColorStop(1, 'rgba(242,239,232,0)')
+  } else {
+    gr.addColorStop(0, 'rgba(96,110,240,0.10)'); gr.addColorStop(1, 'rgba(96,110,240,0)')
+  }
+  g.fillStyle = gr
+  g.fillRect(0, 0, W, yN)
+  g.lineWidth = 1
+  g.fillStyle = studio ? 'rgba(242,239,232,0.45)' : 'rgba(255,255,255,0.2)'
+  g.font = `500 10px ${FONT}`
+  g.textAlign = 'left'; g.textBaseline = 'alphabetic'
+  g.beginPath()
+  for (const k of keys) {
+    if (k.pc !== 0 || k.black) continue
+    const x = Math.round(k.farX) + 0.5
+    g.moveTo(x, 0); g.lineTo(x, yN)
+  }
+  g.strokeStyle = 'rgba(255,255,255,0.06)'
+  g.stroke()
+  for (const k of keys) {
+    if (k.pc !== 0 || k.black) continue
+    g.fillText('C' + (Math.floor(k.pitch / 12) - 1), Math.round(k.farX) + 4, yN - 8)
+  }
+  // the bars melt into the dark over the top quarter of the stage
+  const fadeTop = studio ? '#0d0f15' : STUDIO_TOP
+  STUDIO.fadeH = Math.round(yN * 0.25)
+  gr = g.createLinearGradient(0, 0, 0, STUDIO.fadeH)
+  gr.addColorStop(0, rgba(fadeTop, 1)); gr.addColorStop(1, rgba(fadeTop, 0))
+  STUDIO.fade = gr
+  STUDIO.key = key
+  return c
+}
+
+let studioEmpty = 1, studioLast = 0
+function drawStudio(ctx, s, W, wall) {
+  if (wall - studioLast > 0.5) {   // away from the Playground for a while: start clean, no stale full-height bars
+    for (let i = 0; i < BAR_CAP; i++) BARS[i].on = false
+    kBar.fill(-1); kPrevPitch.fill(0)
+  }
+  const dt = Math.min(0.1, Math.max(0, wall - studioLast)); studioLast = wall
+  updateBars(s, wall)
+  const reduced = reducedMotion()
+  const base = G.kbTop - 1
+  const speed = Math.max(80, Math.min(260, 140 * (G.kbTop / 600)))
+  const hold = G.kbTop * 0.2               // reduced motion: a held bar stays this tall
+  const fadeLife = 0.9
+  let alive = 0, flash = false
+  for (let pass = 0; pass < 2; pass++) {   // white keys' bars first, black keys' on top
+    for (let i = 0; i < BAR_CAP; i++) {
+      const b = BARS[i]
+      if (!b.on || b.black !== (pass === 1)) continue
+      const rel = b.t1 >= 0
+      const since = rel ? wall - b.t1 : 0
+      if (rel && (reduced ? since > fadeLife : base - speed * since <= -4)) { b.on = false; continue }
+      const idx = b.pitch - G.ws
+      if (idx < 0 || idx >= keys.length) continue
+      alive++
+      const k = keys[idx]
+      let top, bottom, a
+      if (reduced) {
+        top = base - hold * Math.min(1, (wall - b.t0) * 8); bottom = base
+        a = rel ? 1 - since / fadeLife : 1
+      } else {
+        top = base - speed * (wall - b.t0)
+        bottom = rel ? base - speed * since : base
+        a = 1
+      }
+      if (bottom - top < 6) top = bottom - 6
+      if (top < -4) top = -4
+      a *= Math.min(1, (wall - b.t0) * 14)
+      const bw = b.black ? Math.max(2, k.farW * 0.8) : Math.max(2, k.farW - 2)
+      const x = k.farCx - bw / 2
+      const h = bottom - top
+      const soft = b.sus ? 0.5 : 1
+      ctx.fillStyle = b.color
+      ctx.globalAlpha = a * 0.14 * soft
+      barPath(ctx, x - 3, top - 3, bw + 6, h + 6, 7); ctx.fill()
+      ctx.globalAlpha = a * 0.88 * soft
+      barPath(ctx, x, top, bw, h, 4); ctx.fill()
+      if ((!rel || !reduced) && h > 3 && bw > 3) {
+        ctx.globalAlpha = a * 0.5 * soft
+        ctx.fillStyle = '#ffffff'
+        barPath(ctx, x + 1, top + 1, bw - 2, Math.min(3, h - 2), 1.5); ctx.fill()
+      }
+      if (!reduced && wall - b.t0 < 0.28) flash = true
+    }
+  }
+  if (flash) {   // strike bloom at the keyboard edge, scaled by how hard the key was hit
+    ctx.globalCompositeOperation = 'lighter'
+    for (let i = 0; i < BAR_CAP; i++) {
+      const b = BARS[i]
+      const age = wall - b.t0
+      if (!b.on || age < 0 || age >= 0.28) continue
+      const idx = b.pitch - G.ws
+      if (idx < 0 || idx >= keys.length) continue
+      const k = keys[idx]
+      const f = 1 - age / 0.28
+      const r = Math.max(k.farW, G.farWW) * (1.5 + 1.8 * b.vel)
+      drawGlow(ctx, b.color, k.farCx, G.kbTop, r, r * 0.75, (0.3 + 0.5 * b.vel) * f * f)
+    }
+    ctx.globalCompositeOperation = 'source-over'
   }
   ctx.globalAlpha = 1
-  return alive
+  ctx.fillStyle = STUDIO.fade
+  ctx.fillRect(0, 0, W, STUDIO.fadeH)
+  // calm hint, only while nothing is on the stage; eases in and out
+  const idle = !alive && !s.chordName
+  studioEmpty += ((idle ? 1 : 0) - studioEmpty) * (1 - Math.exp(-dt * 7))
+  if (studioEmpty > 0.01) {
+    ctx.globalAlpha = studioEmpty * (isStudio ? 0.72 : 0.38)
+    ctx.fillStyle = isStudio ? '#f2efe8' : '#c9d2ec'
+    ctx.font = `400 15px ${FONT}`
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+    ctx.fillText('Play anything. Your notes rise here.', W / 2, G.kbTop * 0.45)
+    ctx.globalAlpha = 1
+  }
 }
 
 // judgement words that float up from a key after a hit / miss
@@ -696,12 +897,14 @@ function notePerf(list, label, ms, W, H, view) {
 }
 
 export function drawScene(ctx, W, H, s) {
-  if (!ctx || !(W > 0) || !(H > 0) || !s) return GEO
+  if (!ctx || !Number.isFinite(W) || !Number.isFinite(H) || W < 1 || H < 1 || !s) return GEO
   const t0 = performance.now()
+  isStudio = studioPalette()
   if (readPalette()) { G.W = -1; toneCache.clear(); glowCache.clear(); keyTones() }
   const ws = Number.isFinite(s.windowStart) ? s.windowStart : 60
   const view = s.view === 'RAINBOW' || s.view === 'COLORNOTE' || s.view === 'CLASSIC' ? s.view : 'CASCADE'
   const notes = Array.isArray(s.notes) ? s.notes : []
+  glowGain = s.glow > 1 ? Math.min(2.5, s.glow) : (isIOSPage() ? 1.35 : 1)
   const freeplay = notes.length === 0 && Array.isArray(s.scale)
   const flat = view === 'CLASSIC'
   const m = typeof ctx.getTransform === 'function' ? ctx.getTransform() : null
@@ -740,27 +943,27 @@ function prepareKeys(s, view, ws, wall, freeplay, pos) {
       const i = p - ws
       if (i < 0 || i >= keys.length) continue
       let c = null
-      if (Array.isArray(s.waitNotes)) for (const n of s.waitNotes) if (n.pitch === p) { c = noteColor(n, view); break }
-      kWait[i] = c || noteColor({ pitch: p, hand: p < 60 ? 'left' : 'right' }, view)
+      if (Array.isArray(s.waitNotes)) for (const n of s.waitNotes) if (n.pitch === p) { c = noteColor(n, view, isStudio); break }
+      kWait[i] = c || noteColor({ pitch: p, hand: p < 60 ? 'left' : 'right' }, view, isStudio)
     }
   }
   if (Array.isArray(s.activeNotes)) {
     for (const n of s.activeNotes) {
       const i = n.pitch - ws
       if (i < 0 || i >= keys.length || kWait[i]) continue
-      if (countingIn) { kNext[i] = noteColor(n, view); continue }
-      kAct[i] = noteColor(n, view)
+      if (countingIn) { kNext[i] = noteColor(n, view, isStudio); continue }
+      kAct[i] = noteColor(n, view, isStudio)
       // spark burst when a note reaches the line
       if (s.playing && !waiting && pos - n.start < 0.2 && pos >= n.start - 0.02 && burstDone.get(n) !== burstEpoch) {
         burstDone.set(n, burstEpoch)
-        if (view !== 'CLASSIC') spawnBurst(keys[i].farCx, G.kbTop, kAct[i], ((keys[i].black ? M.barBlack : M.barWhite) * G.farWW) / 2, wall)
+        if (view !== 'CLASSIC' && !reducedMotion()) spawnBurst(keys[i].farCx, G.kbTop, kAct[i], ((keys[i].black ? M.barBlack : M.barWhite) * G.farWW) / 2, wall)
       }
     }
   }
   if (Array.isArray(s.upcomingNotes)) {
     for (const n of s.upcomingNotes) {
       const i = n.pitch - ws
-      if (i >= 0 && i < keys.length && !kAct[i] && !kNext[i]) kNext[i] = noteColor(n, view)
+      if (i >= 0 && i < keys.length && !kAct[i] && !kNext[i]) kNext[i] = noteColor(n, view, isStudio)
     }
   }
   if (s.held && typeof s.held[Symbol.iterator] === 'function') {
@@ -799,7 +1002,7 @@ function keyStates(freeplay, scaleSet, root) {
       else if (scaleSet.has(k.pc)) c = k.black ? PAL.blackScale : KT.scaleW
       else c = k.black ? PAL.black : PAL.whiteOff
     }
-    if (freeplay && kHeld[i]) { c = playgroundColor(k.pc); lit = 1; down = 1 }
+    if (freeplay && kHeld[i]) { c = studioFill(k.pitch, k.black, !!scaleSet && !scaleSet.has(k.pc)); lit = 1; down = 1 }
     else if (kAct[i]) { c = k.black ? tone(kAct[i]).blackKey : kAct[i]; lit = 1; down = 1 }
     else {
       if (kNext[i]) c = k.black ? tone(kNext[i]).nextB : tone(kNext[i]).nextW
@@ -816,25 +1019,18 @@ function keyStates(freeplay, scaleSet, root) {
 
 /* ============================================================ 3D frame */
 function drawFrame3D(ctx, s, W, H, view, notes, freeplay, pos, wall, sig) {
-  const pulse = 0.5 + 0.5 * Math.sin(wall * Math.PI * 2 * 1.3)
-  ctx.drawImage(fieldLayer(s), 0, 0, W, H)
+  const pulse = reducedMotion() ? 0.5 : 0.5 + 0.5 * Math.sin(wall * Math.PI * 2 * 1.3)
+  ctx.drawImage(freeplay ? studioLayer() : fieldLayer(s), 0, 0, W, H)
   if (!freeplay) drawBeatLines(ctx, s.tempo, pos)
-  drawBeams(ctx, freeplay)
+  if (!freeplay) drawBeams(ctx, false)
   if (freeplay) {
-    updateBubbles(s, wall)
-    const alive = drawBubbles(ctx, wall)
-    if (!alive && !s.chordName) {
-      ctx.fillStyle = rgba(PAL.accent2, 0.4)
-      ctx.font = `500 15px ${FONT}`
-      ctx.fillText('Play anything — the keys are yours', W / 2, G.kbTop * 0.45)
-    }
+    drawStudio(ctx, s, W, wall)
   } else {
     for (let i = 0; i < keys.length; i++) kPrevHeld[i] = kHeld[i]
     drawHotSpots3D(ctx)
     drawNotes3D(ctx, s, notes, view, pos, pulse)
   }
-  ctx.fillStyle = G.fog
-  ctx.fillRect(0, 0, W, G.fogH)
+  if (!freeplay) { ctx.fillStyle = G.fog; ctx.fillRect(0, 0, W, G.fogH) }
   if (freeplay) drawChordName(ctx, s, W, wall)
   if (!freeplay) drawLoopMarkers3D(ctx, s, pos)
   drawNowLine3D(ctx)
@@ -842,13 +1038,13 @@ function drawFrame3D(ctx, s, W, H, view, notes, freeplay, pos, wall, sig) {
   ctx.drawImage(kb.canvas, 0, kb.top, W, H - kb.top)
   drawKeyOverlays3D(ctx, pulse)
   drawKeyGlows3D(ctx, pulse)
-  drawSparks(ctx, wall)
+  if (!reducedMotion()) drawSparks(ctx, wall)
   drawWords(ctx, wall)
   drawHud(ctx, s, wall)
 }
 
-// Playground: the chord you hold (s.chordName), large and upright above the keys. It pops
-// in when it changes and fades out with s.chordAlpha once you let go.
+// Playground: the chord you hold (s.chordName) as a small pill near the top. It eases in when
+// it changes and fades out with s.chordAlpha once you let go.
 let chordShown = '', chordSince = 0
 function drawChordName(ctx, s, W, wall) {
   const name = typeof s.chordName === 'string' ? s.chordName : ''
@@ -856,22 +1052,26 @@ function drawChordName(ctx, s, W, wall) {
   const a = clamp01(s.chordAlpha == null ? 1 : s.chordAlpha)
   if (!name || !(a > 0)) return
   const k = clamp01((wall - chordSince) / 0.2)
-  const pop = 0.9 + 0.1 * (1 - Math.pow(1 - k, 3))
-  // a chord or note name is big; an interval ("perfect fifth") smaller; never wider than the stage
+  const pop = reducedMotion() ? 1 : 0.94 + 0.06 * (1 - Math.pow(1 - k, 3))
+  // a chord or note name is larger; an interval ("perfect fifth") smaller; never wider than the stage
   const symbol = /^[A-G]/.test(name)
-  let size = Math.min(symbol ? 112 : 56, G.kbTop * (symbol ? 0.26 : 0.14))
-  ctx.font = `700 ${Math.round(size)}px ${FONT}`
-  const tw = ctx.measureText(name).width
-  if (tw > W * 0.8) { size *= (W * 0.8) / tw; ctx.font = `700 ${Math.round(size)}px ${FONT}` }
+  let size = Math.max(14, Math.min(symbol ? 30 : 17, G.kbTop * (symbol ? 0.075 : 0.045)))
+  ctx.font = `600 ${Math.round(size)}px ${FONT}`
+  let tw = ctx.measureText(name).width
+  if (tw > W * 0.7) { size *= (W * 0.7) / tw; ctx.font = `600 ${Math.round(size)}px ${FONT}`; tw = W * 0.7 }
+  const ph = Math.round(size * 1.7), pw = Math.round(tw + size * 1.6)
   ctx.save()
-  ctx.translate(W / 2, G.kbTop * 0.4)
+  ctx.translate(W / 2, isStudio ? Math.max(ph / 2 + 64, G.kbTop * 0.22) : Math.max(ph / 2 + 10, G.kbTop * 0.14))
   ctx.scale(pop, pop)
   ctx.globalAlpha = a
+  ctx.fillStyle = isStudio ? 'rgba(20,22,29,0.86)' : 'rgba(14,18,36,0.62)'
+  ctx.strokeStyle = isStudio ? 'rgba(242,239,232,0.14)' : 'rgba(255,255,255,0.12)'
+  ctx.lineWidth = 1
+  barPath(ctx, -pw / 2, -ph / 2, pw, ph, ph / 2)
+  ctx.fill(); ctx.stroke()
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-  ctx.shadowColor = rgba(PAL.bed, 0.7)
-  ctx.shadowBlur = size * 0.35
-  ctx.fillStyle = PAL.cream
-  ctx.fillText(name, 0, 0)
+  ctx.fillStyle = isStudio ? '#f2efe8' : '#eef1fb'
+  ctx.fillText(name, 0, 1)
   ctx.restore()
 }
 
@@ -978,11 +1178,12 @@ function drawBeams(ctx, freeplay) {
   for (const k of keys) {
     const c = kAct[k.i] || kWait[k.i] || (freeplay && kHeld[k.i] ? playgroundColor(k.pc) : null)
     if (!c) continue
-    let gr = beamCache.get(c)
+    const bkey = glowGain === 1 ? c : c + '|' + glowGain
+    let gr = beamCache.get(bkey)
     if (!gr) {
       gr = ctx.createLinearGradient(0, G.kbTop, 0, G.beamTop)
-      gr.addColorStop(0, rgba(c, 0.24)); gr.addColorStop(1, rgba(c, 0))
-      beamCache.set(c, gr)
+      gr.addColorStop(0, rgba(c, Math.min(0.9, 0.24 * glowGain))); gr.addColorStop(1, rgba(c, 0))
+      beamCache.set(bkey, gr)
     }
     ctx.beginPath()
     planeQuad(ctx, k.lx0 - h, k.lx1 - h, 0, dEnd)
@@ -999,7 +1200,7 @@ function drawHotSpots3D(ctx) {
     if (!c) continue
     if (!on) { on = true; ctx.globalCompositeOperation = 'lighter' }
     const r = k.farW * 1.5
-    drawGlow(ctx, c, k.farCx, G.kbTop, r, r * 0.55, 0.55)
+    drawGlow(ctx, c, k.farCx, G.kbTop, r, r * 0.55 * glowGain, 0.55 * Math.min(1.4, glowGain))
   }
   if (on) { ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1 }
 }
@@ -1095,7 +1296,7 @@ function drawNote3D(ctx, n, k, pos, view, labels, meta, alpha, waitPulse) {
   const rc = Math.min(half * 0.55, (d1 - d0) * 0.45)
   const xc = k.lc - G.span / 2, xl = xc - half, xr = xc + half
   const active = t0 <= 0.001 && !countingIn && !waitPulse
-  const color = noteColor(n, view)
+  const color = noteColor(n, view, isStudio)
   const tn = tone(color)
   const s0 = P.k / (P.k + d0)
   const th = M.noteH * P.w0 * s0 * P.hz
@@ -1432,22 +1633,35 @@ function drawKeyOverlays3D(ctx, pulse) {
   }
 }
 
-// light spilling from lit and waiting keys onto the strip behind them
+// light spilling from lit and waiting keys onto the strip behind them; a perfect hit flares in its own colour for a moment
 function drawKeyGlows3D(ctx, pulse) {
   let on = false
+  const wide = glowGain > 1 ? 1 + 0.45 * (glowGain - 1) : 1       // the TV's light also climbs the lane
   for (const k of keys) {
     const i = k.i
     const c = kLit[i] ? kFill[i] : kWait[i]
-    if (!c) continue
+    const fb = kFb[i]
+    if (!c && !fb) continue
     if (!on) { on = true; ctx.globalCompositeOperation = 'lighter' }
-    const r = k.farW * 0.9
-    drawGlow(ctx, c, k.farCx, G.kbTop + 2, r, r * 0.4, kLit[i] ? 0.4 : 0.15 + 0.3 * pulse)
+    const r = k.farW * 0.9 * wide
+    if (c) drawGlow(ctx, c, k.farCx, G.kbTop + 2, r, r * 0.4 * glowGain, (kLit[i] ? 0.4 : 0.15 + 0.3 * pulse) * glowGain)
+    if (fb && glowGain > 1) drawGlow(ctx, fb, k.farCx, G.kbTop + 2, r * 1.15, r * 0.5 * glowGain, 0.5 * kFbA[i])
   }
   if (on) { ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1 }
 }
 
 /* ========================================================== flat frame */
 function drawFrameFlat(ctx, s, W, H, view, notes, pos, wall, freeplay) {
+  if (freeplay) {
+    ctx.drawImage(studioLayer(), 0, 0, W, H)
+    drawStudio(ctx, s, W, wall)
+    drawJudgementLine(ctx)
+    drawKeyboardFlat(ctx, wall)
+    drawChordName(ctx, s, W, wall)
+    drawWords(ctx, wall)
+    drawHud(ctx, s, wall)
+    return
+  }
   ctx.fillStyle = G.bg; ctx.fillRect(0, 0, W, H)
   const bd = backdropFor(s.backdrop, W, G.kbTop)
   if (bd) {
@@ -1464,7 +1678,6 @@ function drawFrameFlat(ctx, s, W, H, view, notes, pos, wall, freeplay) {
   drawLoopMarkers(ctx, s, pos)
   drawJudgementLine(ctx)
   drawKeyboardFlat(ctx, wall)
-  if (freeplay) drawChordName(ctx, s, W, wall)
   drawWords(ctx, wall)
   drawHud(ctx, s, wall)
 }
@@ -1516,7 +1729,7 @@ function drawNotes(ctx, s, notes, view, pos, wall) {
   const handOnly = s.handFilter === 'left' || s.handFilter === 'right' ? s.handFilter : null
   const lo = meta.sorted ? firstIndexFrom(notes, pos - meta.maxDur - 0.05) : 0
   const tMax = pos + LOOK * UMAX
-  const pulse = 0.5 + 0.5 * Math.sin(wall * Math.PI * 2 * 1.3)
+  const pulse = reducedMotion() ? 0.5 : 0.5 + 0.5 * Math.sin(wall * Math.PI * 2 * 1.3)
 
   ctx.save()
   ctx.beginPath(); ctx.rect(0, 0, G.W, G.kbTop); ctx.clip()
@@ -1563,7 +1776,7 @@ function drawNote(ctx, n, k, pos, view, labels, meta, alpha, waitPulse) {
   let yt = flatY(u1)
   if (yb - yt < hB * 1.7) yt = yb - hB * 1.7     // very short notes still read as bars
   const active = dt0 <= 0.001 && !countingIn
-  const color = noteColor(n, view)
+  const color = noteColor(n, view, isStudio)
   const tn = tone(color)
 
   if (active || waitPulse || alpha > 0.5) {
@@ -1651,7 +1864,7 @@ function drawJudgementLine(ctx) {
 
 function drawKeyboardFlat(ctx, wall) {
   const top = G.kbTop, H = G.H, W = G.W
-  const pulse = 0.5 + 0.5 * Math.sin(wall * Math.PI * 2 * 1.3)
+  const pulse = reducedMotion() ? 0.5 : 0.5 + 0.5 * Math.sin(wall * Math.PI * 2 * 1.3)
   ctx.fillStyle = PAL.bed; ctx.fillRect(0, top, W, G.kbH)
 
   const wTop = top + 2, wH = H - wTop - 2
@@ -1745,16 +1958,16 @@ function drawHud(ctx, s, wall) {
     }
     ctx.globalAlpha = 1
   }
-  if (s.waiting) {
-    const pulse = 0.5 + 0.5 * Math.sin(wall * Math.PI * 2 * 1.3)
+  if (s.waiting && s.waitPill !== false) {
+    const pulse = reducedMotion() ? 1 : 0.5 + 0.5 * Math.sin(wall * Math.PI * 2 * 1.3)
     ctx.font = `600 13px ${FONT}`
-    const text = 'Your turn — play the glowing keys'
+    const text = 'Your turn: play the glowing keys'
     const tw = ctx.measureText(text).width
-    const pw = tw + 44, ph = 30, x = W / 2 - pw / 2, y = 14
-    ctx.fillStyle = rgba(PAL.ink, 0.86)
+    const pw = tw + 44, ph = 30, x = W / 2 - pw / 2, y = Math.max(14, Number(s.hudTop) || 0)   // hudTop: below the floating top bar
+    ctx.fillStyle = isStudio ? 'rgba(20,22,29,0.86)' : rgba(PAL.ink, 0.86)
     roundRect(ctx, x, y, pw, ph, ph / 2); ctx.fill()
-    ctx.strokeStyle = rgba(PAL.accentHi, 0.4); ctx.lineWidth = 1; ctx.stroke()
-    ctx.fillStyle = PAL.accentHi
+    ctx.strokeStyle = isStudio ? 'rgba(242,239,232,0.16)' : rgba(PAL.accentHi, 0.4); ctx.lineWidth = 1; ctx.stroke()
+    ctx.fillStyle = isStudio ? STUDIO_HAND.right : PAL.accentHi
     ctx.globalAlpha = 0.45 + 0.55 * pulse
     ctx.beginPath(); ctx.arc(x + 17, y + ph / 2, 4, 0, Math.PI * 2); ctx.fill()
     ctx.globalAlpha = 1

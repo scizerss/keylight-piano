@@ -13,8 +13,10 @@
 // A restore reads and checks the whole file before it writes anything, asks first, then
 // writes settings (undone again if anything fails) and saves every song in one batch.
 // Keys and songs that are not in the backup are left alone; ones that are get replaced.
-import { checkNotes, MAX_SECONDS } from './editor-model.js'
-import { isSafeCover } from './importer.js'
+import { checkNotes, MAX_NOTES, MAX_SECONDS, MIN_DUR } from './editor-model.js'
+import { DIFFICULTIES } from './arranger.js'
+import { cleanCoverModelDifficulty, isSafeCover } from './importer.js'
+import { MAX_LYRIC_ITEMS, MAX_LYRIC_TEXT } from './lyrics-model.js'
 import { isNum, plain, validStoredValue } from './storage-validation.js'
 
 export const MAGIC = 'KEYLIGHT-BACKUP\n'
@@ -93,6 +95,55 @@ function lyrics(v, what) {
   return fail(`${what}: the lyrics are not valid`)
 }
 
+// Piano-roll grid settings (song.grid): { offset, division } or null; older songs have none.
+function grid(v, what) {
+  if (v == null) return null
+  if (!plain(v) || !isNum(v.offset) || v.offset < 0 || v.offset > 60 || !Number.isInteger(v.division) || v.division < 1 || v.division > 16) fail(`${what}: the grid settings are not valid`)
+  return { offset: v.offset, division: v.division }
+}
+
+function coverRaw(v, what) {
+  if (v == null) return null
+  if (!Array.isArray(v) || !v.length || v.length > MAX_NOTES) fail(`${what}: the cover notes are not valid`)
+  const out = v.map((n, i) => {
+    if (!plain(n) || !Number.isInteger(n.pitch) || n.pitch < 0 || n.pitch > 127) fail(`${what}: cover note ${i + 1} has no valid pitch`)
+    if (!isNum(n.start) || n.start < 0 || n.start > MAX_SECONDS) fail(`${what}: cover note ${i + 1} has no valid start`)
+    if (!isNum(n.dur) || n.dur < MIN_DUR || n.dur > MAX_SECONDS) fail(`${what}: cover note ${i + 1} has no valid length`)
+    if (n.vel != null && !(Number.isInteger(n.vel) && n.vel >= 0 && n.vel <= 127)) fail(`${what}: cover note ${i + 1} has no valid velocity`)
+    const clean = { pitch: n.pitch, start: n.start, dur: n.dur }
+    if (n.vel != null) clean.vel = n.vel
+    return clean
+  })
+  return out.sort((a, b) => a.start - b.start || a.pitch - b.pitch)
+}
+
+function coverArrangement(v, what) {
+  if (v == null) return null
+  if (!plain(v) || !DIFFICULTIES.includes(v.difficulty)) fail(`${what}: the cover arrangement is not valid`)
+  const r = v.keyRange
+  if (!plain(r) || !Number.isInteger(r.lo) || !Number.isInteger(r.hi) || r.lo < 0 || r.hi > 127 || r.lo > r.hi) fail(`${what}: the cover arrangement key range is not valid`)
+  return { difficulty: v.difficulty, keyRange: { lo: r.lo, hi: r.hi } }
+}
+
+// Syllable-level lyrics (song.lyricWords): the shape lyrics-model.js writes; null when there are none. Anything that is not
+// exactly that (a bad entry, a wrongly typed flag, too many items) rejects the backup: nothing is dropped or trimmed silently.
+function lyricWords(v, what) {
+  if (v == null) return null
+  if (!Array.isArray(v) || v.length > MAX_LYRIC_ITEMS) fail(`${what}: the lyric words are not valid`)
+  const out = v.map((item, i) => {
+    if (!plain(item) || !isNum(item.t) || item.t < 0 || item.t > MAX_SECONDS) fail(`${what}: lyric word ${i + 1} has no valid time`)
+    if (typeof item.text !== 'string' || !item.text || item.text.length > MAX_LYRIC_TEXT) fail(`${what}: lyric word ${i + 1} has no valid text`)
+    const clean = { t: item.t, text: item.text }
+    for (const flag of ['cont', 'nl', 'line']) {
+      if (item[flag] == null) continue
+      if (typeof item[flag] !== 'boolean') fail(`${what}: lyric word ${i + 1} has a ${flag} that is not true or false`)
+      if (item[flag]) clean[flag] = true
+    }
+    return clean
+  })
+  return out.length ? out.sort((a, b) => a.t - b.t) : null
+}
+
 // One song of the manifest, rebuilt from known fields in the shape saveImported takes.
 // audioAt(entry) turns the manifest's audio entry into a Blob.
 function readSong(s, i, audioAt) {
@@ -107,6 +158,10 @@ function readSong(s, i, audioAt) {
   if (s.source != null && s.source !== 'audio' && s.source !== 'score') fail(`${what}: the source is not known`)
   if (s.added != null && !(isNum(s.added) && s.added >= 0)) fail(`${what}: the date added is not valid`)
   if (s.lyricsFromFile != null && typeof s.lyricsFromFile !== 'boolean') fail(`${what}: lyricsFromFile is not true or false`)
+  const modelDifficulty = cleanCoverModelDifficulty(s.coverModelDifficulty)
+  if (s.coverModelDifficulty != null && (!modelDifficulty || !s.coverRaw)) fail(`${what}: the cover model difficulty is not valid`)
+  const raw = coverRaw(s.coverRaw, what)
+  const arrangement = coverArrangement(s.coverArrangement, what)
   return {
     id: s.id,
     title: str(s.title, LIMIT.text, what + ': the title') || 'Untitled',
@@ -115,14 +170,17 @@ function readSong(s, i, audioAt) {
     notes: notes.notes, duration: s.duration, tempo: s.tempo,
     timeSignature: timeSignature(s.timeSignature, what), parts: parts(s.parts, what),
     bars: s.bars == null ? null : numbers(s.bars, what + ': bars', { min: 0 }),
-    score: score(s.score, what),
-    cover: s.cover || null, lyrics: lyrics(s.lyrics, what), lyricsFromFile: !!s.lyricsFromFile,
+    score: score(s.score, what), grid: grid(s.grid, what),
+    coverRaw: raw, coverArrangement: arrangement && raw ? arrangement : null,     // an arrangement means nothing without the notes it arranges
+    coverModelDifficulty: modelDifficulty,
+    cover: s.cover || null, lyrics: lyrics(s.lyrics, what), lyricsFromFile: !!s.lyricsFromFile, lyricWords: lyricWords(s.lyricWords, what),
     audio: s.audio == null ? null : audioAt(s.audio, what),
+    importNotice: s.importNotice == null ? null : str(s.importNotice, 400, what + ': the import note') || null,
     source: s.source ?? undefined, added: s.added ?? Date.now()
   }
 }
 
-const AUDIO_TYPE = /^(audio\/[A-Za-z0-9.+-]{1,60}|)$/
+const AUDIO_TYPE = /^(audio\/[A-Za-z0-9.+-]{1,60}|video\/(mp4|quicktime|x-m4v)|)$/   // a small video is kept as the recording
 const audioMeta = (blob, fallbackName) => ({
   type: AUDIO_TYPE.test(blob.type || '') ? blob.type || '' : '',
   name: typeof blob.name === 'string' && blob.name && blob.name.length <= LIMIT.text ? blob.name : fallbackName
@@ -157,12 +215,11 @@ function checkStorage(v) {
 const pad = (n) => String(n).padStart(2, '0')
 const stamp = (d) => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`
 
-// createBackup({ songs, storage, now? }) -> { blob, name, songs, keys, skipped }
-//   songs: the imported records (importer.js listImported()), storage: localStorage.
-//   A song that would not restore is left out and named in skipped: [{ title, reason }].
-export async function createBackup({ songs, storage, now = new Date() }) {
+// What goes in a backup: every song (its recording too when withRecordings), the lumi.* entries, and the
+// finished manifest. Nothing is copied: `blobs` are the stored recordings, `size` is the file's final size.
+function assemble({ songs, storage, now }, withRecordings) {
   const entries = [], blobs = [], skipped = []
-  let offset = 0
+  let offset = 0, recordingsLeftOut = 0
   for (const rec of songs) {
     let entry
     try {
@@ -174,10 +231,13 @@ export async function createBackup({ songs, storage, now = new Date() }) {
       continue
     }
     if (rec.audio instanceof Blob) {
-      if (rec.audio.size > LIMIT.audio) { skipped.push({ title: entry.title, reason: 'the recording is larger than 1 GB' }); continue }
-      entry.audio = { offset, size: rec.audio.size, ...audioMeta(rec.audio, entry.title) }
-      offset += rec.audio.size
-      blobs.push(rec.audio)
+      if (!withRecordings) recordingsLeftOut++
+      else if (rec.audio.size > LIMIT.audio) { skipped.push({ title: entry.title, reason: 'the recording is larger than 1 GB' }); continue }
+      else {
+        entry.audio = { offset, size: rec.audio.size, ...audioMeta(rec.audio, entry.title) }
+        offset += rec.audio.size
+        blobs.push(rec.audio)
+      }
     }
     entries.push(entry)
   }
@@ -193,12 +253,49 @@ export async function createBackup({ songs, storage, now = new Date() }) {
     format: 'keylight-backup', version: VERSION, created: now.toISOString(), songs: entries, storage: checkStorage(kept)
   }))
   if (manifest.length > LIMIT.manifest) fail('The library is too large for one backup')
+  return { entries, blobs, skipped, kept, manifest, recordingsLeftOut, size: HEAD + manifest.length + offset }
+}
+
+export const RECORDINGS_TOO_LARGE = 'Your recordings are too large to include, so this backup has your progress, settings and songs but not the recordings.'
+export const RECORDINGS_LEFT_OUT = 'This backup has your progress, settings and songs but not the recordings.'
+
+// backupSize({ songs, storage, now? }) -> { full, withoutRecordings, recordings }, all in bytes, before anything is staged.
+//   full: the file with every recording; withoutRecordings: progress, settings and each song's notes only;
+//   recordings: how many songs have a recording.
+export function backupSize({ songs, storage, now = new Date() }) {
+  const full = assemble({ songs, storage, now }, true)
+  const lean = full.blobs.length ? assemble({ songs, storage, now }, false) : full
+  return { full: full.size, withoutRecordings: lean.size, recordings: songs.filter((s) => s && s.audio instanceof Blob).length }
+}
+
+// createBackup({ songs, storage, now?, includeRecordings?, maxBytes? })
+//   -> { blob, name, songs, keys, skipped, recordingsIncluded, recordingsLeftOut, notice }
+//   songs: the imported records (importer.js listImported()), storage: localStorage.
+//   A song that would not restore is left out and named in skipped: [{ title, reason }].
+//   includeRecordings: false makes a "progress only" backup (songs' notes, progress and settings, no recordings).
+//   maxBytes: the biggest file the caller can hand on (SHARE_LIMIT_BYTES on iPhone/iPad). The size is worked out before
+//     the file is made; when the full backup would be larger, the recordings are left out instead and `notice` says so.
+//   recordingsLeftOut: how many songs had a recording that is not in the file. notice: a sentence to show the user, or ''.
+export async function createBackup({ songs, storage, now = new Date(), includeRecordings = true, maxBytes = Infinity }) {
+  let plan = assemble({ songs, storage, now }, includeRecordings)
+  let notice = includeRecordings ? '' : plan.recordingsLeftOut ? RECORDINGS_LEFT_OUT : ''
+  if (plan.size > maxBytes && plan.blobs.length) {
+    plan = assemble({ songs, storage, now }, false)
+    notice = RECORDINGS_TOO_LARGE
+  }
+  if (plan.size > maxBytes) fail('Your songs and progress are too large for one backup file')
   const head = new Uint8Array(HEAD)
   head.set(new TextEncoder().encode(MAGIC))
-  new DataView(head.buffer).setUint32(MAGIC.length, manifest.length, true)
-  const blob = new Blob([head, manifest, ...blobs], { type: 'application/octet-stream' })
-  return { blob, name: `keylight-backup-${stamp(now)}${EXTENSION}`, songs: entries.length, keys: Object.keys(kept).length, skipped }
+  new DataView(head.buffer).setUint32(MAGIC.length, plan.manifest.length, true)
+  const blob = new Blob([head, plan.manifest, ...plan.blobs], { type: 'application/octet-stream' })
+  return {
+    blob, name: `keylight-backup-${stamp(now)}${EXTENSION}`, songs: plan.entries.length, keys: Object.keys(plan.kept).length, skipped: plan.skipped,
+    recordingsIncluded: plan.blobs.length > 0, recordingsLeftOut: plan.recordingsLeftOut, notice
+  }
 }
+
+// createProgressOnlyBackup({ songs, storage, now? }): the same as createBackup with no recordings, for a "progress only" choice.
+export const createProgressOnlyBackup = (options) => createBackup({ ...options, includeRecordings: false })
 
 // readBackup(file) -> { created, songs, storage }: the whole file checked, nothing written.
 // Throws BackupError with a message for the user.
@@ -242,7 +339,16 @@ export async function readBackup(file) {
 //   saveSongs(songs): saves every song in one transaction, all or none (a rejection
 //     means none were saved). confirm(plan): true to go ahead; plan is readBackup's
 //     result. Declining writes nothing.
-export async function restoreBackup(file, { saveSongs, storage, confirm }) {
+let restoring = 0, restoreRevision = 0
+export const backupRestoreRevision = () => restoring ? null : restoreRevision
+
+export async function restoreBackup(file, options) {
+  restoring++
+  restoreRevision++
+  try { return await applyBackup(file, options) } finally { restoring-- }
+}
+
+async function applyBackup(file, { saveSongs, storage, confirm }) {
   const plan = await readBackup(file)
   if (!(await confirm(plan))) return { restored: false, songs: 0, keys: 0 }
   const keys = Object.keys(plan.storage)

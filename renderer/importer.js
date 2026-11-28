@@ -8,6 +8,10 @@
 // Nothing is downloaded except that metadata.
 import { parseSongFile, normalise, decodeText } from './songloader.js'
 import { assignFingering } from './fingering.js'
+import { arrange, cleanCoverNotes, DIFFICULTIES } from './arranger.js'
+import { MAX_NOTES, MIN_DUR, MAX_SECONDS as MAX_NOTE_SECONDS } from './editor-model.js'
+import { lyricFields, sanitizeLyrics } from './lyrics-model.js'
+import { inflateRaw, InflateError } from './inflate.js'
 
 const MODEL_URL = 'models/basic-pitch/model.json'
 const MODEL_RATE = 22050
@@ -129,12 +133,12 @@ async function pickNotes(mod, frames, onsets, onProgress) {
 
 export const MAX_SECONDS = 20 * 60
 
-export async function transcribe(audioBuffer, onProgress = () => {}) {
+export async function transcribe(audioBuffer, onProgress = () => {}, signal) {
   if (audioBuffer.duration > MAX_SECONDS) throw new Error('Recordings up to 20 minutes can be added')
-  const { mod, model } = await loadTranscriber()
-  await mod.tf.ready()
+  const { mod, model } = await waitForImport(loadTranscriber(), signal)
+  await waitForImport(mod.tf.ready(), signal)
   console.log('IMPORT transcribing on ' + mod.tf.getBackend() + ' backend')
-  const samples = await toModelRate(audioBuffer)
+  const samples = await waitForImport(toModelRate(audioBuffer), signal)
   const frames = [], onsets = [], contours = []
   // every tensor made while evaluating is freed afterwards (results are plain arrays)
   mod.tf.engine().startScope()
@@ -142,12 +146,13 @@ export async function transcribe(audioBuffer, onProgress = () => {}) {
     await new mod.BasicPitch(model).evaluateModel(
       samples,
       (f, o, c) => { frames.push(...f); onsets.push(...o); contours.push(...c) },
-      (p) => onProgress(0.85 * p)
+      (p) => { signal?.throwIfAborted(); onProgress(0.85 * p) }
     )
   } finally {
     mod.tf.engine().endScope()
   }
-  const events = await pickNotes(mod, frames, onsets, (p) => onProgress(0.85 + 0.15 * p))
+  const events = await pickNotes(mod, frames, onsets, (p) => { signal?.throwIfAborted(); onProgress(0.85 + 0.15 * p) })
+  signal?.throwIfAborted()
   const raw = mod.noteFramesToTime(mod.addPitchBendsToNoteEvents(contours, events))
   return cleanNotes(raw)
 }
@@ -191,10 +196,12 @@ export async function readTags(file) {
       if (lyr.syncText && lyr.syncText.length) lyrics = { synced: lyr.syncText.map((l) => ({ t: (l.timestamp || 0) / 1000, text: l.text })) }
       else if (lyr.text) lyrics = { plain: lyr.text }
     }
-    return { title: c.title || '', artist: c.artist || '', album: c.album || '', cover, lyrics }
+    // the length when the file's header states it (no scan of the whole file), so a too-long recording is refused before decoding
+    const length = Number(meta.format && meta.format.duration)
+    return { title: c.title || '', artist: c.artist || '', album: c.album || '', cover, lyrics, duration: Number.isFinite(length) && length > 0 ? length : null }
   } catch (e) {
     console.log('IMPORT tags unreadable: ' + e.message)
-    return { title: '', artist: '', album: '', cover: null, lyrics: null }
+    return { title: '', artist: '', album: '', cover: null, lyrics: null, duration: null }
   }
 }
 
@@ -258,11 +265,42 @@ export async function fetchLyrics(title, artist, duration) {
 // ---------- compressed MusicXML (.mxl) ----------
 
 // A zip archive's entries, from its central directory: { names, read(name) -> bytes }.
-// Reads 'stored' and 'deflate' entries (deflate through DecompressionStream),
+// Reads 'stored' and 'deflate' entries (deflate through DecompressionStream, or inflate.js where that is missing),
 // which is all that MusicXML writers use. No entry may unpack past MAX_ENTRY_BYTES
 // (a score is a few MB at most): the directory's size is checked first, and the
 // inflated bytes are counted as they arrive, since that size can be forged.
 const MAX_ENTRY_BYTES = 50 * 1024 * 1024
+
+// One deflated entry. DecompressionStream is used when the browser has it and knows 'deflate-raw' (older Safari may not);
+// otherwise, or if the stream fails, the small inflater in inflate.js does it, with the same size cap.
+async function inflateEntry(data, name) {
+  const tooLarge = () => Object.assign(new Error(name + ' is too large to open'), { tooLarge: true })
+  if (typeof DecompressionStream === 'function') {
+    try {
+      const reader = new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader()
+      const chunks = []
+      let total = 0
+      for (;;) {
+        const { value, done } = await reader.read()
+        if (done) break
+        total += value.byteLength
+        if (total > MAX_ENTRY_BYTES) { await reader.cancel(); throw tooLarge() }
+        chunks.push(value)
+      }
+      const out = new Uint8Array(total)
+      let off = 0
+      for (const c of chunks) { out.set(c, off); off += c.byteLength }
+      return out
+    } catch (e) {
+      if (e && e.tooLarge) throw e
+      // not supported here, or the stream failed: the inflater below gives the answer
+    }
+  }
+  try { return inflateRaw(data, { maxBytes: MAX_ENTRY_BYTES }) } catch (e) {
+    if (!(e instanceof InflateError)) throw e
+    throw e.tooLarge ? tooLarge() : new Error('The score inside this file is damaged and could not be unpacked')
+  }
+}
 export function unzip(buffer) {
   const dv = new DataView(buffer)
   const size = dv.byteLength
@@ -290,7 +328,7 @@ export function unzip(buffer) {
     const e = entries.get(name)
     if (!e) throw new Error('No ' + name + ' in the archive')
     if (e.flags & 1) throw new Error('Encrypted archives are not supported')
-    if (e.usize > MAX_ENTRY_BYTES) throw new Error(name + ' is too large to open')
+    if (e.usize > MAX_ENTRY_BYTES || (e.method === 0 && e.csize > MAX_ENTRY_BYTES)) throw new Error(name + ' is too large to open')
     if (e.local + 30 > size || dv.getUint32(e.local, true) !== 0x04034b50) throw new Error('Broken zip entry ' + name)
     // sizes come from the directory: a local header may leave them to a trailing descriptor
     const at = e.local + 30 + dv.getUint16(e.local + 26, true) + dv.getUint16(e.local + 28, true)
@@ -298,20 +336,7 @@ export function unzip(buffer) {
     const data = new Uint8Array(buffer, at, Math.max(0, Math.min(e.csize, size - at)))
     if (e.method === 0) return data
     if (e.method !== 8) throw new Error('Unsupported zip compression (method ' + e.method + ')')
-    const reader = new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader()
-    const chunks = []
-    let total = 0
-    for (;;) {
-      const { value, done } = await reader.read()
-      if (done) break
-      total += value.byteLength
-      if (total > MAX_ENTRY_BYTES) { await reader.cancel(); throw new Error(name + ' is too large to open') }
-      chunks.push(value)
-    }
-    const out = new Uint8Array(total)
-    let off = 0
-    for (const c of chunks) { out.set(c, off); off += c.byteLength }
-    return out
+    return inflateEntry(data, name)
   }
   return { names: [...entries.keys()], read }
 }
@@ -338,18 +363,116 @@ export async function readMxl(buffer) {
 
 // ---------- whole imports ----------
 
-const AUDIO_EXT = /\.(mp3|m4a|aac|wav|aif|aiff|flac|ogg|opus)$/i
-const SCORE_EXT = /\.(mid|midi|xml|musicxml|mxl)$/i
-export const isAudioFile = (f) => AUDIO_EXT.test(f.name) || /^audio\//.test(f.type || '')
+const AUDIO_EXT = /\.(mp3|m4a|aac|wav|aif|aiff|aifc|caf|flac|ogg|opus|webm)$/i
+const VIDEO_EXT = /\.(mp4|m4v|mov)$/i
+const SCORE_EXT = /\.(mid|midi|kar|xml|musicxml|mxl)$/i
+export const isVideoFile = (f) => VIDEO_EXT.test(f.name) || /^video\/(mp4|quicktime|x-m4v)$/.test(f.type || '')
+// a video is read for its sound track: decodeAudioData takes the audio of an mp4 / mov (WebKit, Chromium and Android WebView
+// do when their AAC decoder is present; the importer says so in words when one cannot)
+export const isAudioFile = (f) => {
+  if (/\.webm$/i.test(f.name) && /^video\//.test(f.type || '')) return false
+  return AUDIO_EXT.test(f.name) || /^audio\//.test(f.type || '') || isVideoFile(f)
+}
 export const isScoreFile = (f) => SCORE_EXT.test(f.name)
 export const isLyricsFile = (f) => /\.lrc$/i.test(f.name)
 
-// opts: { ctx: AudioContext, simplify: bool, lookup: bool, onStage(text, fraction) }
+export const MAX_KEPT_VIDEO = 60 * 1024 * 1024
+
+// A file is read into memory (and an audio file decoded to raw samples, many times its size), so a very large one is refused first.
+export const MAX_IMPORT_BYTES = 100 * 1024 * 1024
+export function checkImportSize(file) {
+  if (file && Number.isFinite(file.size) && file.size > MAX_IMPORT_BYTES) throw new Error('This file is too large to add. The limit is 100 MB.')
+}
+// seconds: the length from a file's header (null when it does not say); checked before any decoding
+export function checkImportDuration(seconds) {
+  if (Number.isFinite(seconds) && seconds > MAX_SECONDS) throw new Error('Recordings up to 20 minutes can be added')
+}
+
+// The decoded sound of an audio file, or of a video's audio track. A failure says what to do instead of "Unable to decode".
+const DECODE_TIMEOUT_MS = 60_000
+let importDecode = null
+export async function decodeFileAudio(ctx, file, signal, timeoutMs = DECODE_TIMEOUT_MS) {
+  checkImportSize(file)
+  // A cancelled import can leave a Chromium decode running. Share one slot across both import paths,
+  // with a safety ceiling so a stalled Chromium decodeAudioData never wedges later imports permanently.
+  while (importDecode) await waitForImport(importDecode, signal)
+  signal?.throwIfAborted()
+  let release
+  const slot = new Promise((resolve) => { release = resolve })
+  importDecode = slot
+  try {
+    const audio = await withDecodeTimeout(readImportAudio(ctx, file, signal), timeoutMs)
+    signal?.throwIfAborted()
+    return audio
+  } finally {
+    if (importDecode === slot) importDecode = null
+    release()
+  }
+}
+
+function withDecodeTimeout(work, ms) {
+  if (!Number.isFinite(ms) || ms <= 0) return work
+  let timer
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      console.warn?.('Keylight audio decode timed out after ' + ms + ' ms; releasing the import slot')
+      reject(new Error('This audio file took too long to decode. Try another file or convert it to mp3, m4a or wav.'))
+    }, ms)
+    timer.unref?.()
+  })
+  return Promise.race([work, timeout]).finally(() => clearTimeout(timer))
+}
+
+async function readImportAudio(ctx, file, signal) {
+  let bytes
+  try { bytes = await file.arrayBuffer() } catch { throw new Error('This file could not be read') }
+  signal?.throwIfAborted()
+  try { return await ctx.decodeAudioData(bytes) } catch (e) {
+    const video = isVideoFile(file)
+    const why = e && e.message ? ' (' + e.message + ')' : ''
+    throw new Error(video
+      ? 'The sound of this video could not be read here, or the video has no sound' + why + '. Save just the audio (an m4a or mp3 file) and add that instead.'
+      : 'This audio file could not be read' + why + '. Try an mp3, m4a or wav file.')
+  }
+}
+
+// File and metadata APIs without cancellation can finish in the background, but never hold the import queue open.
+async function waitForImport(work, signal) {
+  if (!signal) return work
+  let abort
+  const stopped = new Promise((_, reject) => {
+    abort = () => reject(signal.reason)
+    if (signal.aborted) abort()
+    else signal.addEventListener('abort', abort, { once: true })
+  })
+  try { return await Promise.race([work, stopped]) }
+  finally { signal.removeEventListener('abort', abort) }
+}
+
+export function rearrangeCover(record, difficulty, keyRange) {
+  if (!record.coverRaw) return record
+  const current = record.coverArrangement
+  const next = cleanCoverArrangement({ difficulty, keyRange })
+  if (!next || (current?.difficulty === difficulty && current.keyRange.lo === keyRange.lo && current.keyRange.hi === keyRange.hi)) return record
+  // arrange emits fresh, finger-free notes. normalise assigns fingers for this layout.
+  const notes = arrange(record.coverRaw, next)
+  if (!notes.length) throw new Error('No notes fit this keyboard')
+  const song = normalise(record.title, { notes, tempo: record.tempo, duration: record.duration })
+  return { ...record, notes: song.notes, duration: song.duration, coverArrangement: next }
+}
+
+// cover: { generate({ signal, onProgress }), difficulty, keyRange() }
 export async function importFile(file, opts) {
-  const stage = opts.onStage || (() => {})
+  const { signal, cover } = opts
+  const stage = (label, fraction) => {
+    signal?.throwIfAborted()
+    opts.onStage?.(label, fraction)
+  }
+  signal?.throwIfAborted()
+  checkImportSize(file)       // before anything reads the file
   if (isScoreFile(file)) {
     stage('Reading notes', 0.2)
-    const parsed = await parseSongFile(file)   // an .mxl is unzipped by readMxl
+    const parsed = await waitForImport(parseSongFile(file), signal)
     const song = normalise(file.name, parsed)
     // the file's own title and composer (MusicXML work / movement title and
     // creator, a MIDI file's sequence name) beat "Artist - Title" in the file name
@@ -359,27 +482,49 @@ export async function importFile(file, opts) {
     song.artist = artist || 'Imported'
     if (opts.lookup) {
       stage('Finding cover and lyrics', 0.7)
-      ;[song.cover, song.lyrics] = await Promise.all([fetchCover(song.title, artist), fetchLyrics(song.title, artist, song.duration)])
+      ;[song.cover, song.lyrics] = await waitForImport(Promise.all([fetchCover(song.title, artist), fetchLyrics(song.title, artist, song.duration)]), signal)
     }
     song.source = 'score'
+    // words written in the file (MIDI lyric events, MusicXML <lyric>) stay with the song; a lookup result does not replace them
+    const written = sanitizeLyrics(parsed.lyrics)
+    if (written.length) Object.assign(song, lyricFields(written))
     return song
   }
-  if (!isAudioFile(file)) throw new Error('Pick a MIDI, MusicXML or audio file')
+  if (!isAudioFile(file)) throw new Error('Pick a MIDI, MusicXML, audio or video file')
 
   stage('Reading the file', 0.02)
-  const tags = await readTags(file)
+  const tags = await waitForImport(readTags(file), signal)
   const guess = guessFromFilename(file.name)
   const title = tags.title || guess.title
   const artist = tags.artist || guess.artist
-  const decoded = await opts.ctx.decodeAudioData(await file.arrayBuffer())
-
-  if (decoded.duration > MAX_SECONDS) throw new Error('Recordings up to 20 minutes can be added')
-  stage('Listening for notes', 0.05)
-  let notes = await transcribe(decoded, (p) => stage('Listening for notes', 0.05 + 0.8 * p))
-  if (!notes.length) throw new Error('No notes could be heard in this recording')
-  if (opts.simplify) notes = simplifyNotes(notes)
-  const tempo = estimateTempo(notes)
-  const song = normalise(title, { notes, duration: decoded.duration, tempo })
+  checkImportDuration(tags.duration)      // from the header: no decoding for a recording that is too long
+  let song
+  if (cover) {
+    const label = 'Making a piano cover'
+    stage(label, 0.05)
+    const result = await cover.generate({ signal, onProgress: (p) => stage(label, 0.05 + 0.8 * p) })
+    signal?.throwIfAborted()
+    const input = result?.notes
+    if (Array.isArray(input) && input.length > MAX_NOTES) throw new Error('This piano cover has too many notes. Try a shorter recording.')
+    if (!Array.isArray(input) || !input.every((n) => validCoverNote(n, Number.MIN_VALUE))) {
+      throw new Error('The piano cover contains invalid notes.')
+    }
+    const raw = cleanCoverNotes(input)
+    if (!raw.length) throw new Error('No notes could be heard in this recording')
+    checkImportDuration(result.duration)
+    song = rearrangeCover({
+      title, coverRaw: raw, coverModelDifficulty: cleanCoverModelDifficulty(result.modelDifficulty),
+      duration: result.duration || tags.duration, tempo: estimateTempo(raw)
+    }, cover.difficulty, cover.keyRange())
+  } else {
+    const decoded = await waitForImport(decodeFileAudio(opts.ctx, file, signal), signal)
+    checkImportDuration(decoded.duration)
+    stage('Listening for notes', 0.05)
+    let notes = await transcribe(decoded, (p) => stage('Listening for notes', 0.05 + 0.8 * p), signal)
+    if (!notes.length) throw new Error('No notes could be heard in this recording')
+    if (opts.simplify) notes = simplifyNotes(notes)
+    song = normalise(title, { notes, duration: decoded.duration, tempo: estimateTempo(notes) })
+  }
   song.title = title
   song.artist = artist
   song.album = tags.album
@@ -387,14 +532,20 @@ export async function importFile(file, opts) {
   song.lyrics = tags.lyrics
   if (opts.lookup && (!song.cover || !song.lyrics)) {
     stage('Finding cover and lyrics', 0.9)
-    const [cover, lyrics] = await Promise.all([
+    const [artwork, lyrics] = await waitForImport(Promise.all([
       song.cover ? null : fetchCover(title, artist),
-      song.lyrics ? null : fetchLyrics(title, artist, decoded.duration)
-    ])
-    song.cover = song.cover || cover
+      song.lyrics ? null : fetchLyrics(title, artist, song.duration)
+    ]), signal)
+    song.cover = song.cover || artwork
     song.lyrics = song.lyrics || lyrics
   }
   song.audio = file           // kept so the recording plays along
+  // A video is only kept as the recording when it is small: there is no encoder here to keep just its sound (decoded audio as
+  // WAV would be larger still), so a big video is read for its notes and then dropped.
+  if (isVideoFile(file) && file.size > MAX_KEPT_VIDEO) {
+    song.audio = null
+    song.importNotice = 'The notes were taken from the video, but the video itself is too large to keep (over ' + Math.round(MAX_KEPT_VIDEO / 1048576) + ' MB), so it will not play along.'
+  }
   song.source = 'audio'
   stage('Done', 1)
   return song
@@ -424,14 +575,59 @@ const tx = async (mode, fn) => {
   })
 }
 
-function importedRecord(song) {
+// grid settings of the piano-roll editor: { offset (seconds, 0..60), division (steps a beat, 1..16) } or null
+export function cleanGrid(g) {
+  if (!g || typeof g !== 'object') return null
+  const offset = Number(g.offset), division = g.division
+  if (!Number.isFinite(offset) || offset < 0 || offset > 60 || !Number.isInteger(division) || division < 1 || division > 16) return null
+  return { offset: Math.round(offset * 1e4) / 1e4, division }
+}
+function validCoverNote(n, minDuration) {
+  return n && typeof n === 'object' &&
+    Number.isInteger(n.pitch) && n.pitch >= 0 && n.pitch <= 127 &&
+    Number.isFinite(n.start) && n.start >= 0 && n.start <= MAX_NOTE_SECONDS &&
+    Number.isFinite(n.dur) && n.dur >= minDuration && n.dur <= MAX_NOTE_SECONDS &&
+    (n.vel == null || (Number.isInteger(n.vel) && n.vel >= 0 && n.vel <= 127))
+}
+
+// Canonical notes let a cover change difficulty or key range without running the model again.
+export function cleanCoverRaw(raw) {
+  if (!Array.isArray(raw) || !raw.length || raw.length > MAX_NOTES || !raw.every((n) => validCoverNote(n, MIN_DUR))) return null
+  return raw.map(({ pitch, start, dur, vel }) => vel == null ? { pitch, start, dur } : { pitch, start, dur, vel })
+    .sort((a, b) => a.start - b.start || a.pitch - b.pitch)
+}
+
+export function cleanCoverModelDifficulty(value) {
+  return ['beginner', 'intermediate', 'advanced'].includes(value) ? value : null
+}
+
+export function coverScoreFile(file, arrangement) {
+  if (!arrangement) return file
+  const { difficulty, keyRange: { lo, hi } } = arrangement
+  return `${file}.cover-v1.${difficulty}.${lo}-${hi}`
+}
+
+export function cleanCoverArrangement(arr) {
+  if (!arr || typeof arr !== 'object' || Array.isArray(arr)) return null
+  if (!DIFFICULTIES.includes(arr.difficulty)) return null
+  const r = arr.keyRange
+  if (!r || typeof r !== 'object' || Array.isArray(r)) return null
+  if (!Number.isInteger(r.lo) || !Number.isInteger(r.hi) || r.lo < 0 || r.hi > 127 || r.lo > r.hi) return null
+  return { difficulty: arr.difficulty, keyRange: { lo: r.lo, hi: r.hi } }
+}
+export function importedRecord(song) {
   const id = song.id || ('imp-' + Date.now().toString(36))
+  const coverRaw = cleanCoverRaw(song.coverRaw)
   return {
     id, file: 'imported:' + id, title: song.title, artist: song.artist || '', album: song.album || '',
     notes: song.notes, duration: song.duration, tempo: song.tempo,
-    timeSignature: song.timeSignature || null, parts: song.parts || null, bars: song.bars || null, score: song.score || null,
+    timeSignature: song.timeSignature || null, parts: song.parts || null, bars: song.bars || null, score: song.score || null, grid: cleanGrid(song.grid),
+    coverRaw, coverArrangement: coverRaw ? cleanCoverArrangement(song.coverArrangement) : null,     // an arrangement means nothing without its notes
+    coverModelDifficulty: coverRaw ? cleanCoverModelDifficulty(song.coverModelDifficulty) : null,
     cover: isSafeCover(song.cover) ? song.cover : null, lyrics: song.lyrics || null, lyricsFromFile: !!song.lyricsFromFile,
+    lyricWords: sanitizeLyrics(song.lyricWords).length ? sanitizeLyrics(song.lyricWords) : null,   // syllable timing; songs saved earlier have none
     audio: song.audio || null,     // a File/Blob is stored as is (no copy into memory)
+    importNotice: typeof song.importNotice === 'string' && song.importNotice ? song.importNotice.slice(0, 400) : null,   // the importer's note about this song (shown on its card)
     source: song.source, added: song.added || Date.now()
   }
 }

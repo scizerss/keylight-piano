@@ -1,10 +1,112 @@
 // Unit test for the course's four exercise types (echo, rhythm, ear, sight): renderer/course/exercise-logic.js
 // and how the real course content feeds it. Pure logic, no window or sound: node scripts/test-course-exercises.js
 const assert = require('node:assert/strict')
+const { readFileSync } = require('node:fs')
 const path = require('node:path')
 const { pathToFileURL } = require('node:url')
+const vm = require('node:vm')
 
 const load = (f) => import(pathToFileURL(path.join(__dirname, '..', 'renderer', 'course', f)).href)
+
+async function testNoteGames(course, noteGameAccuracy) {
+  const root = path.join(__dirname, '..', 'renderer')
+  const games = await import(pathToFileURL(path.join(root, 'notegames.js')).href)
+  const exerciseUi = readFileSync(path.join(root, 'course', 'exercise-ui.js'), 'utf8')
+  const { NOTE_GAMES, nextQuestion } = games
+  const game = NOTE_GAMES[0]
+  const onlyC = { ...game, names: ['C'] }
+  const c = nextQuestion(onlyC)
+  assert.deepEqual(c, { pitch: 60, name: 'C' })
+  assert.deepEqual(nextQuestion(onlyC, c), c, 'a single pitch class can be repeated')
+  const white = { ...game, names: ['C', 'D', 'E', 'F', 'G', 'A', 'B'] }
+  for (let i = 0; i < 100; i++) assert.ok(white.names.includes(nextQuestion(white, null, () => i / 100).name))
+
+  const app = readFileSync(path.join(root, 'app.js'), 'utf8')
+  const slice = (start, end) => app.slice(app.indexOf(start), app.indexOf(end))
+  const elements = new Map(), results = [], noteLights = new Map()
+  function element() {
+    const classes = new Set()
+    return { classList: {
+      add: (c) => classes.add(c), remove: (c) => classes.delete(c), contains: (c) => classes.has(c),
+      toggle: (c, on) => on ? classes.add(c) : classes.delete(c)
+    } }
+  }
+  const $ = (id) => {
+    if (!elements.has(id)) elements.set(id, element())
+    return elements.get(id)
+  }
+  let keys
+  Object.defineProperty($('quizPad'), 'innerHTML', {
+    set(html) {
+      keys = Array.from(html.matchAll(/class="dk-[wb] ex-key" data-p="(\d+)"/g), ([, p]) => ({ ...element(), dataset: { p } }))
+    }
+  })
+  $('quizPad').querySelectorAll = () => keys
+  const context = vm.createContext({ dot: () => ' \u00b7 ', starsShown: (n) => n, STAR_SLOTS: 5,
+    ...games, pc: games.pitchClass, noteGameAccuracy, $, settings: {}, screen: 'home', courseRun: null,
+    performance: { now: () => 1000 }, TOUCH: true, IS_NATIVE_HOST: false,
+    kbBase: () => 55, kbKeys: () => 24, lightKeys: () => 24, handGuideRun: null,
+    haptic() {}, initAudio() {}, showScreen: (name) => { context.screen = name }, markCalm() {},
+    setText: (el, text) => { el.textContent = text }, passText: () => '80%',
+    course: {
+      record(_owner, _item, result) { results.push(result); return { passed: result.accuracy >= 0.8 } },
+      nextAction: () => ({ label: 'Continue' })
+    },
+    drawPlayedKeys() {}, userRgb: () => [255, 0, 0], restRgb: () => [255, 255, 255],
+    framesDrive: () => false, hasNoteLightPort: () => true, updatePartyLights() {},   // updatePartyLights: key-light keyboards, not in play here
+    noteLightColour: (rgb) => rgb[0], asNext: (value) => value | 128,
+    jamLitPitches: () => [], addHeldNoteLights() {},
+    updateNoteLights: (desired) => { noteLights.clear(); for (const entry of desired) noteLights.set(...entry) }
+  })
+  vm.runInContext([
+    exerciseUi.slice(exerciseUi.indexOf('const NAMES ='), exerciseUi.indexOf('const noteName =')),
+    exerciseUi.slice(exerciseUi.indexOf('export function padSvg') + 7, exerciseUi.indexOf('/* ============================== the mount')),
+    slice('let quiz =', 'async function startGame'),
+    slice('const NEXT_LEVEL =', '// How bright the keys'),
+    slice('const quizHintRgb =', 'const brighter ='),
+    slice('function restFrame()', '// Settings preview'),
+    slice('function idleNoteLights()', 'function freeplayScene')
+  ].join('\n'), context)
+
+  const item = course.levels[0].lessons[0].items.at(-1)
+  const run = { ownerId: 'l1-find-c', item, rounds: item.params.rounds }
+  context.startQuiz({ ...game, ...item.params }, run)
+  const lit = () => Array.from(context.restFrame().entries()).filter(([, rgb]) => rgb.some(Boolean)).map(([i]) => i + 55)
+  assert.deepEqual(lit(), [], 'quiz frames show no resting landmarks')
+  assert.equal(context.quizHintPitches(7000).length, 0, 'time alone never gives a course hint')
+  context.quizPress(60)
+  assert.ok(keys.find((key) => key.dataset.p === '60').classList.contains('ok'))
+  for (let i = 0; i < 10; i++) context.quizPress(60)
+  assert.equal($('quizScore').textContent, 'Round 1 of 3', 'repeating one key does not advance a round')
+  assert.deepEqual(lit(), [], 'found keys are marked only on the pad')
+  context.quizPress(61)
+  assert.deepEqual(lit(), [72], 'a wrong key lights only the remaining target')
+  assert.equal(context.restFrame()[72 - 55][0], 56, 'the hint is dim')
+  context.idleNoteLights()
+  assert.deepEqual([...noteLights], [[72, 56 | 128]], 'the note light uses its dim flag')
+  context.quizPress(72)
+  assert.deepEqual(lit(), [], 'the next round clears its hint')
+  assert.ok(keys.every((key) => !key.classList.contains('ok')), 'progress resets on the pad')
+  for (let i = 0; i < 2; i++) { context.quizPress(72); context.quizPress(60) }
+  assert.equal(results.length, 1)
+  assert.equal(results[0].accuracy, 6 / 7, 'one missed key still allows a pass after all three rounds')
+  context.startQuiz({ ...game, ...item.params }, run)
+  for (let i = 0; i < 10; i++) context.quizPress(60)
+  context.updateQuiz(61000)
+  assert.equal(results.at(-1).accuracy, 0, 'the same key alone cannot pass at timeout')
+
+  context.startQuiz(white, run)
+  assert.equal(context.quizHintPitches(7000).length, 0)
+  context.quizPress(61)
+  const hint = context.quizHintPitches(1000)
+  assert.ok(hint.length > 0, 'regular course games also hint immediately after a wrong key')
+  context.quizPress(hint[0])
+  assert.equal(context.quizHintPitches(7000).length, 0, 'a right answer clears the course hint for the next question')
+
+  context.startQuiz(game)
+  assert.equal(context.quizHintPitches(5999).length, 0)
+  assert.ok(context.quizHintPitches(6000).length > 0, 'standalone hints still arrive after five seconds')
+}
 
 ;(async () => {
   const L = await load('exercise-logic.js')
@@ -171,6 +273,7 @@ const load = (f) => import(pathToFileURL(path.join(__dirname, '..', 'renderer', 
 
   /* ---------- the real course feeds the runners ---------- */
   const { COURSE } = await load('index.js')
+  await testNoteGames(COURSE, R.noteGameAccuracy)
   const types = { echo: 0, rhythm: 0, ear: 0, sight: 0 }
   const items = []
   for (const level of COURSE.levels) {
@@ -248,7 +351,7 @@ const load = (f) => import(pathToFileURL(path.join(__dirname, '..', 'renderer', 
   // and a pass at exactly the bar of each item is enough, never more than the bar
   let p2 = E.emptyProgress()
   for (const level of playable) for (const lesson of level.lessons) for (const it of lesson.items) {
-    const need = it.passAt.accuracy ?? (it.passAt.stars ? 0 : 0.8)
+    const need = typeof it.passAt === 'number' ? it.passAt : it.passAt.accuracy ?? (it.passAt.stars ? 0 : 0.8)
     p2 = E.recordItemResult(p2, lesson.id, it.id, { accuracy: need, stars: it.passAt.stars })
     assert.ok(E.isItemDone(it, p2.lessons[lesson.id][it.id]), it.id + ' passes at its own bar')
   }

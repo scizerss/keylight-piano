@@ -1,3 +1,4 @@
+import { dot } from './studio-copy.js'
 export const RATES = [0.6, 0.8, 1]
 export const PASS = { wait: 0.8, timed: 0.85 }
 const BARS_PER_PHRASE = 4
@@ -66,7 +67,7 @@ export function stepsFor(section, prefs) {
   return steps.map((s) => ({ ...s, id: `${s.hand}.${s.mode}.${Math.round(s.rate * 100)}` }))
 }
 export function stepLabel(step) {
-  return HAND_NAME[step.hand] + ' · ' + (step.mode === 'PRACTISE' ? 'Wait mode' : Math.round(step.rate * 100) + '% speed')
+  return HAND_NAME[step.hand] + dot() + (step.mode === 'PRACTISE' ? 'Wait mode' : Math.round(step.rate * 100) + '% speed')
 }
 export function evaluateRun(step, player, summary) {
   const expected = player.score ? player.score.expected : []

@@ -11,6 +11,8 @@ export const SCHEMA = 'keylight-device-report/1'
 export const SCHEMA_REVISION = 2     // new fields are added under the same schema string: this counts them
 export const ISSUE_URL = 'https://github.com/scizerss/keylight-piano/issues/new'
 export const ISSUE_URL_MAX = 1800
+export const SUPPORT_EMAIL = 'support@keylightpiano.app'
+export const MAILTO_MAX = ISSUE_URL_MAX   // the same budget as the issue address
 export const NAME_MAX = 80
 export const NOTE_MAX = 1000
 export const INQUIRY = [0xf0, 0x7e, 0x7f, 0x06, 0x01, 0xf7]
@@ -238,7 +240,29 @@ export function reportData(input = {}) {
       route: s(lights.route, 40), tested: !!lights.tested,
       result: ['yes', 'partly', 'no'].includes(lights.result) ? lights.result : '',
       colours: pickList(lights.colours, LIGHT_COLOURS)
-    }
+    },
+    keyLights: keyLightsData(input.keyLights, s)
+  }
+}
+// What a key-light keyboard (the PartyKeys family) was detected as and why its lights are or aren't on. Every field is an enum, a number
+// or a short sanitised string: a port name never goes in here (the port lists above already carry it).
+const KEY_PROFILES = ['palette71', 'rgb15', 'popu', 'none']
+const KEY_STATES = ['none', 'unavailable', 'starting', 'ready', 'sent', 'error']
+const KEY_MODES = ['one', 'hands', 'rgb']
+const KEY_REASONS = ['unsupported', 'no-output', 'no-sysex', 'unpaired']
+function keyLightsData(input, s) {
+  if (!input || typeof input !== 'object') return null
+  const note = (v) => (Number.isInteger(v) && v >= 0 && v <= 127 ? v : null)
+  return {
+    profile: KEY_PROFILES.includes(input.profile) ? input.profile : 'none',
+    mode: KEY_MODES.includes(input.mode) ? input.mode : 'one',
+    state: KEY_STATES.includes(input.state) ? input.state : 'none',
+    detail: s(input.detail, 80),
+    reason: KEY_REASONS.includes(input.reason) ? input.reason : '',
+    sysex: !!input.sysex, paired: !!input.paired,
+    low: note(input.low), high: note(input.high),
+    units: Number.isInteger(input.units) && input.units >= 0 && input.units <= 8 ? input.units : 0,
+    frames: Number.isInteger(input.frames) && input.frames >= 0 ? input.frames : 0
   }
 }
 export const LIGHT_COLOURS = ['More than one colour', 'One colour only', 'Some keys stayed lit afterwards']
@@ -297,6 +321,11 @@ export function buildReport(input) {
     }
   } else line('Key press test: skipped')
   line('Lights check: ' + (d.lights.tested ? `${d.lights.result || 'no answer'}${d.lights.colours.length ? ' (' + d.lights.colours.join(', ') + ')' : ''}` : 'skipped') + ` | route: ${dash(md(d.lights.route))}`)
+  if (d.keyLights) {
+    const k = d.keyLights
+    line(`Key lights: profile ${k.profile} | colour mode ${k.mode} | status ${k.state}${k.detail ? ' (' + md(k.detail) + ')' : ''} | system exclusive ${k.sysex ? 'allowed' : 'not allowed'} | input ${k.paired ? 'paired' : 'not paired'}${k.reason ? ' | reason ' + k.reason : ''}`)
+    line(`  keys lit: ${k.low == null ? 'not known yet' : k.low + '-' + k.high}${k.units ? ' | units found ' + k.units : ''} | frames written ${k.frames}`)
+  }
   line('Works: ' + (d.device.works.join(', ') || 'not given'))
   line('Does not work: ' + (d.device.doesNotWork.join(', ') || 'not given'))
   if (d.device.note) { line('Note:'); for (const l of d.device.note.split('\n')) line('  > ' + md(l)) } else line('Note: none')
@@ -338,6 +367,28 @@ export function buildIssueUrl(input) {
   let url = make(lines)
   while (url.length > ISSUE_URL_MAX && lines.length > 3) { lines = lines.slice(0, -1); url = make(lines) }
   if (url.length > ISSUE_URL_MAX) url = `${ISSUE_URL}?title=${encodeURIComponent('Support request')}&body=${encodeURIComponent(tail)}`
+  return url
+}
+
+// A typed name can carry a control character or a Unicode line separator; the mail rules refuse those percent-encoded
+// (host-policy.js, LinkPolicy.swift), so they are made plain spaces here and a real name never makes the mail invalid.
+const mailSafe = (t) => t.replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029]/g, (c) => (c === '\n' ? '\n' : ' '))
+
+// The iPhone/iPad alternative to the issue form: a mail to support with the same short lines in the body. The whole
+// address is kept under MAILTO_MAX by dropping summary lines, and a literal % is removed first so no value ever reads
+// as a twice-encoded one (the link rules in LinkPolicy.swift and host-policy.js refuse that). The report itself is
+// never in the mail: the person attaches the shared file.
+export function buildSupportMailto(input) {
+  const d = reportData(input)
+  const name = mailSafe(sanitizeText(d.device.name, 40)).replace(/%/g, '') || 'my keyboard'
+  const subject = 'Keyboard support: ' + name
+  const head = [`Device: ${name}`, `System: ${[d.os.platform, d.os.release, d.os.arch].filter(Boolean).join(' ') || 'unknown'}`, `Keylight: ${d.app.version || 'unknown'}`, '', ...summaryLines(input).map((l) => '- ' + l), '']
+  const tail = 'The full report is ready in Keylight, under Settings, Support my device. Use Share report there and attach the file to this email.'
+  const make = (lines) => 'mailto:' + SUPPORT_EMAIL + '?subject=' + encodeURIComponent(mailSafe(subject)) + '&body=' + encodeURIComponent(mailSafe([...lines, tail].join('\n')).replace(/%/g, ''))
+  let lines = head
+  let url = make(lines)
+  while (url.length > MAILTO_MAX && lines.length > 3) { lines = lines.slice(0, -1); url = make(lines) }
+  if (url.length > MAILTO_MAX) url = 'mailto:' + SUPPORT_EMAIL + '?subject=' + encodeURIComponent('Keyboard support') + '&body=' + encodeURIComponent(tail)
   return url
 }
 
@@ -399,6 +450,7 @@ export function mountDeviceSupport(ctx) {
     about: { name: '', goals: [], works: [], doesNotWork: [], note: '' }
   }
   const fake = !!ctx.fake
+  const ios = !!ctx.ios            // iPhone/iPad: no USB probe, and email and share instead of the issue form
   const say = (id, text) => { const el = $(id); if (el) el.textContent = text }
   const ports = (kind) => { const m = ctx.getMidi(); return m ? [...(kind === 'in' ? m.inputs : m.outputs).values()] : [] }
   const portRow = (p) => ({ id: p.id, name: p.name, manufacturer: p.manufacturer, state: p.state, connection: p.connection })
@@ -441,7 +493,7 @@ export function mountDeviceSupport(ctx) {
       st.identity = [...heard.values()]
     }
     try {
-      const probe = ctx.usbProbe ? await ctx.usbProbe() : null
+      const probe = ios || !ctx.usbProbe ? null : await ctx.usbProbe()
       if (probe && probe.ok) {
         st.usb = probe; st.usbReason = ''; st.os = probe.os; st.redact = probe.redact || []
         // A device keeps the choice the person made for it, also when they ticked nothing at all; only a device
@@ -487,7 +539,7 @@ export function mountDeviceSupport(ctx) {
     const usb = $('dsUsb')
     usb.replaceChildren()
     if (!st.detected) return
-    const where = ctx.platform === 'Android' ? 'this device' : 'this computer'
+    const where = ctx.platform === 'Android' || ios ? 'this device' : 'this computer'
     if (!st.usb) usb.append(el('p', 'ds-muted', 'USB details: not available on ' + where + '.'))
     else if (!st.usb.devices.length) usb.append(el('p', 'ds-muted', 'No USB devices were listed besides hubs. A Bluetooth keyboard will not appear here.'))
     else {
@@ -544,7 +596,7 @@ export function mountDeviceSupport(ctx) {
     }
     const started = performance.now()
     $('dsCaptureBtn').textContent = 'Stop'
-    say('dsCaptureState', 'Press a few keys, move the wheels, use the pedal… (or just move a hand above a sensor)')
+    say('dsCaptureState', 'Press a few keys, move the wheels, use the pedal…' + (ios ? '' : ' (or just move a hand above a sensor)'))
     capture.tick = setInterval(() => $('dsCaptureBar').style.setProperty('--p', String(Math.min(1, (performance.now() - started) / CAPTURE_MS))), 100)
     capture.timer = setTimeout(() => stopCapture(true), CAPTURE_MS)
     paintLive()
@@ -583,7 +635,8 @@ export function mountDeviceSupport(ctx) {
   function paintLights() {
     const ready = lightsReady()
     $('dsLightsBtn').disabled = !ready
-    say('dsLightsState', ready ? 'Optional. A light runs across the keys. Nothing new is sent to your keyboard: this is the same test as Test lights in Settings.' : 'Not available: Keylight has no way to light this keyboard yet, which is exactly what the report helps with.')
+    const why = ctx.lightsNote ? ctx.lightsNote() : ''
+    say('dsLightsState', ready ? 'Optional. A light runs across the keys. Nothing new is sent to your keyboard: this is the same test as Test lights in Settings.' : why ? 'Not available: ' + why : 'Not available: Keylight has no way to light this keyboard yet, which is exactly what the report helps with.')
     $('dsLightsAsk').hidden = !st.lights.tested
     for (const r of document.querySelectorAll('input[name="dsLights"]')) r.checked = r.value === st.lights.result
     for (const c of document.querySelectorAll('input[name="dsColour"]')) c.checked = st.lights.colours.includes(c.value)
@@ -612,7 +665,7 @@ export function mountDeviceSupport(ctx) {
   const input = () => ({
     app: { version: ctx.version, platform: ctx.platform }, os: st.os || { platform: ctx.platform, release: '', arch: '' }, redact: st.redact,
     ports: st.ports, identity: st.identity, sysex: st.sysex, usb: usbForReport(), capture: st.capture,
-    lights: { ...st.lights, route: ctx.lightRoute ? ctx.lightRoute() : '' }, keys: { chosen: st.keys, app: ctx.appKeys ? ctx.appKeys() : null },
+    lights: { ...st.lights, route: ctx.lightRoute ? ctx.lightRoute() : '' }, keyLights: ctx.keyLights ? ctx.keyLights() : null, keys: { chosen: st.keys, app: ctx.appKeys ? ctx.appKeys() : null },
     about: st.about, date: new Date().toISOString().slice(0, 10)
   })
   const preview = () => { readAbout(); return buildReport(input()) }
@@ -625,7 +678,11 @@ export function mountDeviceSupport(ctx) {
   }
   async function copyReport() {
     const text = preview()
-    try { await ctx.copy(text); say('dsSendState', 'Copied. Paste it into the issue, or into a message to us.'); return true } catch (_e) { say('dsSendState', 'Could not copy. Use Save as file instead.'); return false }
+    try {
+      await ctx.copy(text)
+      say('dsSendState', ios ? 'Copied. Paste it into an email or message to us.' : 'Copied. Paste it into the issue, or into a message to us.')
+      return true
+    } catch (_e) { say('dsSendState', ios ? 'Could not copy. Use Share report instead.' : 'Could not copy. Use Save as file instead.'); return false }
   }
   function saveReport() {
     const text = preview()
@@ -638,6 +695,28 @@ export function mountDeviceSupport(ctx) {
     ctx.openLink(url)
     say('dsSendState', 'The issue form opens in your browser with a short description. Paste or attach the report there.')
     return url
+  }
+  // iPhone/iPad: the mail app (a few summary lines, the report is attached by the person) or the share sheet.
+  // On the native host the answer is the system's own (did an app really open it), so the message is true.
+  async function emailReport() {
+    readAbout()
+    const url = buildSupportMailto(input())
+    let opened
+    if (ctx.openLinkAsync) { try { opened = (await ctx.openLinkAsync(url)) !== false } catch (_e) { opened = false } }
+    else opened = ctx.openLink(url) !== false
+    say('dsSendState', opened ? 'Your mail app opens with a short description. Attach the shared report to the mail.' : 'No mail app opened. Use Share report or Copy report instead.')
+    return url
+  }
+  async function shareReport() {
+    if (!ctx.share) return false
+    try {
+      await ctx.share(preview())
+      say('dsSendState', 'The share sheet is open. Choose Mail to send the report, or save it where you like.')
+      return true
+    } catch (_e) {
+      say('dsSendState', 'Could not share the report. Copy it instead.')
+      return false
+    }
   }
 
   /* ----- navigation ----- */
@@ -678,6 +757,20 @@ export function mountDeviceSupport(ctx) {
   $('dsSave').onclick = saveReport
   $('dsIssue').onclick = openIssue
   for (const b of document.querySelectorAll('[data-device-support]')) b.addEventListener('click', () => open(0))
+  if (ios) {
+    // no USB on an iPhone or iPad: the section is hidden, and the probe above already stays unasked
+    for (const id of ['dsUsbHead', 'dsUsb', 'dsUsbReviewNote']) { const n = $(id); if (n) n.hidden = true }
+    // three ways out: the mail app, the share sheet, the clipboard. No issue form and no save button here (sharing is the save)
+    for (const id of ['dsIssue', 'dsSave', 'dsIssueNote']) { const n = $(id); if (n) n.remove() }
+    // no hand-tracking sensor reaches a phone or tablet: neither the line about one nor its step hint applies here
+    const sensor = $('dsSensorHint'); if (sensor) sensor.remove()
+    for (const id of ['dsEmail', 'dsShare', 'dsSendNoteIos']) { const n = $(id); if (n) n.hidden = false }
+    const email = $('dsEmail'), share = $('dsShare'), copyBtn = $('dsCopy')
+    if (email) email.onclick = emailReport
+    if (share) share.onclick = shareReport
+    if (copyBtn) { copyBtn.classList.remove('primary'); copyBtn.classList.add('ghost') }   // one accent: the mail
+    say('dsDetectIntro', 'Keylight lists the MIDI ports your device shows and asks each one who it is with the standard identity question. Serial numbers are never read.')
+  }
   // choices that need building
   const fill = (id, name, values, cls) => { $(id).replaceChildren(...values.map((v) => { const l = el('label', cls || 'ds-check'); const i = el('input'); i.type = 'checkbox'; i.name = name; i.value = v; l.append(i, el('span', '', v)); return l })) }
   fill('dsGoals', 'dsGoal', GOALS); fill('dsWorks', 'dsWorks', FEATURES); fill('dsNot', 'dsNot', FEATURES)
@@ -686,5 +779,5 @@ export function mountDeviceSupport(ctx) {
   $('dsNote').maxLength = NOTE_MAX
   paintCounters()
 
-  return { open, go, detect, cancelDetect, feed, preview, copyReport, saveReport, openIssue, state: () => st, usbForReport, startCapture, stopCapture, readAbout, runLights }
+  return { open, go, detect, cancelDetect, feed, preview, copyReport, saveReport, openIssue, emailReport, shareReport, state: () => st, usbForReport, startCapture, stopCapture, readAbout, runLights }
 }

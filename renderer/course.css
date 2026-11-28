@@ -1,0 +1,316 @@
+/* Course map, lesson page, exam page and quiz card (Stage 3 of docs/DESIGN-DIRECTION.md, section 4.4).
+   Linked right after tokens.css; it restyles the .cr-* classes that glass.css defines and course/course-ui.js writes.
+   Flat surfaces, hairlines, mint only for "you are here" and "done". No glow, no gradients, 44px targets. */
+
+#screen-course { --cr-pad: var(--s4); }
+.course > * { max-width: 760px; }
+.course :focus-visible { outline: 0; box-shadow: var(--focus-ring); }
+.cr-dot { margin: 0 var(--s2); }
+
+.dk-glow, .dk-bface { display: none; }   /* the lit-key glow and the ebony bevel are drawn only on iPhone/iPad (ios.css) */
+
+/* ---------------- progress ring ---------------- */
+.cr-ring { width: 44px; height: 44px; }
+.cr-ring > svg { stroke-width: 4; }
+.cr-ring-bg { stroke: var(--surface-3); }
+.cr-ring-fg { filter: none; }
+.cr-ring-in { font-family: var(--font-round); font-weight: 600; font-size: calc(15px * min(var(--ts), 1.2)); font-variant-numeric: tabular-nums; }
+.cr-ring-in i { font-size: .6em; }
+.cr-ring.big { width: 72px; height: 72px; }
+.cr-ring.big .cr-ring-in { font-size: calc(22px * min(var(--ts), 1.2)); }   /* ring numbers scale a little: the rings have a fixed size */
+.cr-ring.big > svg { stroke-width: 4; }
+.cr-ring.done .cr-ring-bg { stroke: var(--accent-line); }
+
+/* ---------------- summary line + "up next" card ---------------- */
+.cr-summary { margin: 0 0 var(--s3); color: var(--muted); font-size: var(--fs-sub); font-variant-numeric: tabular-nums; }
+#screen-course .cr-hero {
+  grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "ring text" "btn btn"; gap: var(--s4); padding: var(--s5);
+  border: 0; border-radius: var(--r-lg); background: var(--surface); box-shadow: inset 0 0 0 1px var(--accent-line);
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+.cr-hero > .cr-ring { grid-area: ring; }
+.cr-hero-text { grid-area: text; min-width: 0; }
+.cr-hero > .primary { grid-area: btn; width: 100%; justify-content: center; }
+.cr-hero .kicker { color: var(--accent); font-size: var(--fs-caption); letter-spacing: .06em; font-weight: 650; text-transform: uppercase; }
+.cr-hero-title {
+  margin: var(--s1) 0 var(--s1); font-family: var(--font); font-weight: 650; font-size: var(--fs-title); line-height: 1.2; letter-spacing: -.01em;
+  overflow-wrap: anywhere;
+}
+.cr-hero-sub { font-size: var(--fs-sub); line-height: 1.35; color: var(--muted); }
+.cr-btn-ic { width: 16px; height: 16px; margin-right: 0; }
+
+/* ---------------- Guided / Open ---------------- */
+.cr-order { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s2); margin-top: var(--s5); }
+.cr-order-l { color: var(--faint); font-size: var(--fs-caption); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.cr-seg {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 3px; width: 100%; border: 0; border-radius: var(--r-sm); background: var(--surface-2);
+}
+.cr-seg-b {
+  min-height: 44px; height: auto; padding: 0 var(--s4); border-radius: 9px; font-size: var(--fs-sub); font-weight: 500; color: var(--muted);
+  transition: background-color var(--d-base) var(--ease-out), color var(--d-base);
+}
+.cr-seg-b[aria-pressed="true"] { background: var(--surface-3); color: var(--text); font-weight: 650; box-shadow: 0 0 0 1px var(--line-strong); }
+.cr-order-h { color: var(--faint); font-size: var(--fs-caption); line-height: 1.4; }
+
+/* ---------------- level cards ---------------- */
+.cr-path { margin-top: var(--s5); gap: var(--s3); }
+.cr-level { display: block; }
+.cr-level:not(:last-child)::before { display: none; }
+.cr-level:not(:last-child)::after {                       /* the path: a short line joining one level's ring to the next */
+  content: ""; position: absolute; left: calc(var(--cr-pad) + 21px); top: calc(100% - 6px); height: calc(var(--s3) + 12px); width: 2px; border-radius: 2px;
+  background: var(--line-strong); z-index: 1; pointer-events: none;
+}
+.cr-level.st-done:not(:last-child)::after { background: var(--accent-line); }
+.cr-node { position: absolute; left: var(--cr-pad); top: var(--cr-pad); z-index: 2; padding: 0; }
+.cr-node .cr-ring { width: 44px; height: 44px; background: var(--surface); }
+.cr-node .cr-ring-in { font-size: calc(15px * min(var(--ts), 1.2)); }
+.cr-node-ic { width: 18px; height: 18px; }
+#screen-course .cr-card {
+  border: 0; border-radius: var(--r-lg); background: var(--surface); box-shadow: inset 0 0 0 1px var(--line);
+  transition: box-shadow var(--d-base) var(--ease-out), background-color var(--d-base) var(--ease-out);
+}
+#screen-course .cr-level.cur .cr-card { box-shadow: inset 0 0 0 1px var(--accent-line); background: var(--surface); }
+#screen-course .cr-level.st-done .cr-card { background: transparent; }
+.cr-top { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; }
+.cr-toggle {
+  position: relative; min-height: 64px; gap: 2px; padding: var(--cr-pad) 48px var(--s3) calc(var(--cr-pad) + 44px + var(--s3));
+  border-radius: var(--r-lg); -webkit-tap-highlight-color: transparent;
+}
+.cr-toggle:active { background: var(--hover); }
+.cr-tg-ch {
+  position: absolute; right: var(--s4); top: var(--cr-pad); width: 20px; height: 20px; margin-top: 12px;
+  color: var(--faint); transition: transform var(--d-base) var(--ease-out);
+}
+.cr-toggle[aria-expanded="true"] .cr-tg-ch { transform: rotate(90deg); }
+.cr-toggle[aria-disabled="true"] .cr-tg-ch { display: none; }
+.cr-lk { order: -1; color: var(--faint); font-size: var(--fs-caption); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.cr-lt { font-family: var(--font); font-weight: 650; font-size: var(--fs-headline); line-height: 1.25; letter-spacing: -.01em; color: var(--text); }
+.cr-lb {
+  color: var(--muted); font-size: var(--fs-sub); line-height: 1.4; max-width: 56ch;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.cr-toggle[aria-expanded="true"] .cr-lb { -webkit-line-clamp: 3; }
+.cr-lm { color: var(--faint); font-size: var(--fs-caption); margin-top: var(--s1); font-variant-numeric: tabular-nums; }
+.cr-lm .cr-dot { margin: 0 6px; }
+.cr-level.st-ahead .cr-lt, .cr-level.st-soon .cr-lt { color: var(--muted); }
+#screen-course .cr-level.st-soon .cr-card { opacity: .6; }
+.cr-level.cur .cr-lk { color: var(--accent); }
+.cr-side {
+  flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: var(--s2);
+  padding: 0 var(--cr-pad) var(--s4) calc(var(--cr-pad) + 44px + var(--s3));
+}
+.cr-side:not(:has(button)) { padding-bottom: var(--s3); }
+.cr-side:not(:has(button)) .cr-chip.open:not(.done) { display: none; }   /* an unlabelled "Open" says nothing the ring does not */
+.cr-chip { height: 24px; padding: 0 10px; border: 0; border-radius: var(--r-pill); font-size: var(--fs-caption); font-weight: 600; letter-spacing: 0; background: var(--surface-2); color: var(--muted); }
+.cr-chip.open { color: var(--accent); background: var(--accent-soft); border: 0; }
+.cr-chip.done { color: var(--accent); background: var(--accent-soft); border: 0; }
+.cr-chip.ahead { border: 0; }
+.cr-chip-ic { width: 13px; height: 13px; }
+.primary.cr-small, .ghost.cr-small { height: 44px; padding: 0 var(--s5); font-size: var(--fs-sub); flex: 0 1 auto; }
+.ghost.cr-small { background: var(--surface-2); }
+.cr-side .ghost.cr-small + .ghost.cr-small { margin-top: 0; }
+.cr-level.st-done .cr-toggle { padding-bottom: var(--s2); }
+
+/* ---------------- a level opens and closes in place: grid rows 0fr to 1fr, 320ms on the iOS curve (no overshoot) ---------------- */
+.cr-expand { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 320ms cubic-bezier(.32, .72, 0, 1); }
+.cr-expand.open { grid-template-rows: 1fr; }
+.cr-expand-in { min-height: 0; overflow: hidden; }
+@media (prefers-reduced-motion: reduce) { .cr-expand { transition: none; } }
+html.reduce-motion .cr-expand, html.shot .cr-expand { transition: none; }
+.cr-foot { display: flex; justify-content: center; margin-top: var(--s5); }
+.cr-foot .link { min-height: 44px; padding: 0 var(--s4); color: var(--muted); }
+
+/* ---------------- lessons inside a level ---------------- */
+.cr-lessons { margin: 0; padding: var(--s1) var(--s2) var(--s2); border-top: 1px solid var(--line); }
+.cr-lessons li:first-child { margin-top: 0; }
+.cr-lessons li + li { border-top: 1px solid var(--line); }
+.cr-lessons li:has(> .cr-lrow.cur), .cr-lessons li:has(> .cr-lrow.cur) + li { border-top-color: transparent; }
+.cr-lrow {
+  grid-template-columns: 32px minmax(0, 1fr) auto 16px; grid-template-areas: "si txt lw ch"; align-items: center; column-gap: var(--s3); row-gap: 0;
+  min-height: 64px; margin: 0; padding: var(--s2) var(--s3) var(--s2) var(--s2); border: 0; border-radius: var(--r-sm);
+  transition: background-color var(--d-base) var(--ease-out), transform var(--d-fast) var(--ease-out);
+}
+.cr-lrow > .cr-si { grid-area: si; }
+.cr-lrow > .cr-ltxt { grid-area: txt; }
+.cr-lrow > .cr-lw { grid-area: lw; align-self: center; }
+.cr-lrow > .cr-lch { grid-area: ch; }
+.cr-lrow:hover:not(:disabled) { background: var(--hover); border: 0; }
+.cr-lrow:active:not(:disabled) { background: var(--surface-2); }
+.cr-lrow.cur { background: var(--accent-soft); border: 0; }
+.cr-lrow.cur:hover { background: var(--accent-soft); }
+.cr-lrow.exam { margin: 0; border: 0; border-radius: var(--r-sm); }
+.cr-ln { font-family: var(--font); font-weight: 600; font-size: var(--fs-body); line-height: 1.25; letter-spacing: -.01em; }
+.cr-lg { display: block; font-size: var(--fs-caption); color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -webkit-line-clamp: unset; }
+.cr-lw { display: block; min-width: 0; text-align: right; font-size: var(--fs-caption); font-weight: 600; letter-spacing: 0; }
+.cr-lw.done, .cr-lw.ahead, .cr-lw:empty { display: none; }
+.cr-lw.open { color: var(--accent); }
+.cr-lrow:not(.cur) .cr-lw.open { display: none; }       /* only the one lesson you are meant to take says "Up next" */
+.cr-lch { width: 16px; height: 16px; }
+.cr-si { width: 32px; height: 32px; border-width: 1.5px; border-color: var(--line-strong); }
+.cr-si-ic { width: 16px; height: 16px; }
+.cr-si.done { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
+.cr-si.open { border-color: var(--accent-line); color: var(--accent); box-shadow: none; }
+.cr-lrow.cur .cr-si.open { background: var(--accent); border-color: transparent; color: var(--ink); }
+.cr-lrow.done .cr-ln { color: var(--muted); }
+.cr-lrow.ahead .cr-ln { color: var(--muted); }
+
+/* ---------------- lesson and exam pages ---------------- */
+.cr-page { padding-top: 0; }
+.cr-back { min-height: 44px; height: 44px; margin: 0 0 var(--s2) calc(var(--s2) * -1); padding: 0 var(--s4) 0 var(--s1); border-radius: var(--r-pill); font-size: var(--fs-sub); max-width: 100%; }
+.cr-back span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cr-lhead { margin-bottom: var(--s5); }
+.cr-lhead .kicker { color: var(--faint); font-size: var(--fs-caption); letter-spacing: .06em; font-weight: 600; }
+.cr-title { margin: var(--s2) 0 var(--s2); font-family: var(--serif); font-weight: 500; font-size: clamp(28px, 7vw, 38px); line-height: 1.1; letter-spacing: -.015em; }
+.cr-goal { max-width: 52ch; font-family: var(--font); font-style: normal; font-size: var(--fs-headline); line-height: 1.4; color: var(--muted); }
+.cr-cols { grid-template-columns: minmax(0, 1fr); gap: var(--s5); }
+.cr-prose p { font-size: var(--fs-headline); line-height: 1.6; color: var(--text); max-width: 60ch; margin: 0 0 var(--s4); }
+#screen-course .cr-fig { margin: 0 0 var(--s5); padding: var(--s4); border-radius: var(--r-md); border: 0; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); }
+.cr-tip { margin: var(--s5) 0 var(--s2); padding: var(--s4) var(--s4) var(--s1); border-radius: var(--r-md); border: 0; background: var(--surface); box-shadow: inset 0 0 0 1px rgba(255, 207, 122, 0.3); }
+.cr-tip b { color: var(--amber, #ffcf7a); font-size: var(--fs-caption); letter-spacing: .06em; }
+.cr-tip p { font-size: var(--fs-body); line-height: 1.55; }
+#screen-course .cr-sidecard { position: static; padding: var(--s4) var(--s4) var(--s2); border-radius: var(--r-lg); border: 0; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); }
+.cr-sc-head { padding: 0; }
+.cr-sc-head h3 { font-family: var(--font); font-weight: 650; font-size: var(--fs-headline); letter-spacing: -.01em; }
+.cr-sc-n { font-size: var(--fs-caption); }
+.cr-bar { height: 6px; margin: var(--s3) 0 var(--s2); border-radius: var(--r-pill); background: var(--surface-3); }
+.cr-bar i { background: var(--accent); box-shadow: none; border-radius: inherit; }
+.cr-item {
+  grid-template-columns: 40px minmax(0, 1fr) auto; column-gap: var(--s3); padding: var(--s3) 0; border-top: 1px solid var(--line); align-items: center;
+}
+.cr-it-ic { width: 40px; height: 40px; border: 0; border-radius: var(--r-sm); background: var(--surface-2); }
+.cr-item.done .cr-it-ic { border: 0; background: var(--accent-soft); color: var(--accent); }
+.cr-it-t { font-weight: 600; font-size: var(--fs-body); line-height: 1.25; }
+.cr-it-k { font-size: var(--fs-caption); }
+.cr-is { font-size: var(--fs-caption); }
+.cr-is.tried { color: var(--warn); }
+.cr-is.done { color: var(--accent); }
+.cr-note { font-size: var(--fs-sub); max-width: 60ch; margin: 0 0 var(--s5); }
+.cr-complete {
+  grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "mark text" "btn btn"; gap: var(--s3) var(--s4); margin: 0 0 var(--s5); padding: var(--s4);
+  border: 0; border-radius: var(--r-lg); background: var(--surface); box-shadow: inset 0 0 0 1px var(--accent-line);
+}
+.cr-complete.miss { border: 0; background: var(--surface); box-shadow: inset 0 0 0 1px rgba(255, 208, 138, 0.4); }
+.cr-complete > .cr-complete-mark { grid-area: mark; }
+.cr-complete > div { grid-area: text; }
+.cr-complete > .primary { grid-area: btn; width: 100%; height: 52px; justify-content: center; }
+.cr-complete-mark { width: 40px; height: 40px; background: var(--accent); box-shadow: none; }
+.cr-complete.miss .cr-complete-mark { background: var(--warn); box-shadow: none; }
+.cr-complete-ic { width: 22px; height: 22px; }
+.cr-complete-t { font-family: var(--font); font-weight: 650; font-size: var(--fs-headline); }
+.cr-complete-s { font-size: var(--fs-sub); }
+
+/* quiz card */
+#screen-course .cr-qcard { padding: var(--s5) var(--s4) var(--s4); border: 0; border-radius: var(--r-lg); background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); }
+.cr-q { margin: var(--s2) 0 var(--s5); font-family: var(--font); font-weight: 650; font-size: var(--fs-title); line-height: 1.3; letter-spacing: -.01em; }
+.cr-opts { gap: var(--s2); }
+.cr-opt {
+  min-height: 56px; padding: var(--s2) var(--s4) var(--s2) var(--s3); border: 0; border-radius: var(--r-md); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line);
+  font-size: var(--fs-body); box-shadow: inset 0 0 0 1px var(--line);
+}
+.cr-opt:hover:not([aria-disabled="true"]) { transform: none; background: var(--surface-3); border: 0; }
+.cr-opt:active:not([aria-disabled="true"]) { transform: scale(.985); }
+.cr-opt-l { border-color: var(--line-strong); }
+.cr-opt.right { border: 0; background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent-line); }
+.cr-opt.wrong { border: 0; background: rgba(255, 208, 138, 0.1); box-shadow: inset 0 0 0 1px rgba(255, 208, 138, 0.5); }
+.cr-opt.wrong .cr-opt-l, .cr-opt.wrong .cr-opt-tag { color: var(--warn); border-color: var(--warn); }
+.cr-fb { border: 0; border-radius: var(--r-md); background: var(--surface-2); }
+.cr-qacts { display: flex; flex-direction: column; gap: var(--s2); margin-top: var(--s4); }
+.cr-qacts > button { width: 100%; height: 52px; justify-content: center; }
+
+/* ---------------- "this comes after" sheet ---------------- */
+.cr-sheet-back { align-items: end; padding: 0; background: var(--scrim); }
+.cr-sheet {
+  position: relative; width: 100%; padding: var(--s6) var(--s5) calc(var(--sab) + var(--tabbar) * 0 + var(--s4)); border: 0; border-radius: var(--r-lg) var(--r-lg) 0 0;
+  background: var(--surface); box-shadow: var(--e3); animation: crSheet var(--d-slow) var(--ease-sheet) backwards;
+}
+.cr-sheet::before { content: ""; position: absolute; top: 8px; left: 50%; width: 36px; height: 5px; margin-left: -18px; border-radius: 3px; background: var(--line-strong); }
+.cr-sheet-t { font-family: var(--font); font-weight: 650; font-size: var(--fs-title); letter-spacing: -.01em; }
+.cr-sheet-d { font-size: var(--fs-sub); }
+.cr-sheet-acts { flex-direction: column-reverse; align-items: stretch; gap: var(--s2); }
+.cr-sheet-acts button { height: 52px; justify-content: center; }
+@keyframes crSheet { from { transform: translateY(100%); } }
+
+/* ---------------- tablet and Mac ---------------- */
+@media (min-width: 700px) {
+  .course > * { max-width: 860px; }
+  #screen-course { --cr-pad: var(--s5); }
+  #screen-course .cr-hero { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "ring text btn"; align-items: center; gap: var(--s5); padding: var(--s5) var(--s6); }
+  .cr-hero > .primary { width: auto; min-width: 168px; }
+  .cr-order { grid-template-columns: auto minmax(220px, 280px) minmax(0, 1fr); align-items: center; gap: var(--s4); }
+  .cr-order-h { grid-column: auto; }
+  .cr-lrow { min-height: 60px; }
+  .cr-sheet-back { align-items: center; padding: var(--s4); }
+  .cr-sheet { width: min(440px, 100%); border-radius: var(--r-lg); padding: var(--s6); animation-name: crPop; }
+  .cr-sheet::before { display: none; }
+  .cr-sheet-acts { flex-direction: row; justify-content: flex-end; }
+  .cr-sheet-acts button { height: 44px; }
+  .cr-complete { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "mark text btn"; align-items: center; }
+  .cr-complete > .primary { width: auto; height: 44px; }
+  .cr-qacts { flex-direction: row; }
+  .cr-qacts > button { width: auto; height: 44px; }
+}
+@media (min-width: 900px) {
+  .cr-cols:not(.single) { grid-template-columns: minmax(0, 1fr) 360px; gap: var(--s7); }
+  #screen-course .cr-sidecard:not(.wide) { position: sticky; top: var(--s3); }
+  .cr-page { max-width: 1040px; }
+}
+@keyframes crPop { from { opacity: 0; transform: scale(.98); } }
+@media (pointer: fine) { .cr-seg-b, .primary.cr-small, .ghost.cr-small { min-height: 36px; height: 36px; } .primary.cr-small, .ghost.cr-small { padding: 0 var(--s4); } }
+@media (prefers-reduced-motion: reduce) {
+  .cr-tg-ch, .cr-sheet, .cr-ring-fg, .cr-bar i { transition: none; animation: none; }
+}
+
+/* completed levels: one calm line, the ring's check and chevron say the rest (the "Complete" label stays for screen readers) */
+.cr-lm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.cr-level.st-done .cr-lb { display: none; }
+.cr-level.st-done .cr-toggle { min-height: 76px; justify-content: center; padding-bottom: var(--s3); }
+.cr-level.st-done:not(:has(.cr-lessons)) .cr-side:not(:has(button)) { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); }
+.cr-level.st-done .cr-lm { margin-top: 0; }
+
+@media (max-width: 699px) { .cr-keys { display: none; } }
+
+/* practice rows: Start is a tinted button (one filled primary per screen region: the "up next" card or the lesson banner) */
+.cr-item .primary.cr-small { background: var(--accent-soft); color: var(--accent); }
+.cr-item .primary.cr-small:hover:not(:disabled) { background: var(--accent-line); color: var(--text); }
+.cr-item .ghost.cr-small { background: var(--surface-2); }
+.cr-level.st-ahead .cr-chip.ahead { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }   /* "Comes later" on every level is noise: the dashed ring says it; screen readers still get it */
+.cr-level.st-ahead .cr-side { padding-top: var(--s1); }
+.cr-level.st-ahead .ghost.cr-small { background: transparent; box-shadow: inset 0 0 0 1px var(--line-strong); }
+
+/* Exercise actions (Next question, Hear it again) stay in view on a short screen once an answer is in. The tab bar is hidden on
+   this screen (tokens.css), so they stick to the bottom edge, on the card's own solid surface */
+@media (max-width: 699px), (pointer: coarse) {
+  .ex-card .ex-acts:not(:empty) {
+    position: sticky; z-index: 5; bottom: 0; margin-bottom: calc(var(--s5) * -1); padding: var(--s3) 0 calc(var(--sab) + var(--s3));
+    background: var(--surface); box-shadow: 0 -1px 0 var(--line);
+  }
+}
+
+/* ---------------- "Already play a little?": the Find my level card (course-ui.js placementBox, examPlacementBox) ---------------- */
+.cr-place {
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s3); margin: 0 0 var(--s4); padding: var(--s4) var(--s5);
+  border-radius: var(--r-lg); background: var(--surface); box-shadow: inset 0 0 0 1px var(--line);
+}
+.cr-place.result { box-shadow: inset 0 0 0 1px var(--accent-line); }
+.cr-place.inline { margin: var(--s4) 0; }
+.cr-place-t { margin: 0; font-family: var(--font); font-size: var(--fs-headline); font-weight: 650; letter-spacing: -.01em; color: var(--text); }
+.cr-place-s { margin: var(--s1) 0 0; color: var(--muted); font-size: var(--fs-sub); line-height: 1.4; }
+.cr-place-acts { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.cr-place-acts > button { flex: 1 1 auto; height: 44px; min-height: 44px; justify-content: center; padding: 0 var(--s5); font-size: var(--fs-sub); }
+@media (min-width: 700px) {
+  .cr-place { grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--s5); }
+  .cr-place-acts > button { flex: none; }
+}
+
+/* ---------------- iPad landscape and wide windows: the map uses the width ----------------
+   Phones and portrait iPads keep the single 860px column above. The level path stays one column (its rings are joined by a line);
+   the map widens, and an open level lists its lessons in two columns when the path itself is wide enough. */
+@media (min-width: 960px) and (orientation: landscape) {
+  .course > :is(.cr-summary, .cr-place, .cr-hero, .cr-order, .cr-path) { max-width: 1100px; }
+  #screen-course .cr-path { container: course-path / inline-size; }
+}
+@container course-path (min-width: 640px) {
+  #screen-course .cr-lessons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--s5); }
+  #screen-course .cr-lessons > li:nth-child(2) { border-top-color: transparent; }          /* the top of the right-hand column */
+  #screen-course .cr-lessons > li:has(> .cr-lrow.exam) { grid-column: 1 / -1; }            /* the exam row runs under both columns */
+}

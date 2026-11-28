@@ -49,7 +49,15 @@ const POSSESSIVE = new RegExp(String.raw`(?<![A-Za-z0-9])(?:${NAME_WORD}[ -]){0,
 
 // keepLines: a note may have line breaks.
 export function sanitizeText(value, max = 80, { redact = [], keepLines = false } = {}) {
+  // invisible format characters go first, before any redaction: zero-width spaces, soft hyphens, BOMs and tag characters
+  // would split a name, path or address past it ("Ja\u200Bne"), and bidi controls would reorder what the reader sees
   let text = String(value == null ? '' : value)
+    .replace(/[\u00AD\u034F\u061C\u180E\u200B\u200E\u200F\u202A-\u202E\u2060-\u2069\uFEFF\u{E0000}-\u{E007F}]/gu, '')
+  // C1 controls are controls too; the Unicode line and paragraph separators are line breaks
+  text = text.replace(/[\u0085\u2028\u2029]/g, '\n').replace(/[\u0080-\u009F]/g, ' ')
+  // zero-width (non-)joiners stay only between two non-Latin letters or symbols, where they are part of the text
+  // (emoji sequences like a family, Persian and Indic words); next to Latin text, digits, spaces or an edge they go
+  text = text.replace(/(?<![^\x00-\x7F\u00C0-\u024F\s])[\u200C\u200D]+|[\u200C\u200D]+(?![^\x00-\x7F\u00C0-\u024F\s])/g, '')
   text = keepLines ? text.replace(/\r\n?/g, '\n').replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, ' ') : text.replace(/[\u0000-\u001f\u007f]/g, ' ')
   // names this computer knows (user, home folder, host) go first, before any partial replacement
   const names = expandNames(redact.map(String))

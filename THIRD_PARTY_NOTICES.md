@@ -9,10 +9,32 @@ turn ports the ROLI BLOCKS protocol encoding from the original `blocks.py`.
 Copyright (c) 2026 ClockworkPirate and contributors; Copyright (c) 2026 Ehsan Sayyad
 (upstream ROLI-for-Live code). Full licence: `LICENSES/ROLILearn4All-MIT.txt`.
 
+## PartykeysProtocol — MIT
+The key-light SysEx protocol modules in `renderer/partykeys/` (three ES modules, copied unchanged) and the
+25 offline tests in `scripts/partykeys-upstream/` come from the MIT-licensed
+[PartykeysProtocol](https://github.com/allen4z/PartykeysProtocol) (https://protocol.partykeys.org/).
+`renderer/party-lights.js` is Keylight's own controller on top of them. Full licence:
+`LICENSES/PartykeysProtocol-MIT.txt`.
+
 ## Basic Pitch — Apache License 2.0
 `renderer/models/basic-pitch/` (model weights) and the Basic Pitch code bundled in
 `renderer/vendor/transcribe.js` come from [Basic Pitch](https://github.com/spotify/basic-pitch-ts)
 by Spotify AB (full text in `renderer/models/basic-pitch/LICENSE`).
+
+## ONNX Runtime Web — MIT
+`renderer/vendor/onnxruntime-web/` (onnxruntime-web 1.31.1: `ort.wasm.min.mjs`, `ort-wasm-simd-threaded.mjs`,
+`ort-wasm-simd-threaded.wasm`), Copyright (c) Microsoft Corporation, runs the piano cover model in a worker
+(`renderer/piano-cover-worker.js`). Licence: `renderer/vendor/onnxruntime-web/LICENSE`; the licences of what it
+bundles are in `renderer/vendor/onnxruntime-web/ThirdPartyNotices.txt`. Files and checksums:
+`scripts/vendor-onnxruntime.sh`.
+
+## Music2MIDI — MIT code
+The piano cover (renderer/piano-cover-core.js and `ios/Keylight/PianoCover*.swift`) reimplements the audio front end and
+token format of [Music2MIDI](https://github.com/ytinyui/music2midi) (MIT, pinned commit in `tools/music2midi/`), and the
+build scripts in `tools/music2midi/` convert its model. The converted model files are not in this repository: they come
+from `tools/music2midi/fetch-and-build-onnx.sh` and are copied into the packaged app by `scripts/package.sh` and
+`scripts/package-win.js`. The checkpoint (release 0.1.0) states no licence of its own; the author's confirmation that the
+MIT licence covers it is requested before a release ships it (`docs/MUSIC2MIDI-PLAN.md`).
 
 ## TensorFlow.js — Apache License 2.0 (parts of tfjs-layers: MIT)
 Bundled in `renderer/vendor/transcribe.js` (4.22.0, plus the 3.21.0 copy Basic Pitch
@@ -54,7 +76,11 @@ order and widths taken from the Apache-2.0 `LeapC.cs` binding in Ultraleap's Uni
 (Copyright Ultraleap, Inc.). The helper loads the user's own installed Ultraleap runtime at
 run time; no Ultraleap or ROLI library, driver or SDK is included or redistributed.
 
-## blocksd — ISC (bundled in the Mac app)
+## blocksd — ISC
+
+Keylight's JavaScript key renderer uses LittleFoot bytecode and heap transport adapted from blocksd
+v0.8.0 by hyperb1iss, under the ISC licence in `LICENSES/blocksd-ISC.txt`.
+
 The Mac app carries [blocksd](https://github.com/hyperb1iss/blocksd) v0.6.0 (Copyright (c) 2025-2026
 hyperb1iss (Stefanie Jane)), the daemon that drives the per-key lights, as a frozen program in
 `Contents/Resources/blocksd`. blocksd itself is ISC-licensed: `LICENSES/blocksd-ISC.txt`. Keylight applies
@@ -89,14 +115,22 @@ public notes of the LUMI-lights project and the JUCE BLOCKS protocol definitions
 
 ## Songs and artwork
 The built-in songs are public-domain compositions; the arrangements in `renderer/songs/`
-were written for this project and are covered by the desktop app licence. The cover art in
+were written for this project and are distributed under GPL-3.0-or-later. The cover art in
 `renderer/covers/` and the app icon were made with AI image tools for this project and,
-to the extent anyone holds rights in them, are released under the desktop app licence.
+to the extent anyone holds rights in them, are distributed under GPL-3.0-or-later.
 
 ## Online lookups
 Imported songs can ask the iTunes Search API (cover art) and LRCLIB (lyrics) for
 metadata. The hand-tracking model is downloaded from Google's MediaPipe storage only by
 `scripts/build-vendor.sh`. Nothing else is downloaded.
+
+## Android host — Apache License 2.0 components
+
+The Android application uses AndroidX WebKit 1.14.0 and its AndroidX dependencies,
+from the Android Open Source Project, under Apache License 2.0. They provide trusted
+asset loading and WebView messaging. The full Apache 2.0 text is also bundled at
+`renderer/models/basic-pitch/LICENSE`. Android System WebView and the operating system
+are installed separately on the user's device; Keylight does not redistribute them.
 
 ## Not affiliated with ROLI
 Keylight is an independent, unofficial project. It is not affiliated with, endorsed by
@@ -115,20 +149,25 @@ full licence are in `LICENSES/piano-samples.md`, `LICENSES/piano-samples-upstrea
 `LICENSES/piano-samples-CC-BY-3.0.txt`. These are independently redistributable recordings;
 no proprietary ROLI sound pack is included.
 
+The website's example recording (`site-next/audio/piano-example.m4a`) is a 9.6-second phrase arranged from
+the same Salamander samples (pitch-shifted, trimmed and mixed by `scripts/build-recording-demo.js`), under the
+same CC BY 3.0 licence and credited on the page.
+
 ## Mutopia Project songs — Public Domain, CC BY and CC BY-SA
 
-57 piano pieces (`renderer/songs/mutopia/`, `renderer/songs/mutopia-sa/`, registered in
+135 piano and keyboard pieces (`renderer/songs/mutopia/`, `renderer/songs/mutopia-sa/`, registered in
 `renderer/songs-mutopia.js`) are MIDI files from the [Mutopia Project](https://www.mutopiaproject.org).
 The compositions are in the public domain. Each MIDI file was generated from a LilyPond file by a
 Mutopia typesetter and carries that piece's licence:
 
-- **Public Domain** (typesetter dedication): 48 pieces. No credit is required; Keylight credits the typesetter anyway.
-- **CC BY 3.0** (attribution required): 3 pieces, Liszt's Consolations Nos. 1, 3 and 4, typeset by Ryan Prince.
+- **Public Domain** (typesetter dedication): 112 pieces. No credit is required; Keylight credits the typesetter anyway.
+- **CC BY 3.0** (attribution required): 8 pieces: Liszt's Consolations Nos. 1, 3 and 4 (typeset by Ryan Prince) and further pieces whose typesetters are named in
+  `LICENSES/mutopia-songs.md` and shown under each song's title.
   https://creativecommons.org/licenses/by/3.0/
-- **CC BY-SA 3.0 / 4.0** (attribution, share-alike): 6 pieces, kept in `renderer/songs/mutopia-sa/`. They are
+- **CC BY-SA 2.5 / 3.0 / 4.0** (attribution, share-alike): 15 pieces, kept in `renderer/songs/mutopia-sa/`. They are
   separate, attributed data files distributed under their own licences. If you redistribute or adapt those files,
   keep the credit and share them under the same licence.
-  https://creativecommons.org/licenses/by-sa/3.0/ and https://creativecommons.org/licenses/by-sa/4.0/
+  https://creativecommons.org/licenses/by-sa/2.5/, https://creativecommons.org/licenses/by-sa/3.0/ and https://creativecommons.org/licenses/by-sa/4.0/
 
 The title, composer, licence, typesetter, source page and file of every piece are in
 `LICENSES/mutopia-songs.md`; the app shows the credit under the song's title. The files are provided as-is,

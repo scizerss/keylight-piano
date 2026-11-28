@@ -1,7 +1,9 @@
 // Run with node scripts/test-android-midi.js. A wire fake replaces only Android.
 const assert = require('node:assert/strict')
 const fs = require('node:fs/promises')
+const { existsSync } = require('node:fs')
 const { pathToFileURL } = require('node:url')
+const hostBootstrap = new URL('../android/host-bootstrap.js', pathToFileURL(__filename))
 
 async function main() {
   const source = await fs.readFile(new URL('../renderer/android-midi.js', pathToFileURL(__filename)), 'utf8')
@@ -23,7 +25,7 @@ async function main() {
     const message = JSON.parse(raw)
     if (message.op === 'send') received.push(message.bytes)
     if (message.op === 'clear') cleared.push(message.port)
-    queueMicrotask(() => globalThis.__keylightNativeReceive({ id: message.id, result: message.op === 'list' ? ports : true }))
+    queueMicrotask(() => globalThis.__keylightNativeReceive(message.op === 'send' && globalThis.__failSends ? { id: message.id, error: 'queue full' } : { id: message.id, result: message.op === 'list' ? ports : true }))
   } }
   const access = await requestMIDIAccess()
   const input = access.inputs.get(ports[0].id), output = access.outputs.get(ports[1].id)
@@ -55,6 +57,43 @@ async function main() {
   assert.equal(access.inputs.size + access.outputs.size, 0)
   assert.equal(disconnected.state, 'disconnected')
   assert.throws(() => output.send([0x90, 1, 1]), { name: 'InvalidStateError' })
+  // a USB device with two port pairs gives every port the device's name: the port label tells them apart, and a lone pair keeps its plain name
+  globalThis.__keylightNativeReceive({ kind: 'ports', ports: [
+    { id: '2:input:0', type: 'input', name: 'Dual', portName: 'MIDI 1' }, { id: '2:input:1', type: 'input', name: 'Dual', portName: 'MIDI 2' },
+    { id: '2:output:0', type: 'output', name: 'Dual', portName: 'MIDI 1' }, { id: '2:output:1', type: 'output', name: 'Dual', portName: 'MIDI 2' },
+    { id: '3:input:0', type: 'input', name: 'Solo', portName: 'MIDI 1' }, { id: '3:output:0', type: 'output', name: 'Solo', portName: 'MIDI 1' }] })
+  assert.deepEqual([...access.outputs.values()].map((p) => p.name), ['Dual MIDI 1', 'Dual MIDI 2', 'Solo'], 'ports of one device get distinct names')
+  assert.deepEqual([...access.inputs.values()].map((p) => p.name), ['Dual MIDI 1', 'Dual MIDI 2', 'Solo'])
+  // a failed send goes to the caller's own handler when it gave one; otherwise to the access, naming the port and the operation
+  {
+    const dual = access.outputs.get('2:output:0')
+    const own = [], global = []
+    access.onerror = (error, source) => global.push([error.message, source])
+    globalThis.__failSends = true
+    dual.send([0xf0, 1, 0xf7], undefined, (error) => own.push(error.message))
+    dual.send([0xf0, 2, 0xf7])
+    await new Promise((r) => setTimeout(r, 20))
+    globalThis.__failSends = false
+    assert.deepEqual(own, ['queue full'], 'the sender hears its own failure')
+    assert.deepEqual(global, [['queue full', { port: '2:output:0', op: 'send' }]], 'an unclaimed failure names its port and operation, once')
+    access.onerror = null
+  }
+  // two identical keyboards (the same label each), an iOS name that already holds the label, and a 1-in/2-out device
+  globalThis.__keylightNativeReceive({ kind: 'ports', ports: [
+    { id: '4:input:0', type: 'input', name: 'LUMI', portName: 'MIDI 1' }, { id: '5:input:0', type: 'input', name: 'LUMI', portName: 'MIDI 1' },
+    { id: '6:input:0', type: 'input', name: 'ROLI LUMI Keys BLOCK', portName: 'LUMI Keys BLOCK' },
+    { id: '7:input:0', type: 'input', name: 'SAM', portName: 'MIDI' }, { id: '7:output:0', type: 'output', name: 'SAM', portName: 'MIDI' }, { id: '7:output:1', type: 'output', name: 'SAM', portName: 'APP' }] })
+  assert.deepEqual([...access.inputs.values()].map((p) => p.name), ['LUMI', 'LUMI', 'ROLI LUMI Keys BLOCK', 'SAM MIDI'], 'identical keyboards and iOS names are left alone; a multi-port device is suffixed on both sides')
+  assert.deepEqual([...access.outputs.values()].map((p) => p.name), ['SAM MIDI', 'SAM APP'])
+  // a sibling arriving later renames the earlier port, so the input and output names stay a matching set; two generic single-port devices stay apart
+  globalThis.__keylightNativeReceive({ kind: 'ports', ports: [{ id: '8:output:0', type: 'output', name: 'SAM', portName: 'MIDI' }] })
+  assert.deepEqual([...access.outputs.values()].map((p) => p.name), ['SAM'])
+  globalThis.__keylightNativeReceive({ kind: 'ports', ports: [{ id: '8:output:0', type: 'output', name: 'SAM', portName: 'MIDI' }, { id: '8:input:0', type: 'input', name: 'SAM', portName: 'MIDI' }, { id: '8:output:1', type: 'output', name: 'SAM', portName: 'APP' }] })
+  assert.deepEqual([...access.outputs.values()].map((p) => p.name), ['SAM MIDI', 'SAM APP'], 'the first output was renamed when its sibling arrived')
+  assert.deepEqual([...access.inputs.values()].map((p) => p.name), ['SAM MIDI'])
+  globalThis.__keylightNativeReceive({ kind: 'ports', ports: [{ id: '9:input:0', type: 'input', name: 'USB MIDI', portName: 'A' }, { id: '10:input:0', type: 'input', name: 'USB MIDI', portName: 'B' },
+    { id: '11:input:0', type: 'input', name: 'MIDI Interface', portName: 'MIDI' }, { id: '11:input:1', type: 'input', name: 'MIDI Interface', portName: 'In' }] })
+  assert.deepEqual([...access.inputs.values()].map((p) => p.name), ['USB MIDI', 'USB MIDI', 'MIDI Interface', 'MIDI Interface In'], 'different devices with the same generic name are not one device; a label already in the name is not added twice')
   globalThis.__keylightNativeReceive({ kind: 'ports', ports })
   const reconnected = access.inputs.get(ports[0].id)
   const afterReconnect = []
@@ -63,8 +102,62 @@ async function main() {
   globalThis.__keylightNativeReceive({ kind: 'data', port: reconnected.id, bytes: [1, 2, 0x90, 65, 90] })
   assert.deepEqual(afterReconnect, [[0x90, 65, 90]])
   console.log('Android MIDI: 6 stream cases, native delivery, ordered sends, close and hotplug passed')
+  if (existsSync(hostBootstrap)) await testExport(source)
   await testBle(source)
-  await testHostTools()
+  await testHostTools(source)
+  if (existsSync(hostBootstrap)) testJvm()
+  else console.log('Android native checks skipped because the Android project is separate')
+}
+
+async function testExport(adapterSource) {
+  const bootstrap = await fs.readFile(hostBootstrap, 'utf8')
+  const adapterUrl = `data:text/javascript;base64,${Buffer.from(adapterSource).toString('base64')}`
+  const transfers = new Map(), saved = []
+  let complete
+  globalThis.KeylightNative = { postMessage(raw) {
+    const message = JSON.parse(raw)
+    let result = true
+    switch (message.op) {
+      case 'exportBegin': {
+        const token = String(message.id)
+        transfers.set(token, { name: message.name, mime: message.mime, size: message.size, chunks: [] })
+        result = token; break
+      }
+      case 'exportChunk': {
+        const bytes = Buffer.from(message.data, 'base64')
+        assert.ok(bytes.length <= 32768)
+        transfers.get(message.token).chunks.push(bytes); break
+      }
+      case 'exportFinish': {
+        const transfer = transfers.get(message.token)
+        const bytes = Buffer.concat(transfer.chunks)
+        assert.equal(bytes.length, transfer.size)
+        saved.push({ name: transfer.name, mime: transfer.mime, bytes })
+        transfers.delete(message.token); complete?.(); break
+      }
+      case 'exportAbort': transfers.delete(message.token); break
+      default: assert.fail('Unexpected export operation')
+    }
+    queueMicrotask(() => globalThis.__keylightNativeReceive({ id: message.id, result }))
+  } }
+  Object.defineProperty(globalThis, 'navigator', { value: {}, configurable: true })
+  globalThis.HTMLAnchorElement = class { click() { assert.fail('Blob download escaped native handoff') } }
+  globalThis.document = { addEventListener() {} }
+  globalThis.alert = (message) => assert.fail(message)
+  const executable = bootstrap.replace("'./android-midi.js'", JSON.stringify(adapterUrl))
+  const { exportBlob } = await import(`data:text/javascript;base64,${Buffer.from(executable).toString('base64')}`)
+  const bytes = Uint8Array.from({ length: 70001 }, (_, i) => i % 256)
+  await exportBlob(new Blob([bytes], { type: 'video/mp4;codecs=avc1' }), 'take.mp4')
+  assert.deepEqual(saved[0], { name: 'take.mp4', mime: 'video/mp4', bytes: Buffer.from(bytes) })
+  const completion = new Promise((resolve) => { complete = resolve })
+  const anchor = new HTMLAnchorElement()
+  anchor.href = URL.createObjectURL(new Blob(['{"notes":3}'], { type: 'application/json' }))
+  anchor.download = 'take.json'
+  anchor.click(); URL.revokeObjectURL(anchor.href)
+  await completion
+  assert.deepEqual(saved[1], { name: 'take.json', mime: 'application/json', bytes: Buffer.from('{"notes":3}') })
+  await assert.rejects(exportBlob({ size: 256 * 1024 * 1024 + 1 }, 'large.mp4'), RangeError)
+  console.log('Android export: bounded multi-chunk byte delivery, MIME, revoked Blob download and size limit passed')
 }
 
 async function testBle(adapterSource) {
@@ -219,16 +312,17 @@ async function testBle(adapterSource) {
   console.log('Android Bluetooth: phases, scan, connect, remember/forget, errors, rate limit, bounded silent auto-reconnect and BLE ports passed')
 }
 
-// Link, clipboard and USB bridge methods in the shared renderer.
-async function testHostTools() {
+// Link, clipboard and USB bridge methods: the page-side rules, the same rules as the desktop allow-list, and (when a JDK
+// is installed) the Java port of them that the host runs again.
+async function testHostTools(adapterSource) {
   const read = (path) => fs.readFile(new URL(path, pathToFileURL(__filename)), 'utf8')
   const dataUrl = (source) => `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`
   const policySource = await read('../renderer/host-policy.js')
   const { isAllowedLink, cleanUsb } = await import(dataUrl(policySource))
   const desktop = require('../renderer/external-links.cjs')
   const GOOD = [
-    'https://ko-fi.com/scizers', 'https://ko-fi.com/scizers/', 'https://github.com/scizerss/keylight-piano', 'https://github.com/scizerss/keylight-piano/issues',
-    'https://github.com/scizerss/keylight-piano/releases', 'https://github.com/scizerss/keylight-piano/releases/latest', 'https://github.com/demixme/GRAB',
+    'https://github.com/scizerss/keylight-piano', 'https://github.com/scizerss/keylight-piano/issues',
+    'https://github.com/scizerss/keylight-piano/releases', 'https://github.com/scizerss/keylight-piano/releases/latest', 'https://github.com/demixme/GRAB', 'https://www.partykeys.com/discount/MMDMAGDY?ref=m7md333magdy',
     'https://github.com/scizerss/keylight-piano/issues/new?title=Support%20my%20device&body=Report%0A%0Aline',
     'https://github.com/scizerss/keylight-piano/issues/new?body=x&title=y'
   ]
@@ -247,11 +341,56 @@ async function testHostTools() {
     'https://github.com/scizerss/keylight-piano/pulls', 'https://github.com/scizerss/keylight-piano/releases/download/x/y.apk',
     'https://ko-fi.com/scizers/shop', 'https://ko-fi.com/other', 'javascript:alert(1)', 'intent://x#Intent;scheme=https;end', 'file:///etc/passwd', 'content://x/y',
     'market://details?id=org.keylight.piano', ' https://ko-fi.com/scizers', 'https://ko-fi.com/scizers\n', 'https://ko-fi.com/scizers?x=1',
+    'https://www.partykeys.com/discount/MMDMAGDY?ref=other', 'https://www.partykeys.com/discount/OTHER?ref=m7md333magdy', 'http://www.partykeys.com/discount/MMDMAGDY?ref=m7md333magdy', 'https://www.partykeys.com/discount/MMDMAGDY?ref=m7md333magdy&x=1', 'https://www.partykeys.com/discount/MMDMAGDY?ref=m7md333magdy/', 'https://www.partykeys.com/discount/MMDMAGDY?ref=m7md333magdy/', 'https://www.partykeys.com/discount/MMDMAGDY', 'https://partykeys.com/discount/MMDMAGDY?ref=m7md333magdy', ' https://www.partykeys.com/discount/MMDMAGDY?ref=m7md333magdy', 'https://www.partykeys.com/discount/MMDMAGDY?ref=m7md333magdy\n', 'https://www.partykeys.com/discount/MMDMAGDY?ref=m7md333magdy#x',
     'https://github.com/scizerss/keylight-piano/issues/new?title=a&body=' + 'a'.repeat(2000)
   ]
   for (const url of GOOD) { assert.equal(isAllowedLink(url), true, url); assert.equal(desktop.isAllowedExternalUrl(url), true, url) }
   for (const url of BAD) { assert.equal(isAllowedLink(url), false, JSON.stringify(url)); assert.equal(desktop.isAllowedExternalUrl(url), false, JSON.stringify(url)) }
+  const LEGAL = ['https://keylightpiano.app/terms', 'https://keylightpiano.app/privacy']
+  const SUPPORT = ['https://ko-fi.com/scizers', 'https://ko-fi.com/scizers/']
+  for (const url of LEGAL) assert.equal(isAllowedLink(url), true, url)
+  for (const url of SUPPORT) {
+    assert.equal(isAllowedLink(url), false, url)
+    assert.equal(isAllowedLink(url, { native: false }), true, url)
+    assert.equal(desktop.isAllowedExternalUrl(url), true, url)
+  }
   for (const value of [null, undefined, 5, {}, [], ['https://ko-fi.com/scizers'], { toString: () => 'https://ko-fi.com/scizers' }]) assert.equal(isAllowedLink(value), false)
+
+  // the support mail the iPhone/iPad wizard writes: the page rules accept exactly subject and body, each once and
+  // once-encoded. Desktop and Android do not write this form, so only host-policy.js knows it (LinkPolicy.swift does too).
+  const MAIL = 'mailto:support@keylightpiano.app'
+  // a body line break (%0A) is the wizard's own and passes; other control bytes, line separators and non-UTF-8 bytes do not
+  for (const good of [MAIL + '?subject=Keyboard%20support%3A%20Piano&body=Device%3A%20Piano', MAIL + '?body=x&subject=y', MAIL + '?subject=a&body=b%0Aline']) assert.equal(isAllowedLink(good), true, good)
+  for (const bad of [MAIL, MAIL + '?', MAIL + '?subject=a', MAIL + '?body=b', MAIL + '?subject=a&body=b&cc=x%40example.com', MAIL + '?bcc=x%40example.com&subject=a&body=b',
+    MAIL + '?subject=a&body=b&labels=x', MAIL + '?subject=a&Subject=b', MAIL + '?subject=&body=b', MAIL + '?subject=a&body=b c', MAIL + '?subject=a&body=%2525',
+    MAIL + '?subject=a&body=b%0D%0ABcc%3A%20x%40y', MAIL + '?subject=a%0ABcc%3A%20x%40y&body=b', MAIL + '?subject=a%00b&body=b', MAIL + '?subject=a%E2%80%A8b&body=b',
+    MAIL + '?subject=a&body=b%00c', MAIL + '?subject=%FF&body=b', MAIL + '?subject=a&body=%C0%AF',
+    'mailto:x%40example.com?subject=a&body=b', 'mailto:support@keylightpiano.app.evil.example?subject=a&body=b',
+    MAIL + '?subject=a&body=' + 'a'.repeat(2000)]) assert.equal(isAllowedLink(bad), false, bad)
+
+  // the Java port agrees on every address
+  const { spawnSync } = require('node:child_process'), os = require('node:os'), path = require('node:path'), fsSync = require('node:fs')
+  const javac = spawnSync('javac', ['-version'], { encoding: 'utf8' })
+  let java = 'skipped (no JDK on the PATH)'
+  const javaPolicy = path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'java', 'org', 'keylight', 'piano', 'LinkPolicy.java')
+  if (!fsSync.existsSync(javaPolicy)) java = 'skipped (the Android project is separate)'
+  else if (javac.status === 0) {
+    const dir = fsSync.mkdtempSync(path.join(os.tmpdir(), 'keylight-link-'))
+    try {
+      const pkg = path.join(dir, 'org', 'keylight', 'piano'); fsSync.mkdirSync(pkg, { recursive: true })
+      fsSync.copyFileSync(javaPolicy, path.join(pkg, 'LinkPolicy.java'))
+      fsSync.writeFileSync(path.join(pkg, 'LinkCheck.java'), 'package org.keylight.piano;\nimport java.io.*;\npublic class LinkCheck { public static void main(String[] a) throws Exception {\n' +
+        ' BufferedReader in = new BufferedReader(new InputStreamReader(System.in, "UTF-8")); String line; StringBuilder out = new StringBuilder();\n' +
+        ' while ((line = in.readLine()) != null) { String url = java.net.URLDecoder.decode(line.replace("+", "%2B"), "UTF-8"); out.append(LinkPolicy.allowed(url) ? "1" : "0"); }\n System.out.println(out); } }\n')
+      const build = spawnSync('javac', ['-d', dir, path.join(pkg, 'LinkPolicy.java'), path.join(pkg, 'LinkCheck.java')], { encoding: 'utf8' })
+      assert.equal(build.status, 0, build.stderr)
+      const all = [...GOOD, ...BAD, ...LEGAL, ...SUPPORT]
+      const run = spawnSync('java', ['-cp', dir, 'org.keylight.piano.LinkCheck'], { input: all.map((u) => encodeURIComponent(u)).join('\n') + '\n', encoding: 'utf8' })
+      assert.equal(run.status, 0, run.stderr)
+      assert.equal(run.stdout.trim(), all.map((u) => (isAllowedLink(u) ? '1' : '0')).join(''), 'Java LinkPolicy and the page rules agree on every address')
+      java = 'agrees on ' + all.length + ' addresses'
+    } finally { fsSync.rmSync(dir, { recursive: true, force: true }) }
+  }
 
   // the USB answer is rebuilt field by field: a serial, a path or a bad id never gets through
   const hostile = { ok: true, source: 'x', reason: 'y', redact: ['name'], os: { platform: 'darwin', release: '15 (API 35)', arch: 'arm64-v8a', serial: 'S1' },
@@ -273,7 +412,7 @@ async function testHostTools() {
 
   // host-tools.js on a wire fake of the bridge: what it sends, and what it refuses to
   const toolsSource = (await read('../renderer/host-tools.js'))
-    .replace(/^import \{ IS_ANDROID \}.*$/m, 'const IS_ANDROID = true')
+    .replace(/^import \{ IS_ANDROID, IS_NATIVE_HOST \}.*$/m, 'const IS_ANDROID = true, IS_NATIVE_HOST = true')
     .replace(/^import \{ nativeRequest \}.*$/m, 'const nativeRequest = (op, args) => globalThis.__bridge(op, args)')
     .replace(/^import \{ isAllowedLink, cleanUsb \}.*$/m, policySource.replace(/^export /gm, ''))
   const tools = await import(dataUrl(toolsSource))
@@ -287,6 +426,15 @@ async function testHostTools() {
   await tools.copyText('report text')
   assert.deepEqual(sent.pop(), { op: 'clipboard', text: 'report text' })
   assert.equal(tools.openExternal('https://evil.com/'), false); assert.equal(tools.openExternal('javascript:alert(1)'), false); assert.equal(sent.length, 0)
+  for (const url of SUPPORT) {
+    assert.equal(tools.openExternal(url), false)
+    assert.equal(await tools.openExternalAsync(url), false)
+  }
+  assert.equal(sent.length, 0)
+  for (const url of LEGAL) {
+    assert.equal(await tools.openExternalAsync(url), true)
+    assert.deepEqual(sent.pop(), { op: 'openLink', url })
+  }
   assert.equal(tools.openExternal('https://github.com/scizerss/keylight-piano/issues/new?title=a&body=b'), true)
   assert.deepEqual(sent.pop(), { op: 'openLink', url: 'https://github.com/scizerss/keylight-piano/issues/new?title=a&body=b' })
   const probe = await tools.usbProbe()
@@ -294,7 +442,34 @@ async function testHostTools() {
   globalThis.__bridge = async () => { throw new Error('offline') }
   assert.equal(await tools.usbProbe(), null)
   delete globalThis.__bridge; delete globalThis.window
-  console.log('Shared renderer host tools: link allow-list, clipboard and USB descriptor checks passed')
+
+  // downloads: a title with an apostrophe, an accent or a slash still saves, under a plain name
+  if (existsSync(hostBootstrap)) {
+    const { safeName } = await import(dataUrl(/export function safeName[\s\S]*?\n}\n/.exec(await fs.readFile(hostBootstrap, 'utf8'))[0]))
+    assert.equal(safeName("Für Elise - take 1.mp4"), 'Fur Elise - take 1.mp4'); assert.equal(safeName("../../etc/passwd"), 'etc-passwd'); assert.equal(safeName('..'), 'keylight-file')
+    assert.ok(/^[A-Za-z0-9][A-Za-z0-9._ -]{0,127}$/.test(safeName("O'Brien: Prelude?.json"))); assert.equal(safeName('x'.repeat(300)).length, 128)
+  }
+  console.log('Android host tools: link allow-list (' + (GOOD.length + BAD.length + LEGAL.length + SUPPORT.length) + ' addresses; Java ' + java + '), clipboard, and USB descriptors without serials passed')
 }
 const deadline = setTimeout(() => { console.error('Android bridge tests timed out'); process.exit(1) }, 40000)
 main().catch((error) => { console.error(error); process.exitCode = 1 }).finally(() => clearTimeout(deadline))
+
+// Pure host logic (bounded MIDI buffer, Bluetooth attempt state machine, picker URI rules) runs on a plain JVM.
+function testJvm() {
+  const { spawnSync } = require('node:child_process')
+  const os = require('node:os'), path = require('node:path')
+  const root = path.join(__dirname, '..')
+  let javaHome = process.env.JAVA_HOME
+  if (!javaHome) { const r = spawnSync('/usr/libexec/java_home', ['-v', '17'], { encoding: 'utf8' }); if (r.status === 0) javaHome = r.stdout.trim() }
+  const bin = (name) => javaHome ? path.join(javaHome, 'bin', name) : name
+  if (spawnSync(bin('javac'), ['-version'], { encoding: 'utf8' }).error) { console.log('jvm host logic: skipped (no JDK found)'); return }
+  const out = require('node:fs').mkdtempSync(path.join(os.tmpdir(), 'keylight-jvm-'))
+  try {
+    const dir = path.join(root, 'android/app/src/main/java/org/keylight/piano')
+    const compile = spawnSync(bin('javac'), ['-d', out, ...['MidiBuffer', 'PortFeed', 'StagingPolicy', 'AttemptTracker', 'UriPolicy', 'CaptureGate'].map((n) => path.join(dir, n + '.java')), path.join(root, 'android/jvm-test/HostLogicTests.java')], { encoding: 'utf8' })
+    assert.equal(compile.status, 0, compile.stdout + compile.stderr)
+    const run = spawnSync(bin('java'), ['-ea', '-cp', out, 'org.keylight.piano.HostLogicTests'], { encoding: 'utf8' })
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    process.stdout.write(run.stdout)
+  } finally { require('node:fs').rmSync(out, { recursive: true, force: true }) }
+}

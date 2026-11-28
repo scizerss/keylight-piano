@@ -1,9 +1,15 @@
-import { COLORS, FONTS, MODES, NOTE_VIEWS, NOTE_LABELS } from './theme.js'
-import { copyText, openExternal, usbProbe } from './host-tools.js'
-import { IS_WIN, IS_ANDROID, IS_IOS, IS_NATIVE_HOST, TOUCH, THIS_COMPUTER, TAKES_FOLDER } from './platform.js'
+import { COLORS, NOTE_VIEWS, NOTE_LABELS } from './theme.js'
+import { copyText, openExternal, openExternalAsync, usbProbe } from './host-tools.js'
+import { IS_WIN, IS_ANDROID, IS_IOS, IS_IOS_BETA, SHOT_MODE, IS_NATIVE_HOST, TOUCH, THIS_COMPUTER, TAKES_FOLDER } from './platform.js'
+import { enterPlayer, leavePlayer } from './ios-orientation.js'
+import { mountIncomingFile, serializeSongImports } from './incoming-file.js'
+import { generatePianoCover } from './piano-cover-import.js'
+import { createDesktopCoverBridge, decodeToMono16k } from './piano-cover-desktop.js'
+import { coverKeyRange as coverRange, playerWindowStart } from './cover-keys.js'
+import { recordingTime, recordingMessages, startBrowserRecording } from './song-recorder.js'
 import { requestMIDIAccess as requestAndroidMIDIAccess, nativeRequest as androidRequest, onNativeEvent as androidEvents } from './android-midi.js'
 import { Player, fitWindow } from './player.js'
-import { drawScene, noteName, setKeyCount } from './views.js'
+import { drawScene, formatWaitNotes, noteColor, noteName, setKeyCount } from './views.js'
 import { loadSongFile } from './songloader.js'
 import { assignFingering } from './fingering.js'
 import { parseMusicXml } from './musicxml.js'
@@ -17,46 +23,77 @@ import { mountPerformanceControls } from './performance-controls.js'
 import { mountCameraCoach } from './camera-coach.js'
 import { mountAirwaveSource } from './airwave-source.js'
 import { mountEditor } from './editor.js'
+import { mountRoll } from './roll-editor.js'
+import { lyricsFingerprint, mountLyricsEditor } from './lyrics-editor.js'
+import { lyricsOfSong } from './lyrics-model.js'
 import { createNav } from './nav.js'
+import { listProfiles, profileById, normalizeChoice, readGenericEndKeys, glyphSVG } from './keyboard-profiles.js'
+import { SETUP_STEPS, planFor, nextStep, pushStep, backStep, canGoBack, keysText, connectCopy, rowView, sortDevices, supportDetails, EXPERIENCES, GOAL_CHOICES, normalizeExperience, experienceDefaults, readyView } from './setup-flow.js'
+import { guideTargets, startPositionKey, cTargets, HandGuide, autoOffUpdate, handGuideOn } from './hand-guide.js'
+import { mountHandGuideView } from './hand-guide-view.js'
+import { mountConnBanner } from './conn-banner.js'
+import { PARTYKEYS_URL, offerLine as partyKeysOffer, showInPicker as showPartyKeysInPicker } from './partykeys.js'
+import { haptic, hapticSequence, setHapticsEnabled } from './haptics.js'
+import { mountSheetDrag } from './sheet-drag.js'
+import { mountSettingsSearch, moveSettingsFooters } from './settings-search.js'
 import { mountBackupControls } from './backup.js'
+import { mountReminders } from './reminders.js'
 import { SongScheduler } from './scheduler.js'
 import { HandTracker, listCameras, BONES, TIPS } from './handtrack.js'
 import { summarize } from './scoring.js'
-import { Voice, prepareInstrument } from './instruments.js'
+import { createTVLink, DEFAULT_DELAY_MS } from './tv-link.js'
+import { tvNow, MAX_DELAY_MS } from './tv-sync.js'
+import { CALIB, makeSchedule, resultFromTaps } from './tv-calibrate.js'
+import { Voice } from './instruments.js'
 import {
-  initAudio, audioContext, playNote, stopNote, noteOn, noteOff, stopAll, click,
-  loadBackingFile, hasBacking, backingDuration, playBacking, stopBacking,
-  setBackingVolume, setVolume, playBass, playHat, pickStem,
+  initAudio, audioContext, playNote, noteOn, noteOff, stopAll, click,
+  loadBackingFile, invalidateBackingLoads, hasBacking, playBacking, stopBacking,
+  setBackingVolume, setVolume, setOutputMuted, muteForMicrophone, pickStem,
   setInstrument, currentInstrument, instrumentList, setBend, setPressure, setSlide,
-  setPolyPressure, setBendRange, activeVoiceCount, voiceState, clearBacking, isBackingPlaying, setSustain, sustainDown,
+  setPolyPressure, setBendRange, activeVoiceCount, voiceState, setSustain, sustainDown,
   loadRecording, unloadRecording, hasRecording, playRecording, pauseRecording, recordingPosition, nudgeRecording,
   listOutputs, setOutput, latencyInfo, scheduleNote, cancelScheduled, cancelClicks, pendingClicks,
-  createTrack, jamFx, sampledPianoStatus, sampledInstrumentStatus, jamVoiceCount
+  createTrack, jamFx, sampledPianoStatus, jamVoiceCount
 } from './audio.js'
 import {
-  importFile, saveImported, saveImportedBatch, listImported, getImported, deleteImported, isLyricsFile, parseLrc, isSafeCover
+  importFile, saveImported as dbSaveSong, saveImportedBatch as dbSaveSongs, listImported as dbListSongs,
+  getImported as dbGetSong, deleteImported as dbDeleteSong, isAudioFile, isLyricsFile, parseLrc, isSafeCover, rearrangeCover, coverScoreFile, decodeFileAudio
 } from './importer.js'
 import {
-  noteOn as syNoteOn, noteOff as syNoteOff, clearLights,
+  clearLights, noteBursts,
   beginApiMode, setLightingMode, turnOffAllKeys, setKeyOn, setKeyOff, endApiMode, LIGHTING_MODE,
-  blankOwnColours, restoreOwnColours, velocityForColour
+  velocityForColour
 } from './lights.js'
-import { NOTE_GAMES, ROUND_SECONDS, HINT_AFTER_SECONDS, nextQuestion, isRight, starsFor, staffSvg, pitchClass } from './notegames.js'
+import { createPartyLights, planParty, partyProfileFor } from './party-lights.js'
+import { BlocksLink, looksBlanked, isBlocksPacket, parseIdentity, routeRowLights, RowLightsWait, rowsDisagree } from './blocks.js'
+import { NOTE_GAMES, ROUND_SECONDS, HINT_AFTER_SECONDS, nextQuestion, isRight, matchingPitches, starsFor, staffSvg, pitchClass } from './notegames.js'
 import {
   startTake, stopTake, isRecording, takeBusy, logMidi, onTakeChange, takeElapsed, takeFrameDrawn,
   pickMimeType, MIME_TYPES, TAKE_NAME, mp4Timeline, audioEdit, AAC_PRIMING
 } from './recorder.js'
 import { MUTOPIA_SONGS, mutopiaCredit, applyTempoScale } from './songs-mutopia.js'
-import { cleanGoal, goalProgress, crossedGoal, levelsPresent, composersOf, cleanFilter, applyFilter, countLabel } from './discover.js'
+import { SONG_SECONDS } from './song-durations.js'
+import { ambientColors, coverArt, coverSignature, fingerprintOf } from './cover-art.js'
+import { COVER_PRINTS } from './cover-prints.js'
+import { cleanGoal, goalProgress, crossedGoal, levelsPresent, composersOf, cleanFilter, applyFilter, countLabel, erasPresent, moodsPresent, lengthsPresent, filterCount, storableFilter, searchWords, searchRank, topComposers } from './discover.js'
 import { mountInfoDialogs } from './info-dialogs.js'
 import { COURSE, emptyProgress, recordItemResult, recordExamResult, serializeProgress } from './course/index.js'
 import { mountCourse } from './course/course-ui.js'
+import { premium, tvAllowed, onChange as onEntitlementChange } from './entitlement.js'
+import { mountPremium, openPaywall } from './paywall.js'
+import { mountBetaNotice } from './beta-notice.js'
 import { buildPieceSong, pieceHand, requiredHand, noteGameAccuracy, passText, PLAYER_TYPES, EXERCISE_TYPES } from './course/runners.js'
 import { mountExercise, padSvg } from './course/exercise-ui.js'
 import { mountPractice } from './practice/practice-ui.js'
 import { mountJam } from './jam/jam-ui.js'
 import { downloadFile } from './download.js'
 import { createMpeState } from './mpe-zones.js'
+import { mountPlayerHud, prefersReducedMotion, speedChipLabel } from './player-hud.js'
+import { mountTour, maybeStartTour, startTour, closeTour, tourIsOpen } from './tour.js'
+import { mountHomeLight, handsFromNotes } from './home-light.js'
+import { enterScreen, installBackSwipe } from './ios-motion.js'
+import { playResults, mountResultsRail } from './results-motion.js'
+import { dot } from './studio-copy.js'
 import { ACTIVITIES, STATS_KEY, parseStats, recordResult, recordUse, railPicks, suggestLevel, HARDER_AT } from './practice/registry.js'
 
 /* ============================== state ============================== */
@@ -66,68 +103,220 @@ const ctx2d = canvas.getContext('2d')
 // the pixel ratio the stage was last sized for: a take keeps the stage's size (and this
 // ratio) when the window's ratio changes, and everything is drawn with it until it ends
 let stageDpr = window.devicePixelRatio || 1
+let stageResizePending = false
 
-// Built-in songs. cover: a square PNG in renderer/covers/ (the generated tile shows while it
-// loads and stays if the file is missing); level: the difficulty badge.
+// Built-in songs. cover: no longer used (covers are generated, see cover-art.js); level: the difficulty badge.
+// The free set: the two starter songs plus every song the built-in lessons play. The lesson files are
+// derived from LESSONS (at call time: LESSONS is defined further down) so the guided lesson path can
+// never drift out of the free set when the lesson list changes.
+const STARTER_SONGS = new Set(['twinkle.xml', 'mary-had-a-little-lamb.xml'])
+const libraryAllowed = (file) => premium() || STARTER_SONGS.has(file) || LESSONS.some((lesson) => lesson.file === file)
+// The library file the current course/placement piece was loaded from ('' when it is not one): those
+// pieces play without the library gate, so the note editors use this to keep a paid piece out of a
+// free user's imported library. startCoursePiece sets it; resetSession clears it.
+let sessionLibraryFile = ''
+// A free user may play a paid library piece from a placement exam, but both note editors save the
+// current song as a new imported song: refuse that so the piece cannot be kept for free.
+const editorBlocked = () => {
+  if (premium() || song?.importedId) return false
+  const file = song?.file || sessionLibraryFile
+  return !!file && !libraryAllowed(file)
+}
 const LIBRARY = [
   { file: 'c-major-scale.xml', title: 'C Major Scale', artist: 'Exercise', cover: 'covers/c-major-scale.png', level: 'Level 1', genre: 'Exercise', hands: 'right' },
-  { file: 'twinkle.xml', title: 'Twinkle Twinkle Little Star', artist: 'Traditional', cover: 'covers/twinkle.png', level: 'Level 1', genre: 'Traditional', hands: 'both' },
-  { file: 'mary-had-a-little-lamb.xml', title: 'Mary Had a Little Lamb', artist: 'Traditional', cover: 'covers/mary-had-a-little-lamb.png', level: 'Level 1', genre: 'Traditional', hands: 'both' },
-  { file: 'ode-to-joy.xml', title: 'Ode to Joy', artist: 'Beethoven', cover: 'covers/ode-to-joy.png', level: 'Level 1', genre: 'Classical', hands: 'both' },
-  { file: 'jingle-bells.xml', title: 'Jingle Bells', artist: 'James Lord Pierpont', cover: 'covers/jingle-bells.png', level: 'Level 1', genre: 'Traditional', hands: 'both' },
-  { file: 'au-clair-de-la-lune.xml', title: 'Au clair de la lune', artist: 'Traditional', cover: 'covers/au-clair-de-la-lune.png', level: 'Level 1', genre: 'Traditional', hands: 'both' },
-  { file: 'frere-jacques.xml', title: 'Frère Jacques', artist: 'Traditional', cover: 'covers/frere-jacques.png', level: 'Level 2', genre: 'Traditional', hands: 'both' },
-  { file: 'when-the-saints.xml', title: 'When the Saints Go Marching In', artist: 'Traditional', cover: 'covers/when-the-saints.png', level: 'Level 2', genre: 'Traditional', hands: 'both' },
-  { file: 'happy-birthday.xml', title: 'Happy Birthday', artist: 'Mildred & Patty Hill', cover: 'covers/happy-birthday.png', level: 'Level 2', genre: 'Traditional', hands: 'both' },
-  { file: 'amazing-grace.xml', title: 'Amazing Grace', artist: 'Traditional', cover: 'covers/amazing-grace.png', level: 'Level 2', genre: 'Traditional', hands: 'both' },
-  { file: 'morning-mood.xml', title: 'Morning Mood', artist: 'Grieg', cover: 'covers/morning-mood.png', level: 'Level 2', genre: 'Classical', hands: 'both' },
-  { file: 'brahms-lullaby.xml', title: "Brahms' Lullaby", artist: 'Brahms', cover: 'covers/brahms-lullaby.png', level: 'Beginner', genre: 'Classical', hands: 'right' },
-  { file: 'scarborough-fair.xml', title: 'Scarborough Fair', artist: 'Traditional', cover: 'covers/scarborough-fair.png', level: 'Beginner', genre: 'Traditional', hands: 'right' },
-  { file: 'silent-night.xml', title: 'Silent Night', artist: 'Gruber', cover: 'covers/silent-night.png', level: 'Beginner', genre: 'Traditional', hands: 'right' },
-  { file: 'auld-lang-syne.xml', title: 'Auld Lang Syne', artist: 'Traditional', cover: 'covers/auld-lang-syne.png', level: 'Beginner', genre: 'Traditional', hands: 'right' },
-  { file: 'greensleeves.xml', title: 'Greensleeves', artist: 'Traditional', cover: 'covers/greensleeves.png', level: 'Easy', genre: 'Traditional', hands: 'right' },
-  { file: 'canon-in-d.xml', title: 'Canon in D', artist: 'Pachelbel', cover: 'covers/canon-in-d.png', level: 'Easy', genre: 'Classical', hands: 'right' },
-  { file: 'minuet-in-g.xml', title: 'Minuet in G', artist: 'Petzold', cover: 'covers/minuet-in-g.png', level: 'Easy', genre: 'Classical', hands: 'right' },
-  { file: 'fur-elise.xml', title: 'Für Elise', artist: 'Beethoven', cover: 'covers/fur-elise.png', level: 'Easy', genre: 'Classical', hands: 'right' },
+  { file: 'twinkle.xml', title: 'Twinkle Twinkle Little Star', artist: 'Traditional', cover: 'covers/twinkle.png', level: 'Level 1', genre: 'Traditional', hands: 'both', era: 'Traditional', moods: ['Tender', 'Calm'] },
+  { file: 'mary-had-a-little-lamb.xml', title: 'Mary Had a Little Lamb', artist: 'Traditional', cover: 'covers/mary-had-a-little-lamb.png', level: 'Level 1', genre: 'Traditional', hands: 'both', era: 'Traditional', moods: ['Playful'] },
+  { file: 'ode-to-joy.xml', title: 'Ode to Joy', artist: 'Beethoven', cover: 'covers/ode-to-joy.png', level: 'Level 1', genre: 'Classical', hands: 'both', era: 'Classical', moods: ['Bright', 'Grand'] },
+  { file: 'jingle-bells.xml', title: 'Jingle Bells', artist: 'James Lord Pierpont', cover: 'covers/jingle-bells.png', level: 'Level 1', genre: 'Traditional', hands: 'both', era: 'Traditional', moods: ['Bright', 'Playful'] },
+  { file: 'au-clair-de-la-lune.xml', title: 'Au clair de la lune', artist: 'Traditional', cover: 'covers/au-clair-de-la-lune.png', level: 'Level 1', genre: 'Traditional', hands: 'both', era: 'Traditional', moods: ['Calm', 'Tender'] },
+  { file: 'frere-jacques.xml', title: 'Frère Jacques', artist: 'Traditional', cover: 'covers/frere-jacques.png', level: 'Level 2', genre: 'Traditional', hands: 'both', era: 'Traditional', moods: ['Playful'] },
+  { file: 'when-the-saints.xml', title: 'When the Saints Go Marching In', artist: 'Traditional', cover: 'covers/when-the-saints.png', level: 'Level 2', genre: 'Traditional', hands: 'both', era: 'Traditional', moods: ['Bright', 'Playful'] },
+  { file: 'happy-birthday.xml', title: 'Happy Birthday', artist: 'Mildred & Patty Hill', cover: 'covers/happy-birthday.png', level: 'Level 2', genre: 'Traditional', hands: 'both', era: 'Traditional', moods: ['Bright'] },
+  { file: 'amazing-grace.xml', title: 'Amazing Grace', artist: 'Traditional', cover: 'covers/amazing-grace.png', level: 'Level 2', genre: 'Traditional', hands: 'both', era: 'Traditional', moods: ['Calm', 'Tender'] },
+  { file: 'morning-mood.xml', title: 'Morning Mood', artist: 'Grieg', cover: 'covers/morning-mood.png', level: 'Level 2', genre: 'Classical', hands: 'both', era: 'Romantic', moods: ['Calm', 'Tender'] },
+  { file: 'brahms-lullaby.xml', title: "Brahms' Lullaby", artist: 'Brahms', cover: 'covers/brahms-lullaby.png', level: 'Beginner', genre: 'Classical', hands: 'right', era: 'Romantic', moods: ['Calm', 'Tender'] },
+  { file: 'scarborough-fair.xml', title: 'Scarborough Fair', artist: 'Traditional', cover: 'covers/scarborough-fair.png', level: 'Beginner', genre: 'Traditional', hands: 'right', era: 'Traditional', moods: ['Melancholy', 'Calm'] },
+  { file: 'silent-night.xml', title: 'Silent Night', artist: 'Gruber', cover: 'covers/silent-night.png', level: 'Beginner', genre: 'Traditional', hands: 'right', era: 'Traditional', moods: ['Calm', 'Tender'] },
+  { file: 'auld-lang-syne.xml', title: 'Auld Lang Syne', artist: 'Traditional', cover: 'covers/auld-lang-syne.png', level: 'Beginner', genre: 'Traditional', hands: 'right', era: 'Traditional', moods: ['Tender', 'Melancholy'] },
+  { file: 'greensleeves.xml', title: 'Greensleeves', artist: 'Traditional', cover: 'covers/greensleeves.png', level: 'Easy', genre: 'Traditional', hands: 'right', era: 'Traditional', moods: ['Melancholy', 'Tender'] },
+  { file: 'canon-in-d.xml', title: 'Canon in D', artist: 'Pachelbel', cover: 'covers/canon-in-d.png', level: 'Easy', genre: 'Classical', hands: 'right', era: 'Baroque', moods: ['Calm', 'Grand'] },
+  { file: 'minuet-in-g.xml', title: 'Minuet in G', artist: 'Petzold', cover: 'covers/minuet-in-g.png', level: 'Easy', genre: 'Classical', hands: 'right', era: 'Baroque', moods: ['Playful', 'Bright'] },
+  { file: 'fur-elise.xml', title: 'Für Elise', artist: 'Beethoven', cover: 'covers/fur-elise.png', level: 'Easy', genre: 'Classical', hands: 'right', era: 'Classical', moods: ['Tender', 'Melancholy'] },
   // advanced piano pieces from the Mutopia Project (MIDI, with credits): see songs-mutopia.js
   ...MUTOPIA_SONGS
 ]
+// the first two levels are shown by name too, so the filter and the badges use one scheme (Beginner, Easy, ...)
+const LEVEL_NAMES = { 'Level 1': 'First steps', 'Level 2': 'Early steps' }
+const levelName = (l) => LEVEL_NAMES[l] || l
 const LEVELS = ['Level 1', 'Level 2', 'Beginner', 'Easy', 'Intermediate', 'Advanced', 'Virtuoso']   // easiest first (Sort: Level)
 
 const DEFAULTS = {
   brightness: 255, volume: 80, backingVolume: 70,
   countIn: 4, metronome: false, labels: 'off', view: 'CASCADE',
   hands: 'both', rate: 1, band: false, waitMode: 'pauseAndSnap', instrument: 'sampled-piano', keyboardMode: 'Pro', bendRange: 12,
-  accompany: true, kbZero: 48, kbPort: '', kbLast: '', kbKeysFor: {}, kbBaseFor: {}, kbPair: {}, kbLightsLeft: '', kbLightsSwap: false, userColor: '#a78bfa', expression: null, audioOutput: '',
-  recordTakes: false, sheet: false, exactColors: false, goalMin: 10
+  accompany: true, kbZero: 48, kbPort: '', kbLast: '', kbKeysFor: {}, kbBaseFor: {}, kbPair: {}, kbLightsLeft: '', kbLightsSwap: false, userColor: '#a78bfa', expression: null, glide: false, audioOutput: '',
+  recordTakes: false, sheet: false, exactColors: false, goalMin: 10,
+  partyColor: 'rgb',   // Settings > Lights colour on a PartyKeys-family keyboard: 'rgb' (the screen's colours, default), 'hands' or 'one' (party-lights.js)
+  waitStyle: 'breathe', nextStyle: 'glow',   // keys waiting for you, and the next notes (buildKeyFrame)
+  kbChoice: '', kbOwnColours: {}, kbMidiSeen: false, haptics: true, textScale: 1, reduceMotion: 'system',
+  tvSetup: 'airplay', tvDelayBySetup: {}, tvSound: 'tv', tvPhoneNotes: false, tvCalibOffered: false,   // TV mode, see the TV section
+  tourDone: false,         // the first-lesson spotlight tour (tour.js) has been seen or skipped
+  experience: '',          // the setup's "How much piano have you played?": '' (not asked or skipped) | 'new' | 'some' | 'experienced'
+  handGuide: 'off',        // "Place your hands" before a song: 'auto' (the setup sets it for brand new players) | 'always' | 'off'
+  handGuideRuns: 0         // 'auto': good runs in a row; five switch it off (hand-guide.js autoOffUpdate)
 }
 
+const diagnosticFailures = []
+function recordDiagnosticFailure(area, operation, error, includeMessage = false) {
+  const detail = includeMessage ? error?.message : error?.name
+  diagnosticFailures.push({ area, operation, detail: detail || 'Unknown error', at: new Date().toISOString() })
+  if (diagnosticFailures.length > 20) diagnosticFailures.shift()
+}
+
+const settingReadFailures = new Set()
+const SETTINGS_READ_ERROR = 'Keylight could not read some saved settings or progress. Restart the app and try again.'
+const SETTINGS_WRITE_ERROR = 'Keylight could not save your settings or progress. Restart the app and try again.'
+function showSettingsStorageError(message) {
+  const notice = $('settingsStorageNotice')
+  notice.textContent = message
+  notice.classList.toggle('hidden', !message)
+}
 const store = {
-  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v) } catch { return d } },
-  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)) } catch {} }
+  get(k, d) {
+    try {
+      const v = localStorage.getItem(k)
+      const result = v == null ? d : JSON.parse(v)
+      if (settingReadFailures.delete(k) && !settingReadFailures.size) showSettingsStorageError('')
+      return result
+    } catch (error) {
+      if (!settingReadFailures.has(k)) recordDiagnosticFailure('Storage', 'Read settings or progress', error)
+      settingReadFailures.add(k)
+      showSettingsStorageError(SETTINGS_READ_ERROR)
+      return d
+    }
+  },
+  set(k, v) {
+    if (settingReadFailures.has(k)) return
+    try {
+      localStorage.setItem(k, JSON.stringify(v))
+    } catch (error) {
+      recordDiagnosticFailure('Storage', 'Save settings or progress', error)
+      showSettingsStorageError(SETTINGS_WRITE_ERROR)
+    }
+  }
 }
 const settings = Object.assign({}, DEFAULTS, store.get('lumi.settings', {}))
+// Piano covers: the iPhone/iPad app makes them with Core ML, Mac and Windows with the Music2MIDI ONNX model in a worker
+// (renderer/piano-cover-desktop.js). Android keeps Basic Pitch. A cover that is already saved is re-arranged on every platform
+// but Android, wherever it was made.
+const HAS_COVERS = !IS_ANDROID
+const desktopCover = IS_NATIVE_HOST ? null : createDesktopCoverBridge({
+  createWorker: () => new Worker(new URL('./piano-cover-worker.js', import.meta.url), { type: 'module' }),
+  decode: (file, signal) => decodeToMono16k(file, signal, decodeFileAudio),
+  threads: Math.min(4, navigator.hardwareConcurrency || 2), batch: 8
+})
+let desktopCoverReady = false            // the model files are installed (a build without them keeps Basic Pitch)
+const desktopCoverChecked = desktopCover ? desktopCover.available().then((ok) => { desktopCoverReady = ok; if (ok) document.getElementById('impSimplifyLabel')?.replaceChildren('Simplify solo recordings to melody and bass') }) : Promise.resolve()
+addEventListener('pagehide', () => desktopCover?.dispose())
+const canMakeCovers = () => IS_IOS || desktopCoverReady
+
+const showBetaNotice = mountBetaNotice({ beta: IS_IOS_BETA, store })
 const saveSettings = () => store.set('lumi.settings', settings)
 // Light style and expression used to be one setting ("Piano" meant no expression)
 if (settings.expression == null) settings.expression = settings.keyboardMode !== 'Piano'
 delete settings.ledTransport
+// The keyboard used to be picked per model; one ROLI choice now works the model out itself (blocks.js).
+if (['lumi24', 'piano49', 'two24'].includes(settings.kbChoice)) settings.kbChoice = 'roli'
+else if (settings.kbChoice === 'other') settings.kbChoice = 'midi'
 settings.goalMin = cleanGoal(settings.goalMin)
+// PartyKeys lights: Full colour (the screen's own colours) became the default once it was checked on a real keyboard (red, green,
+// blue and white all correct, 2026-11-27). Migrate once via partyColorV only when no explicit setting was saved, keeping saved choices intact.
+if (!settings.partyColorV) {
+  if (!settings.partyColorPicked && (!settings.partyColor || settings.partyColor === 'rgb')) settings.partyColor = 'rgb'
+  settings.partyColorV = 1
+}
+// TV mode (iPhone and iPad only): the link that sends the TV page its messages. Its functions are in the TV section.
+const tvLink = createTVLink({
+  enabled: IS_IOS,
+  allowed: tvAllowed(),
+  getPlayer: () => player,
+  getSong: tvSongMeta,
+  getScreen: tvScreenInfo,
+  getSettings: () => ({ delayMs: tvDelay(), view: settings.view, noteLabels: settings.labels }),
+  getKeys: () => ({ held, feedback }),
+  onEvent: tvOnEvent
+})
+const tvOn = () => tvAllowed() && tvLink.isConnected()
+// A song is on the player screen: the only case with a remote layout and the notes on the TV (not the Playground).
+const playingSong = (name = screen) => name === 'play' && !!player && !!song && !freeplay
+// The remote layout starts once the TV page can draw.
+const tvLayoutOn = (name = screen) => tvLink.isReady() && playingSong(name)
+let tvCal = null          // the sync run on screen: { schedule, taps, finished, timer }
+let tvPreviewing = false  // a delay preview is running, so the TV shows the calibrate screen
+let tvPreviewToken = 0    // the newest preview; an older one does not end the calibrate screen early
+const tvDiagnostics = { scene: { message: 'TV scene: no external display scene received' } }
+let tvPreviewTimers = []  // the pending flash and end of a delay preview, so a stop can cancel them
 
 let screen = 'home'
 let player = null
 let song = null
+let playerHud = null          // player-hud.js: auto-hide, More sheet, scrubbing, section ticks
+const PLAYER_ANNOUNCE_MS = 700
+let playerLive = null
+let lastPlayerAnnouncement = -Infinity
+let announcedWaitNotes = null
+let hudTickSong = null
 let daemon = null
 let daemonState = 'checking'
-// The packaged Mac app carries its own light service; svcState is its state (starting | ready |
-// failed | external), told by the app at load and again whenever it changes (watchDaemonService)
+// The opt-in supervised light service reports its state at load and via watchDaemonService.
 const BUNDLED_DAEMON = bundledDaemon()
+const EXPECT_DAEMON = BUNDLED_DAEMON || new URLSearchParams(location.search).get('daemonExpected') === '1'
+const OLD_DAEMON_MESSAGE = 'An old light service (blocksd) holds the keyboard. Quit it or update to version 0.8 or newer.'
 let svcState = daemonStart()
 let svcReason = ''
 const bundledOk = () => BUNDLED_DAEMON && svcState !== 'failed'
 let fakeSupportMidi = null
 let deviceSupport = null   // the 'Support my device' wizard (device-support.js)
+let kbWasOn = false      // the keyboard chip's last state: a new connection plays the key-light sweep (Home)
+let homeLight = null     // the Home hero's key-light rail (home-light.js), iPhone/iPad only
 let midi = null, midiInput = null, midiOutput = null
 let midiInput2 = null, midiOutput2 = null    // the second keyboard, on its own USB cable
+// Joined blocks on two Bluetooth links (two LUMI Keys snapped together, each block connected): each link carries only its own
+// block's keys and lights only its own keys (measured on an iPhone with two LUMI Keys). So the row is one keyboard read from both
+// inputs (midiRowInput feeds the first one's handler), and everything sent goes to both links (rowOutput): a block ignores notes
+// outside its own range. BLOCKS traffic never goes through rowOutput: each physical port has its own BlocksLink (slot 2 for the
+// row's second port), fed only by its own input, and each link drives the block(s) that answer on it.
+let midiRowInput = null
+let rowSeen = 0
+// QA handle (device debugging): which ports the keyboard is bound to
+window.keylightMidiState = () => ({ in: midiInput?.name || null, in2: midiInput2?.name || null, row: midiRowInput?.name || null, rowSeen,
+  out: midiOutput?.name || null, rowOut: rowPorts.has(midiOutput), out2: midiOutput2?.name || null, twiceRow: !!twiceRow, keys: kbKeys(),
+  links: [...blockLinks.values()].map((v) => ({ slot: v.slot, port: v.port?.name || null, keys: v.link.info?.keys || 0, dark: !!v.link.wantDark, saved: v.link.dark?.size || 0 })),
+  sink: daemonFrames() ? 'blocksd' : pageDrives() ? 'page' : 'notes',
+  lights: [...blockLinks.values()].map((v) => ({ slot: v.slot, port: v.port?.name || null, state: v.link.lightsState(), blocks: v.link.lightsDetails() })),
+  pageLights: { ready: pageLights.ready, probing: pageLights.probing, gaveUp: pageLights.gaveUp, why: pageLights.why, blocks: pageLights.blocks.map((b) => b.serial) } })
+const rowPorts = new WeakMap()
+let rowOut = null
+let secondOnlyRowOut = null
+function rowOutput(a, b) {
+  const cached = a ? rowOut : secondOnlyRowOut
+  if (cached && cached.a === a && cached.b === b) return cached.port
+  const port = new Proxy(a || b, {
+    get(t, k) {
+      if (k === 'send') return (data, ts) => { t.send(data, ts); if (a) { try { b.send(data, ts) } catch (_e) {} } }
+      if (k === 'clear') return () => { try { a?.clear?.() } catch (_e) {} try { b.clear?.() } catch (_e) {} }
+      const v = Reflect.get(t, k, t)
+      return typeof v === 'function' ? v.bind(t) : v
+    }
+  })
+  const row = { a, b, port }
+  rowPorts.set(port, row)
+  if (a) rowOut = row
+  else secondOnlyRowOut = row
+  return port
+}
+// The physical ports behind an output: the row's two links for rowOutput, else the port itself.
+const portsBehind = (port) => { const row = rowPorts.get(port); return row ? [row.a, row.b].filter(Boolean) : port ? [port] : [] }
 let freeplay = false
 let feedback = new Map()        // pitch -> { kind, until }
 let missedBlink = new Map()     // pitch -> until
@@ -141,6 +330,11 @@ let litNotes = new Map()
 const scheduler = new SongScheduler()
 let ledOverrideUntil = 0     // a light ceremony owns the keys until then
 let importedSongs = []       // records from the on-disk library (newest first)
+let importedLibraryLoaded = false
+let libraryReadFailed = false
+let pendingLibraryRead = null
+const LIBRARY_READ_ERROR = 'Keylight could not read your saved songs. Nothing was deleted. Restart the app; if it keeps happening, make a backup from Settings.'
+const LIBRARY_WRITE_ERROR = 'Keylight could not save the change to your songs. Restart the app and try again.'
 let backdropImg = null       // imported cover, drawn blurred behind the notes
 let backingEpoch = -1        // player epoch the recording was last synced to
 let recordingEpoch = -1      // same, for an imported song's own recording
@@ -189,20 +383,20 @@ const tb = { type: 'scale', tonic: 0, hand: 'both' }
 let lessonMeta = null
 let searchTerm = ''
 const LESSONS = [
-  { id: 'first-notes', title: 'Your first notes', sub: 'C major scale · up one octave', file: 'c-major-scale.xml', from: 0, to: 6 },
-  { id: 'twinkle', title: 'Twinkle, both hands', sub: 'Traditional · first line, both hands', file: 'twinkle.xml', from: 0, to: 10 },
-  { id: 'ode', title: 'Ode to Joy phrase', sub: 'Beethoven · first phrase, both hands', file: 'ode-to-joy.xml', from: 0, to: 9.23 },
-  { id: 'jingle', title: 'Jingle Bells chorus', sub: 'Traditional · first half of the chorus, both hands', file: 'jingle-bells.xml', from: 0, to: 16 },
-  { id: 'grace', title: 'Amazing Grace', sub: 'Traditional · first two lines, slow, both hands', file: 'amazing-grace.xml', from: 0, to: 18 }
+  { id: 'first-notes', title: 'Your first notes', get sub() { return 'C major scale' + dot() + 'up one octave' }, file: 'c-major-scale.xml', from: 0, to: 6 },
+  { id: 'twinkle', title: 'Twinkle, both hands', get sub() { return 'Traditional' + dot() + 'first line, both hands' }, file: 'twinkle.xml', from: 0, to: 10 },
+  { id: 'ode', title: 'Ode to Joy phrase', get sub() { return 'Beethoven' + dot() + 'first phrase, both hands' }, file: 'ode-to-joy.xml', from: 0, to: 9.23 },
+  { id: 'jingle', title: 'Jingle Bells chorus', get sub() { return 'Traditional' + dot() + 'first half of the chorus, both hands' }, file: 'jingle-bells.xml', from: 0, to: 16 },
+  { id: 'grace', title: 'Amazing Grace', get sub() { return 'Traditional' + dot() + 'first two lines, slow, both hands' }, file: 'amazing-grace.xml', from: 0, to: 18 }
 ]
 const LESSON_STEPS = ['WATCH', 'PRACTISE', 'PLAY']
 
 // Arcade levels, easiest first.
 const GAMES = [
-  { id: 'springboard', name: 'Warm-up', file: 'twinkle.xml', rate: 1, threshold: 0.60, sub: 'Traditional · gentle' },
-  { id: 'cascade', name: 'Cascade', file: 'ode-to-joy.xml', rate: 1, threshold: 0.70, sub: 'Beethoven · steady' },
-  { id: 'rainbow', name: 'Rainbow Run', file: 'jingle-bells.xml', rate: 1, threshold: 0.75, sub: 'Traditional · bouncy' },
-  { id: 'superluminal', name: 'Lightspeed', file: 'canon-in-d.xml', rate: 0.75, threshold: 0.80, sub: 'Pachelbel · fast' }
+  { id: 'springboard', name: 'Warm-up', file: 'twinkle.xml', rate: 1, threshold: 0.60, get sub() { return 'Traditional' + dot() + 'gentle' } },
+  { id: 'cascade', name: 'Cascade', file: 'ode-to-joy.xml', rate: 1, threshold: 0.70, get sub() { return 'Beethoven' + dot() + 'steady' } },
+  { id: 'rainbow', name: 'Rainbow Run', file: 'jingle-bells.xml', rate: 1, threshold: 0.75, get sub() { return 'Traditional' + dot() + 'bouncy' } },
+  { id: 'superluminal', name: 'Lightspeed', file: 'canon-in-d.xml', rate: 0.75, threshold: 0.80, get sub() { return 'Pachelbel' + dot() + 'fast' } }
 ]
 let gameMeta = null
 function gameBest(id) { return store.get('lumi.game.' + id, 0) }
@@ -211,47 +405,152 @@ const guided = mountGuided({
   getSong: () => freeplay || exerciseMeta || lessonMeta || gameMeta || courseRun ? null : song,
   store, notice: status, hideResults, onExit: () => syncHudButtons(),
   beginStep: ({ from, to, hand, mode, rate }) => {
+    cancelSongGuide()
     hideResults(); cancelCeremony(); player.pause()
     player.setLoop(null, null, false)
     player.setSection(from, to); player.setHandFilter(hand); player.setMode(mode)
     if (mode === 'PRACTISE') player.setAdvancement(settings.waitMode || 'pauseAndSnap')
-    player.setRate(rate); player.restart(false); syncHudButtons(); player.play()
+    player.setRate(rate); player.restart(false); syncHudButtons()
+    if (settings.experience === 'new') { handGuideStartPlayer = null; playFresh() }
+    else if (mode !== 'PRACTISE') player.play()   // Wait mode is armed: the first key starts it
   }
 })
+async function songForEditing() {
+  const current = song
+  if (!current?.importedId) return current
+  const stored = await getImported(current.importedId)
+  if (!stored || song !== current) return null
+  const cover = current.coverArrangement && stored.coverRaw
+  return {
+    ...stored, ...(cover && { notes: current.notes, coverArrangement: current.coverArrangement }),
+    importedId: current.importedId
+  }
+}
 const editor = mountEditor({
-  getSong: async () => song?.importedId ? { ...(await getImported(song.importedId)), importedId: song.importedId } : song,
+  getSong: songForEditing,
   saveSong: async (edited) => { const record = await saveImported(edited); await loadImportedLibrary(); await openImported(record.id) },
   notice: status
 })
+// Piano roll: the main note editor. "Song details" inside it saves, then opens the form editor above.
+const rollEditor = mountRoll({
+  getSong: songForEditing,
+  saveSong: async (edited) => { const record = await saveImported(edited); await loadImportedLibrary(); await openImported(record.id) },
+  notice: status,
+  audio: { noteOn: (p, v) => { initAudio(); noteOn(p, v, 0) }, noteOff: (p) => noteOff(p, 0) },
+  pushOverlay: (close) => nav.pushOverlay(close),
+  openDetails: () => editor.open()
+})
+
+window.keylightRoll = rollEditor   // self-test and QA handle on the piano roll
+
+const lyricsEditor = mountLyricsEditor({
+  load: (target) => getImported(target.importedId),
+  begin: beginLyricTiming,
+  save: saveSongLyrics,
+  notice: status
+})
+window.keylightLyricsEditor = lyricsEditor
 
 const course = mountCourse({
   host: $('screen-course'), homeHost: $('courseHome'), goto: (name) => showScreen(name), notice: (m) => status(m),
   confirm: (title, text, ok) => askConfirm(title, text, ok, false), runItem: (item, ctx) => runCourseItem(item, ctx),
-  pushOverlay: (close) => nav.pushOverlay(close)
+  pushOverlay: (close) => nav.pushOverlay(close), usesScreenKeys: () => usesScreenKeys(),
+  getExperience: () => settings.experience, premium, openPaywall,
+  onView: (el, from, to) => enterScreen(el, to === 'map' || from === 'theory' ? 'back' : 'forward')   // Course to a lesson, theory or exam slides in; back out of it slides back
 })
 
+// First-lesson spotlight tour (tour.js): shown once over the first lesson, replayable from Help. It holds playback while it shows.
+mountTour({
+  settings, save: saveSettings,
+  hasLights: () => framesDrive() || hasNoteLightPort(),
+  // never over the setup / Connect screen, the results, a dialog, or a song that is playing
+  canStart: () => !(player && player.active) && !setup.open && !$('app').inert && !handGuideRun && $('results').classList.contains('hidden') && !document.querySelector('dialog[open]'),
+  hold: () => {
+    const held = player, was = !!(held && held.active)
+    if (was) { held.pause(); syncBacking() }
+    // only back onto the same song, and only while the player is still on screen
+    return () => { if (was && player === held && !held.active && document.body.dataset.screen === 'play') { held.play(); syncBacking() } }
+  }
+})
+// Quick tour (Help on iPhone/iPad, About elsewhere): the current player, or the first lesson's watch piece
+function replayTour() {
+  const guard = () => !setup.open && !$('app').inert && !handGuideRun
+  if (handGuideRun) endHandGuide('cancel')
+  if (document.body.dataset.screen === 'play' && song) return startTour({ guard })
+  const first = COURSE.levels[0].lessons[0]
+  course.startItem(first.id, (first.items.find((i) => i.params && i.params.watchFirst) || first.items[0]).id)   // the watch piece, not "Meet your fingers"
+  return startTour({ guard })
+}
+$('replayTour').onclick = replayTour
+$('replayTourAbout').onclick = replayTour
+if (IS_IOS) $('replayTourAbout').classList.add('hidden')
+
 /* ============================== boot ============================== */
+// Phone header: the large title collapses into the 44px bar once the page has scrolled (body.scrolled; tokens.css does the rest).
+function initHeaderCollapse() {
+  const host = document.getElementById('screen')
+  if (!host) return
+  let on = false
+  host.addEventListener('scroll', (e) => {
+    const t = e.target
+    if (!t || !t.classList || !t.classList.contains('screen') || t.classList.contains('hidden')) return
+    const next = t.scrollTop > 24
+    if (next !== on) { on = next; document.body.classList.toggle('scrolled', on) }
+  }, { capture: true, passive: true })
+  new MutationObserver(() => {
+    requestAnimationFrame(() => {
+      const el = document.getElementById('screen-' + document.body.dataset.screen)
+      on = !!el && el.scrollTop > 24
+      document.body.classList.toggle('scrolled', on)
+    })
+  }).observe(document.body, { attributes: true, attributeFilter: ['data-screen'] })
+}
+
 function boot() {
   const q = new URLSearchParams(location.search)
   if (IS_WIN || IS_NATIVE_HOST) applyWindowsPage()
   document.documentElement.classList.toggle('touch', TOUCH)
+  initHeaderCollapse()
   if (IS_NATIVE_HOST) {
     // touch.css keys its phone/tablet rules on .android; the iPhone/iPad app shares them (and adds .ios for its own)
     document.documentElement.classList.add('android')
-    if (IS_IOS) document.documentElement.classList.add('ios')
+    $('aboutLicence').textContent = 'Proprietary. Keylight is an independent project.'
+    $('aboutProjectRow')?.remove()
+    if (IS_IOS) { document.documentElement.classList.add('ios'); applyIOSPage(); tvInitIOS() }
     $('impLookup').checked = false; $('impLookup').disabled = true; $('impLookup').closest('label').classList.add('hidden')   // this build makes no network calls
     for (const id of ['airCard', 'setExperimental']) $(id).classList.add('hidden')   // the Airwave sensor is a desktop USB device
     document.querySelector('#settingsJump [data-jump="setExperimental"]').classList.add('hidden')
     $('fingerSource').closest('label').classList.add('hidden')
     $('fingerSource').value = 'camera'
-    for (const p of document.querySelectorAll('#deviceDialog p')) p.textContent = p.textContent.replace(/your computer/g, 'your device').replace(/this computer/g, 'this device')
+    // "your computer" reads wrong on a phone or tablet; the words keep their capitalisation at a sentence start
+    for (const p of document.querySelectorAll('#deviceDialog p')) p.textContent = p.textContent.replace(/\b([Yy]our|[Tt]his) computer\b/g, '$1 device')
     $('exactHint').textContent = 'Lights each key in its true colour from MIDI notes. Experimental: if the keys stop lighting, turn it off.'
-    $('obOctaveHint').textContent = 'Later, in the player, − and + at the top right move your keys an octave down or up.'
+    if ($('obOctaveHint')) $('obOctaveHint').textContent ='Later, in the player, − and + at the top right move your keys an octave down or up.'
     // the shortcuts overlay is for a keyboard: it is offered once a real key has been pressed (a Bluetooth or USB keyboard)
     document.addEventListener('keydown', (e) => { if (e.code && e.key !== 'Unidentified' && e.key !== 'Process') document.documentElement.classList.add('has-keys') }, true)
-    $('importPrivacy').textContent = 'Files and transcription stay on this device. Cover art and lyrics are read from the file’s own tags. Only add music you have the right to use.'
+    if (!IS_IOS) {
+      $('aboutLine').textContent = 'Piano lessons with falling notes, sheet music and glowing keys.'
+      const mission = document.querySelector('.about-mission')
+      if (mission) mission.textContent = mission.textContent.replace(/^Free, open-source piano/, 'Piano')
+    }
   }
   wireUI()
+  if (typeof ResizeObserver === 'function') {
+    new ResizeObserver(() => { stageResizePending = true }).observe(canvas.parentElement)
+    document.body.classList.add('stage-follows')
+  }
+  playerLive = document.createElement('div')
+  playerLive.className = 'sr-only'
+  playerLive.setAttribute('aria-live', 'polite')
+  playerLive.setAttribute('aria-atomic', 'true')
+  document.body.append(playerLive)
+  if (IS_IOS) applyIOSInstrumentNames()
+  playerHud = mountPlayerHud({ seekFraction: (x) => {
+    if (!player || !song) return
+    const r = $('progress').getBoundingClientRect(), from = player.sectionStart || 0
+    const frac = Math.max(0, Math.min(1, (x - r.left) / Math.max(1, r.width)))
+    player.seek(Math.max(from, Math.min(player.end, from + frac * (player.end - from)))); syncBacking()
+  }, onFit: () => { if (viewMenuOpen()) placeViewMenu() } })   // the bar re-fit can move or hide #btnView under an open menu
   if (q.has('notation')) settings.sheet = q.get('notation') === '1'   // notation=1: for screenshots
   if ([...KB_SIZES, 48].includes(Number(q.get('keys')))) settings.kbKeysFor[kbLabel()] = Number(q.get('keys'))   // keys=49 or 48: the longer keyboards, for screenshots
   restoreKeysAt()
@@ -259,9 +558,14 @@ function boot() {
   fillKbPorts()
   const ob = $('onboarding')
   const skipOb = q.has('demo') || q.has('quiz') || q.has('screen') || q.has('tb') || q.has('importdemo') || q.has('freeplay') || q.has('selftest') || q.has('perf')
-  // setup=1..4 opens the setup at that step even once it is done (screenshots, support)
-  if (q.has('setup')) openSetup(Number(q.get('setup')) || 1)
-  else if (ob && !store.get('lumi.onboarded', false) && !skipOb) openSetup(1)
+  // setup=welcome|pick|connect|ready (or 1..4) opens the setup at that step even once it is done (screenshots, support)
+  if (q.has('setup')) openSetup(Number(q.get('setup')) || q.get('setup') || 'welcome')
+  else if (ob && !store.get('lumi.onboarded', false) && !skipOb) {
+    openSetup('welcome')
+    // the first frame is the welcome: no fade-in over Home (closeSetup gives later opens their fade back)
+    ob.style.setProperty('animation', 'none', 'important')
+  }
+  if (!setup.open && !skipOb && store.get('lumi.onboarded', false)) void showBetaNotice()
   // open the audio output now, so the first key you press doesn't wait for it
   initAudio()
   // instrument=<id> plays this run on that instrument (demo clips; the setting is left as it
@@ -282,8 +586,9 @@ function boot() {
   if (IS_IOS && !q.has('nokb')) import('./ios-ble.js').then(({ mountPairing }) => mountPairing({ host: { request: androidRequest }, notify: (m) => status(m) }))
     .catch((e) => console.log('Bluetooth pairing setup failed: ' + e.message))
   if (IS_NATIVE_HOST) document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) return
-    player?.pause(); stopAll(); setSustain(false); performanceControls?.panic(); clearNoteLights(); held.clear(); syncHudButtons()
+    if (!document.hidden) { tvLink.resnapshot(true); return }
+    pauseRecording(); stopBacking()
+    player?.pause(); stopAll(); setSustain(false); performanceControls?.panic(); clearNoteLights(); held.clear(); tvKeys(); syncHudButtons()
   })
   renderLibrary()
   renderRecent()
@@ -305,7 +610,7 @@ function boot() {
       if (['0.5', '0.75', '1'].includes(q.get('speed'))) setSpeed(q.get('speed'))
       autoplayDemo(q)
       if (q.get('res')) {
-        showResults({ overallAccuracy: 0.86, noteAccuracy: 0.86, rhythmAccuracy: 0.76, totalNotes: 42, totalNotesHit: 36, perfect: 24, good: 8, early: 2, late: 2, missed: 6, longestStreak: 11, starRating: 4 })
+        showResults({ overallAccuracy: 0.86, noteAccuracy: 0.86, rhythmAccuracy: 0.76, totalNotes: 42, totalNotesHit: 36, perfect: 24, good: 8, early: 2, late: 2, missed: 6, longestStreak: 11, starRating: 4, ...(q.get('res') === 'best' ? { newBest: true, bestBefore: 71 } : {}) })   // res=best: a new personal best (the keyboard sweep), for screenshots
       }
     })
   }
@@ -419,7 +724,7 @@ function startDemoScripts(q) {
       i = (i + 1) % order.length
       const wasActive = player.active      // setHandFilter pauses: carry on playing
       settings.hands = order[i]; player.setHandFilter(settings.hands)
-      if (wasActive) player.play()
+      if (wasActive) player.play({ quiet: true })
       pumpAudio(); syncHudButtons()
     }, handMs)
   }
@@ -505,97 +810,235 @@ function playExpressionDemo() {
 }
 
 /* ============================== first-run setup ============================== */
-// Three live checks: a key sounds, the keyboard's two end keys pin down the range it
-// plays, the key lights sweep and you say whether you saw them; then Lesson 1. Each
-// step reads what the app sees right now and can be skipped. lumi.onboarded is only
-// set at the end, so quitting halfway brings the setup back next time.
-const SETUP_STEPS = ['sound', 'keyboard', 'lights', 'ready']
+// Welcome, how you play, connect (with the sound check and the lights), ready; then Lesson 1. setup-flow.js holds
+// the pure parts (steps, Back, row and banner words). Every step after the welcome has Back and keeps the choices
+// made. lumi.onboarded is only set at the end, so quitting halfway brings the setup back next time. The connect
+// step also opens on its own (openConnect) from Settings and from 'keylight:open-connect' (ios-ble.js).
 const setup = {
-  open: false, step: 0, furthest: 0, openedAt: 0, timer: 0, raf: 0,
-  heard: null,        // the last note the keyboard sent on the sound step
-  lowKey: null,       // keyboard step: the far-left key, waiting for the far-right one
+  open: false, step: 0, history: [], first: true, connectOnly: false, openedAt: 0, timer: 0, raf: 0,
+  heard: null,        // the last note the keyboard sent on the connect step
+  heardAt: 0,
+  ranging: false,     // "Set key range": waiting for the far-left key, then the far-right one
+  lowKey: null,       // ...the far-left key pressed
   wrongKey: null,     // ...or the key that was neither
   rangeDone: false,
-  lowPress: null,     // ...which of two keyboards that was, and the note it sent
-  otherKeyboard: false,   // two keyboards: the far-right key has to be on the other one
+  sidesDone: false,   // two keyboards on two links: which one is on the left
   pressOf: new Map(), // two keyboards: pitch -> the keyboard and note of its last press
-  lights: null,       // the answer to "did your keys light up?": null, 'yes' or 'no'
-  sweepAt: 0,
+  swept: false, sweepAt: 0,
   seen: new Set(), lastTick: 0, glow: new Array(14).fill(0),
-  returnFocus: null   // what had focus before the setup opened (Run setup again)
+  returnFocus: null,  // what had focus before the setup opened (Settings)
+  level: '',          // the level step's answer, applied on Continue (Skip leaves settings alone)
+  goal: 0             // ...and the optional daily goal (0: not chosen)
 }
+// Bluetooth keyboards on iOS (ios-ble.js, when the host has the new bridge): the live list and when Connect was tapped
+const ble = { api: null, bluetooth: 'on', devices: [], since: new Map(), scanning: false }
+let keyboardSelectionGeneration = 0
 const keysRange = () => noteName(kbBase()) + '–' + noteName(kbBase() + kbKeys() - 1)
 const setText = (el, text) => { if (el && el.textContent !== text) el.textContent = text }
 const SETUP_CHECK = '<svg><use href="#i-check"/></svg>'
+let connBanner = null   // conn-banner.js: lost / reconnecting / reconnected, app-wide (mounted in wireFirstRunUI)
 
-function openSetup(step = 1) {
+// What the keyboard is: keyboardInfo() (the topology reader) when it is there, else what the MIDI ports say
+function setupKeyboardInfo() {
+  if (typeof keyboardInfo === 'function') { try { const info = keyboardInfo(); if (info) return info } catch { /* fall through */ } }
+  const on = !!(midiInput && midiInput.state !== 'disconnected')
+  return { connected: on, family: on ? (KB_PORT.test(kbLabel()) || KB_MAKER.test(midiInput.name || '') ? 'roli' : isPartyPort(midiInput) ? 'partykeys' : 'midi') : null,
+    name: on ? midiInput.name + (midiInput2 ? ' + ' + midiInput2.name : '') : '', keys: on ? kbKeys() : 0, blocks: midiInput2 ? 2 : 1, joined: false, lights: !!midiOutput, models: [], octave: null }
+}
+
+// step: a name from SETUP_STEPS, or (older links, ?setup=N) a number counted from 1
+function openSetup(step = 'welcome', { connectOnly = false } = {}) {
   const ob = $('onboarding')
   if (!ob) return
   const now = performance.now()
-  Object.assign(setup, { open: true, openedAt: now, furthest: 0, heard: null, lowKey: null, lowPress: null, wrongKey: null, otherKeyboard: false, rangeDone: false, lights: null, sweepAt: 0, seen: new Set(held), lastTick: now, returnFocus: document.activeElement })
-  ob.classList.remove('hidden')
-  // a first run is left step by step; once it has been done, it can just be closed
   const again = store.get('lumi.onboarded', false)
-  $('obClose').classList.toggle('hidden', !again)
-  setText(ob.querySelector('.ob-kicker'), again ? 'SETUP' : 'WELCOME TO KEYLIGHT')
-  setText(ob.querySelector('.ob-title'), again ? 'Check your keyboard' : 'Let’s set up your keyboard')
-  setText(ob.querySelector('.ob-copy'), again ? 'Three quick checks: sound, keys and lights.' : 'Three quick checks, then your first lesson.')
+  const name = typeof step === 'number' ? (SETUP_STEPS[step - 1] || 'welcome') : SETUP_STEPS.includes(step) ? step : 'welcome'
+  // the page behind must not react to keys played here ("play a key to test"): no tour, no menu, no playing or waiting song
+  closeTour({ markDone: false, resume: false })   // first, so focus is back on a real control before it is remembered
+  if (!setup.open) setup.returnFocus = document.activeElement
+  if (viewMenuOpen()) closeViewMenu()
+  if (player && player.active) { player.pause(); stopBacking(); pauseRecording() }
+  if (handGuideRun) endHandGuide('cancel')   // nothing floats over the setup
+  if (jamUi) { try { jamUi.releaseNotes() } catch (_e) { /* already gone */ } }   // keys held in Jam must not keep sounding over the test
+  ble.since.clear()   // a Connect tap from an earlier visit is not pending now
+  Object.assign(setup, { open: true, openedAt: now, first: !again, connectOnly, history: [], level: normalizeExperience(settings.experience), goal: 0, heard: null, heardAt: 0, ranging: false, lowKey: null, wrongKey: null, rangeDone: false, sidesDone: false, swept: false, sweepAt: 0, seen: new Set(held), lastTick: now })
+  ob.classList.remove('hidden')
+  // a first run is left step by step; once it has been done, or from Settings, it can just be closed
+  $('obClose').classList.toggle('hidden', !again && !connectOnly)
   $('obVolume').value = String(settings.volume)
+  setText(ob.querySelector('.range-out[for="obVolume"]'), settings.volume + '%')
   $('app').inert = true
+  connBanner?.suppress(true)
   clearInterval(setup.timer)
   setup.timer = setInterval(setupPoll, 500)
   cancelAnimationFrame(setup.raf)
   setup.raf = requestAnimationFrame(setupKeysTick)
-  goSetupStep(step - 1)
-  console.log('SETUP open step=' + SETUP_STEPS[setup.step])
+  goSetupStep(name)
+  if (IS_IOS && name === 'welcome') setupIntro(true)      // the light runs as the welcome appears, every time it appears
+  console.log('SETUP open step=' + SETUP_STEPS[setup.step] + (connectOnly ? ' (connect only)' : ''))
 }
+// iPhone/iPad (Illuminated Studio A5, v3 P9): as the welcome appears light runs along the keys once (under 1.0s, the CSS .intro rules in
+// ios.css) and the three middle keys stay lit: that is the Keylight mark. A tap or reduced motion shows the mark at once.
+let introTimer = 0
+let introDone = () => {}
+function setupIntro(first) {
+  const ob = $('onboarding'), box = $('obKeys')
+  introDone()
+  box.dataset.mark = '1'
+  markSetupKeys()
+  const calm = prefersReducedMotion() || document.documentElement.classList.contains('reduce-motion') || document.documentElement.classList.contains('shot') || document.documentElement.classList.contains('fx-lite')
+  ob.classList.remove('intro')
+  if (!first || calm) return
+  void box.offsetWidth
+  ob.classList.add('intro')
+  const done = () => { clearTimeout(introTimer); ob.classList.remove('intro'); ob.removeEventListener('pointerdown', done, true); introDone = () => {} }
+  introDone = done
+  ob.addEventListener('pointerdown', done, true)
+  introTimer = setTimeout(done, 900)
+}
+// the three middle drawn keys: cobalt on the left half, amber on the right (the same split as the rail on Home)
+function markSetupKeys() {
+  const box = $('obKeys'), keys = box.children, n = keys.length
+  for (const k of keys) k.classList.remove('mk-l', 'mk-r', 'hr')
+  box.style.setProperty('--step', Math.min(30, Math.floor(500 / Math.max(1, n - 1))) + 'ms')   // the run always ends inside 900ms, 14 keys or 29
+  if (n < 6) return
+  const mid = Math.floor(n / 2)
+  for (let i = mid; i < n; i++) keys[i].classList.add('hr')
+  for (const i of [mid - 2, mid - 1, mid]) keys[i].classList.add(i < mid ? 'mk-l' : 'mk-r')
+}
+// Settings > Connect a Bluetooth keyboard, the "No keyboard" chip: the connect step on its own
+const openConnect = () => openSetup('connect', { connectOnly: true })
 
-function closeSetup() {
+function closeSetup({ resume = true } = {}) {
+  introDone()
   setup.open = false
   clearInterval(setup.timer)
   cancelAnimationFrame(setup.raf)
+  bleScanning(false)
   $('onboarding').classList.add('hidden')
+  $('onboarding').style.removeProperty('animation')
   $('app').inert = false
+  connBanner?.suppress(false)
   const back = setup.returnFocus
   setup.returnFocus = null
   if (back && back.isConnected && back !== document.body) back.focus({ preventScroll: true })
+  if (resume) homeLight?.resume()     // a first run's launch sweep waits until the setup is out of the way; a rail the setup covered repaints (finishSetup resumes it itself, once it knows Home stays)
 }
 
-function finishSetup(lesson) {
+// go: true or 'lesson' (the course's first lesson), 'level' (the placement test), 'songs', or false (Home)
+async function finishSetup(go) {
+  const first = !store.get('lumi.onboarded', false)
+  if (setup.first) applySetupLevel()   // the level answer waits until the end, so Back + Skip can still undo it
   store.set('lumi.onboarded', true)
-  closeSetup()
-  console.log('SETUP done sound=' + (setup.heard != null) + ' keys=' + setup.rangeDone + ' lights=' + (setup.lights || 'skipped'))
-  if (lesson) course.openStep()   // the course's first lesson
-  else { showScreen('home'); status('Pick a lesson or a song to start'); window.dispatchEvent(new Event('keylight:first-run-complete')) }
+  closeSetup({ resume: false })
+  console.log('SETUP done keyboard=' + (settings.kbChoice || 'none') + ' level=' + (settings.experience || 'none') + ' heard=' + (setup.heard != null) + ' sides=' + setup.sidesDone + ' range=' + setup.rangeDone)
+  const betaNotice = showBetaNotice()
+  if (betaNotice) await betaNotice
+  if (go === true || go === 'lesson') course.openStep()   // the course's first lesson
+  else if (go === 'level') course.findMyLevel()
+  else if (go === 'songs') { showScreen('search', { tab: true }); window.dispatchEvent(new Event('keylight:first-run-complete')) }
+  else { showScreen('home'); homeLight?.resume(); status(first ? 'Welcome to Keylight. Pick a lesson or a song to start' : 'Pick a lesson or a song to start'); window.dispatchEvent(new Event('keylight:first-run-complete')) }
 }
 
-function goSetupStep(i) {
-  setup.step = Math.max(0, Math.min(SETUP_STEPS.length - 1, i))
-  setup.furthest = Math.max(setup.furthest, setup.step)
-  const step = SETUP_STEPS[setup.step]
-  if (step === 'keyboard') { setup.lowKey = null; setup.lowPress = null; setup.wrongKey = null; setup.otherKeyboard = false }
-  if (step === 'lights' && setup.lights !== 'yes') setup.lights = null
+// The level step's answer: the defaults it implies (setup-flow.js experienceDefaults) and the daily goal.
+// Settings > Your level does the same later.
+function applyExperience(experience) {
+  const patch = experienceDefaults(experience)
+  if (!patch.experience) return false
+  Object.assign(settings, patch)
+  saveSettings()
+  if (player) { player.setNoteLabels(settings.labels); if (player.mode !== 'PRACTISE') player.setRate(settings.rate) }
+  syncHudButtons()
+  syncLevelSettings()
+  dismissExperienceCard()
+  course.refreshExperience()
+  return true
+}
+function applySetupLevel() {
+  if (setup.level) applyExperience(setup.level)
+  if (setup.goal) { settings.goalMin = cleanGoal(setup.goal); saveSettings(); $('goalMin').value = String(settings.goalMin); updateGoal() }
+  console.log('SETUP level=' + (setup.level || 'skipped') + ' goal=' + (setup.goal || 'unchanged'))
+}
+// Settings > Practice: Your level and Hand placement
+function syncLevelSettings() {
+  const lv = $('experienceSel'), hg = $('handGuideSel')
+  if (lv) lv.value = normalizeExperience(settings.experience)
+  if (hg) hg.value = ['auto', 'always', 'off'].includes(settings.handGuide) ? settings.handGuide : 'off'
+}
+
+// step: a name (or an index into SETUP_STEPS, for the self-tests). back: going back pops the history instead of adding to it.
+function goSetupStep(step, { back = false } = {}) {
+  if (typeof step === 'number') step = SETUP_STEPS[step]
+  if (!SETUP_STEPS.includes(step)) step = 'pick'
+  setup.step = SETUP_STEPS.indexOf(step)
+  setup.history = back ? backStep(setup.history) : pushStep(setup.history, step)
+  if (setup.history.at(-1) !== step) setup.history = pushStep(setup.history, step)
+  if (step === 'connect') { setup.ranging = false; setup.lowKey = null; setup.wrongKey = null; setup.swept = false }
+  bleScanning(step === 'connect')
   renderSetup()
-  if (step === 'lights') sweepSetupLights()
+  const card = $('onboarding').querySelector('.ob-card')
+  card.classList.remove('enter', 'back')
+  void card.offsetWidth
+  card.classList.add('enter')
+  card.classList.toggle('back', back)
+  $('onboarding').querySelector('.ob-side').scrollTop = 0
   $('obStepTitle').focus({ preventScroll: true })
 }
-const setupNext = () => (SETUP_STEPS[setup.step] === 'ready' ? finishSetup(true) : goSetupStep(setup.step + 1))
-const setupSkip = () => (SETUP_STEPS[setup.step] === 'ready' ? finishSetup(false) : goSetupStep(setup.step + 1))
-function setupPassed(step) {
-  return step === 'sound' ? setup.heard != null : step === 'keyboard' ? setup.rangeDone : step === 'lights' ? setup.lights === 'yes' : false
+const setupPlan = () => planFor(settings.kbChoice, { first: setup.first, connectOnly: setup.connectOnly })
+const setupNext = () => {
+  const step = SETUP_STEPS[setup.step]
+  if (setup.connectOnly) return closeSetup()   // "Done"
+  if (step === 'ready') return finishSetup(setupReady().go)
+  if (step === 'pick' && normalizeChoice(settings.kbChoice) === 'screen' && !setup.first) return closeSetup()   // from Settings: back there (a first run asks the level next)
+  const next = nextStep(setupPlan(), step)
+  if (!next) return finishSetup(step === 'level' ? setupReady().go : true)
+  haptic('light')
+  goSetupStep(next)
 }
+// Back: the step you came from (choices are kept in settings)
+function setupBack() {
+  if (!canGoBack(setup.history)) return
+  haptic('light')
+  goSetupStep(backStep(setup.history).at(-1), { back: true })
+}
+// The quiet link under the main button: "Play on screen" on the welcome, "Play on screen for now" while connecting, "Go to Home" when ready
+const setupSkip = () => {
+  const step = SETUP_STEPS[setup.step]
+  if (setup.connectOnly) return closeSetup()
+  if (step === 'welcome') { chooseKeyboard('screen'); return finishSetup(false) }
+  if (step === 'ready') return finishSetup(false)
+  if (!setup.first) return closeSetup()   // from Settings: back where you were
+  if (step === 'connect') { haptic('light'); return goSetupStep('level') }   // the first lesson works with the on-screen keys; the keyboard choice is kept for later
+  if (step === 'level') {
+    setup.level = ''; setup.goal = 0
+    dismissExperienceCard()
+    const next = nextStep(setupPlan(), 'level')
+    return next ? goSetupStep(next) : finishSetup(true)
+  }
+  finishSetup(false)
+}
+// "Find my level" on the last screen (Know a little)
+const setupAlt = () => {
+  const view = setupReady()
+  if (view.altGo) finishSetup(view.altGo)
+}
+// The last screen follows the answer on this first run (not applied yet), else the saved one
+const setupReady = () => readyView(setup.first ? setup.level : settings.experience)
 
-// Twice a second: the keyboard and the light service can come and go while the setup
-// is open, and the output latency only reads true once the device has played a moment.
+// Twice a second: keyboards come and go while the setup is open, a Connect tap times out, and the lights sweep once connected
 function setupPoll() {
   if (!setup.open) return
   renderSetup()
-  if (SETUP_STEPS[setup.step] === 'lights' && setup.lights == null && performance.now() - setup.sweepAt > 1600) sweepSetupLights()
+  if (SETUP_STEPS[setup.step] === 'connect' && !setup.swept && setupKeyboardInfo().connected) {
+    const lights = setupLightsState()
+    if (lights === 'on' || lights === 'midi') { setup.swept = true; sweepSetupLights() }
+  }
 }
 
 // The light style's own sweep (drawStylePreview) runs along the keys, and along the drawn ones
 function sweepSetupLights() {
   const lights = setupLightsState()
+  if (lights === 'party') { runPartyLightTest(); return }   // only when asked ("Show the lights again"): never on connect
   if (lights !== 'on' && lights !== 'midi') return
   if (lights === 'midi') midiLightSweep()
   setup.sweepAt = performance.now()
@@ -608,9 +1051,12 @@ function sweepSetupLights() {
 
 function setupLightsState() {
   if (framesDrive()) return 'on'
+  // a key-light keyboard: lit by SysEx through the party controller, never swept on connect (no automatic Note Ons or frames)
+  if (partyBound()) return partyUsable() ? 'party' : partyLights && partyStatus.state === 'starting' ? 'checking' : 'no-light-port'
+  if (pageLights.pending || pageLights.probing) return 'checking'
   // No light service for this keyboard: it lights keys from MIDI notes ('midi'), once
   // its MIDI output is found ('no-output' until then; 'checking' while MIDI starts)
-  if (noteLightsOnly()) return midiOutput ? 'midi' : midiInput ? 'no-light-port' : !midi && performance.now() - setup.openedAt < 3000 ? 'checking' : 'no-output'
+  if (noteLightsOnly()) return hasNoteLightPort() ? 'midi' : midiInput ? 'no-light-port' : !midi && performance.now() - setup.openedAt < 3000 ? 'checking' : 'no-output'
   return daemonState === 'no-device' ? 'no-device' : daemonState === 'checking' ? 'checking' : 'off'
 }
 
@@ -635,67 +1081,72 @@ function setupKeysTick() {
 }
 // Which of the drawn white keys a note lands on (a black key lights the white key below it)
 function drawnKeyIndex(pitch) {
-  const r = pitch - kbBase()
-  if (r < 0 || r >= kbKeys()) return -1
-  return Math.floor(r / 12) * 7 + [0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6][r % 12]
+  const base = kbBase()
+  if (pitch < base || pitch >= base + kbKeys()) return -1
+  return Math.max(0, countWhiteKeys(base, pitch - base + 1) - 1)
 }
 
+function countWhiteKeys(base, keys) {
+  let whites = 0
+  for (let p = base; p < base + keys; p++) if (![1, 3, 6, 8, 10].includes((p % 12 + 12) % 12)) whites++
+  return whites
+}
+
+// A key on the connect step: shown by name (the sound check), then used for "which is on the left" or the key range
 function onSetupKey(pitch) {
-  const step = SETUP_STEPS[setup.step]
-  if (step === 'sound') {
-    if (setup.heard == null) console.log('SETUP heard ' + noteName(pitch))
-    setup.heard = pitch
-    renderSetup()
-  } else if (step === 'keyboard' && !setup.rangeDone && midiInput2) {
-    onPairSetupKey(pitch)
-  } else if (step === 'keyboard' && !setup.rangeDone) {
-    // 47 apart on a port named for the 24-key keyboards: two joined, unless the light service counts one
-    const joinable = KB_PORT.test(kbLabel()) && !(daemon && daemon.ready && daemon.count < 2)
-    const r = readEndKeys(setup.lowKey, pitch, kbBase(), joinable ? KB_JOINED_SIZES : KB_SIZES)
-    if (r.done) {
-      learnKeyCount(r.keys)     // may move the window to fit a loaded song, so the shift comes after
-      const shift = setup.lowKey - kbBase()
-      if (shift) recalibrate(shift, 'setup: end keys ' + setup.lowKey + ' and ' + pitch)
-      rememberKeysAt()
-      setup.rangeDone = true
-      console.log('SETUP end keys ' + setup.lowKey + ' and ' + pitch + ': keys play ' + keysRange() + (shift ? ' (was off by ' + shift + ')' : ''))
-    } else { setup.lowKey = r.low; setup.wrongKey = r.wrong ?? null }
-    renderSetup()
-  }
-}
-
-// Two keyboards on two cables: the far-left key of the left one, then the far-right key of the
-// right one. Which port each press came from says which keyboard is where, and each press
-// says where that keyboard's keys are, wherever its own octave is.
-function onPairSetupKey(pitch) {
-  const press = setup.pressOf.get(pitch)
-  if (!press) return
-  const pc = (((press.raw - settings.kbZero) % 12) + 12) % 12
-  setup.otherKeyboard = false
-  setup.wrongKey = null
-  if (setup.lowKey == null || !setup.lowPress) {
-    if (pc === 0) { setup.lowKey = pitch; setup.lowPress = press }
-    else { setup.lowKey = null; setup.wrongKey = pitch }
-  } else if (press.slot === setup.lowPress.slot) {
-    if (pc === 0) { setup.lowKey = pitch; setup.lowPress = press }   // a different C on the same keyboard: start from it
-    else setup.otherKeyboard = true
-  } else if (pc !== 11) {
-    setup.wrongKey = pitch
-    setup.lowKey = null
-  } else {
-    const left = setup.lowPress.slot
-    pair.side[left] = 0
-    pair.side[1 - left] = 1
-    pair.low[left] = setup.lowPress.raw
-    pair.low[1 - left] = press.raw - 23
-    savePair()
-    setup.rangeDone = true
-    console.log('SETUP two keyboards: left is port ' + (left + 1) + ' from ' + pair.low[left] + ', right is port ' + (2 - left) + ' from ' + pair.low[1 - left])
-  }
+  if (SETUP_STEPS[setup.step] !== 'connect') return
+  if (setup.heard == null) console.log('SETUP heard ' + noteName(pitch))
+  setup.heard = pitch
+  setup.heardAt = performance.now()
+  if (midiInput2 && !setup.sidesDone) onPairSetupKey(pitch)
+  else if (setup.ranging && !setup.rangeDone) onRangeKey(pitch)
   renderSetup()
 }
 
-// The keyboard step's two presses. The far-left key is always a C and the far-right one
+// "Set key range": the far-left key, then the far-right one. A ROLI or LUMI keyboard's far-left key is a C and the
+// far-right one 23 keys above it (48 on the 49-key ROLI Piano, 47 on two joined); another keyboard can start anywhere.
+function onRangeKey(pitch) {
+  // 47 apart on a port named for the 24-key keyboards: two joined, unless the light service counts one
+  const joinable = KB_PORT.test(kbLabel()) && !(daemon && daemon.ready && daemon.count < 2)
+  const generic = normalizeChoice(settings.kbChoice) === 'midi'
+  const r = generic ? readGenericEndKeys(setup.lowKey, pitch)
+    : readEndKeys(setup.lowKey, pitch, kbBase(), joinable ? KB_JOINED_SIZES : KB_SIZES)
+  if (r.done) {
+    const shift = setup.lowKey - kbBase()
+    if (generic) {
+      settings.kbKeysFor[kbLabel()] = r.keys
+      settings.kbBaseFor[kbLabel()] = setup.lowKey
+      restoreKeysAt()
+      if (player) player.setWindowStart(setup.lowKey)
+      saveSettings()
+      applyKeyCount()
+    } else {
+      learnKeyCount(r.keys)     // may move the window to fit a loaded song, so the shift comes after
+      const litShift = setup.lowKey - kbBase()
+      if (litShift) recalibrate(litShift, 'setup: end keys ' + setup.lowKey + ' and ' + pitch)
+    }
+    rememberKeysAt()
+    setup.rangeDone = true
+    setup.ranging = false
+    console.log('SETUP end keys ' + setup.lowKey + ' and ' + pitch + ': keys play ' + keysRange() + (shift ? ' (was off by ' + shift + ')' : ''))
+  } else { setup.lowKey = r.low; setup.wrongKey = r.wrong ?? null }
+}
+
+// Two keyboards on two links (not snapped together): one press on the left keyboard says which is which.
+// Where each one's keys are is followed from what it plays (pairMessage), so no end keys are needed.
+function onPairSetupKey(pitch) {
+  const press = setup.pressOf.get(pitch)
+  if (!press) return
+  const left = press.slot
+  pair.side[left] = 0
+  pair.side[1 - left] = 1
+  savePair()
+  queuePageLights()      // the row's frame splits by the new sides
+  setup.sidesDone = true
+  console.log('SETUP two keyboards: left is port ' + (left + 1) + ', from ' + pair.low[left] + '; right from ' + pair.low[1 - left])
+}
+
+// The key range's two presses. The far-left key is always a C and the far-right one
 // is 23 keys above it (48 on the 49-key ROLI Piano, 47 on two keyboards joined together). Only
 // the pair pins the range down: one press of a C can't tell the bottom C from the middle one.
 // When done, keys is how many the keyboard has and shift is how far `base` (the range the app
@@ -707,76 +1158,218 @@ function readEndKeys(low, pitch, base, sizes = KB_SIZES) {
   return { low: null, wrong: pitch }
 }
 
-function answerLights(yes) {
-  setup.lights = yes ? 'yes' : 'no'
-  console.log('SETUP lights seen=' + setup.lights)
+// ---------- Bluetooth (iOS) ----------
+function bleScanning(on) {
+  on = !!(on && ble.api && setup.open)
+  if (on === ble.scanning) return
+  ble.scanning = on
+  try { ble.api.bleScan(on) } catch (e) { console.log('BLE scan ' + (e && e.message)) }
+}
+function wireBle() {
+  if (!IS_IOS) return
+  import('./ios-ble.js').then((mod) => {
+    if (typeof mod.onBle !== 'function' || typeof mod.bleAvailable !== 'function' || !mod.bleAvailable()) return
+    ble.api = mod
+    mod.onBle((ev) => {
+      if (!ev) return
+      if (ev.type === 'state') ble.bluetooth = ev.bluetooth || 'on'
+      if (ev.type === 'devices') {
+        ble.devices = Array.isArray(ev.devices) ? ev.devices : []
+        // a Connect tap is settled once the keyboard is connected (or the system took over reconnecting it); a tap on a
+        // lost keyboard keeps its spinner or its "Try again" through the scan updates that keep arriving
+        for (const d of ble.devices) if (d.state === 'connected' || d.state === 'reconnecting') ble.since.delete(d.id)
+        // a known keyboard coming back on its own: the banner says so (the MIDI port then reports the rest)
+        const back = ble.devices.find((d) => d.state === 'reconnecting')
+        if (back && !midiInput) connBanner?.update({ connected: false, reconnecting: true, name: back.name })
+        else if (!back && !midiInput && connBanner?.state.reconnecting && !ble.devices.some((d) => d.state === 'connected')) connBanner.update({ connected: false, reconnecting: false })   // that attempt ended
+      }
+      renderSetup()
+    })
+    if (setup.open && SETUP_STEPS[setup.step] === 'connect') bleScanning(true)
+  }).catch((e) => console.log('BLE not available: ' + (e && e.message)))
+}
+function bleConnectTo(id) {
+  if (!ble.api) return
+  const generation = ++keyboardSelectionGeneration
+  // connecting a PartyKeys by hand means it is the keyboard you want lit, even with a LUMI still switched on
+  const dev = ble.devices.find((d) => d.id === id)
+  const party = !!dev && isPartyPort({ name: dev.name })
+  const pickedHere = () => {
+    if (generation !== keyboardSelectionGeneration) return
+    if (party === (normalizeChoice(settings.kbChoice) === 'partykeys')) return
+    if (party) settings.kbChoice = 'partykeys'
+    else if (normalizeChoice(settings.kbChoice) === 'partykeys' && /lumi|piano m|roli/i.test(dev?.name || '')) settings.kbChoice = 'roli'
+    else return
+    saveSettings(); syncKeyboardChoice(); if (midi) bindMidiPorts()
+  }
+  const started = performance.now()
+  ble.since.set(id, started)
+  haptic('light')
+  // only this attempt may end its own spinner (an older one can still answer after "Try again")
+  const failed = () => { if (ble.since.get(id) === started) ble.since.set(id, -1) }   // -1: this attempt failed (rowView)
+  Promise.resolve().then(() => ble.api.bleConnect(id)).then((ok) => { if (ok === false) failed(); else pickedHere() }).catch(failed).finally(renderSetup)
   renderSetup()
 }
+// Flash one keyboard's lights (worker B's identifyKeyboard), for two that look the same
+function identify(which) {
+  if (typeof identifyKeyboard === 'function') { try { identifyKeyboard(which); haptic('light') } catch (e) { console.log('identify ' + (e && e.message)) } }
+}
 
-// The current step's text, check, panel and buttons, from the live state
+// "Keyboard not listed?": the device-support wizard where it exists (also on iPhone/iPad, where it mails or shares the report).
+// Without a wizard the details go on the clipboard first, for a mail the person writes.
+function keyboardNotListed(e) {
+  const wizard = $('deviceDialog') && document.querySelector('[data-device-support]')
+  if (wizard) { e.preventDefault(); wizard.click(); return }
+  const info = setupKeyboardInfo()
+  const query = new URLSearchParams(location.search)
+  const details = supportDetails({ name: info.name || (midiInput && midiInput.name) || '', keys: info.keys || 0, platform: IS_IOS ? (Math.min(window.screen.width, window.screen.height) >= 700 ? 'iPad' : 'iPhone') : IS_ANDROID ? 'Android' : IS_WIN ? 'Windows' : 'Mac', version: query.get('appVersion') || '' })
+  copyText(details).then(() => status('Your keyboard details are copied. Paste them into the email.')).catch(() => {})
+  console.log('SETUP not listed: ' + details.replace(/\n/g, ' | '))
+}
+
+// ---------- the screen ----------
+// The device list: Bluetooth keyboards (iOS bridge) and the MIDI ports Keylight can see, each with its state
+function setupDeviceRows() {
+  const now = performance.now()
+  const rows = []
+  const live = (p) => p && p.state !== 'disconnected'
+  const ports = midi ? [...midi.inputs.values()].filter((p) => live(p) && !/airwave/i.test(portLabel(p)) && p.id !== performanceControls?.gestureInputId()) : []
+  const inUse = [midiInput, midiInput2].filter(live)
+  // A connected Bluetooth keyboard also shows up as a MIDI port, under its raw name ("LUMI Keys BLOCK" for "LUMI Keys 1"):
+  // pair each one with such a port, in order, so it is listed once and Identify reaches its slot
+  // same rule as BleNaming.sameKeyboard (Swift): either cleaned name contains the other, so "LUMI Keys 1" matches "LUMI Keys BLOCK"
+  const kbName = (n) => String(n || '').replace(/[\x00-\x1f\x7f]/g, ' ').trim().replace(/\s+bluetooth$/i, '').replace(/\s+block$/i, '').trim().toLowerCase()
+  // A Bluetooth row may only claim a CoreMIDI port that is Bluetooth itself (iOS and Android say so): a USB port
+  // with a similar name is a different keyboard. Desktop Web MIDI has no transport, so it is taken on the name.
+  const blePort = (p) => !p.transport || p.transport === 'ble'
+  const sameKb = (a, b) => {
+    const x = kbName(a), y = kbName(b)
+    const ok = (m, n) => !!m && !!n && m !== 'bluetooth keyboard' && n !== 'bluetooth keyboard' && (m.includes(n) || n.includes(m))
+    return ok(x, y) || ok(x, y.replace(/\s+\d+$/, ''))   // "LUMI Keys 1" also matches "LUMI Keys BLOCK Bluetooth"
+  }
+  const taken = new Set()
+  if (ble.api) {
+    const devs = sortDevices(ble.devices)
+    const several = inUse.length > 1 || devs.filter((d) => d.state === 'connected').length > 1   // also one Bluetooth + one USB
+    for (const d of devs) {
+      let port = null
+      if (d.state === 'connected') { port = ports.find((p) => !taken.has(p) && blePort(p) && sameKb(p.name, d.name)) || null; if (port) taken.add(port) }
+      const slot = port ? inUse.indexOf(port) : -1
+      rows.push({ key: 'b:' + d.id, name: d.name || 'Bluetooth keyboard', view: rowView(d, { since: ble.since.get(d.id) ?? 0, now, several }), act: { connect: d.id, identify: slot >= 0 ? String(slot) : d.id } })
+    }
+  }
+  // MIDI ports (USB everywhere; Bluetooth on Mac): the ones in use are connected, the others can be chosen
+  for (const p of ports) {
+    if (taken.has(p)) continue
+    const slot = inUse.indexOf(p)
+    const chooseLights = slot === 0 && canChooseLights()
+    const view = slot >= 0 ? { status: 'Connected', tone: 'ok', busy: false, action: inUse.length > 1 ? 'identify' : null, button: inUse.length > 1 ? 'Identify' : '' }
+      : { status: 'Found', tone: 'idle', busy: false, action: 'use', button: 'Use this' }
+    if (chooseLights) { view.action = 'use'; view.button = 'Enable key lights' }
+    rows.push({ key: 'm:' + p.id, name: p.name || 'MIDI keyboard', view, act: { use: p.name, identify: String(slot) } })
+  }
+  return rows
+}
+
+function renderDeviceRows(rows, info) {
+  const keys = keysText(info)
+  const html = rows.map((r) => {
+    const status = r.view.tone === 'ok' && keys && rows.filter((x) => x.view.tone === 'ok').length === 1 ? 'Connected' + dot() + keys : r.view.status
+    const btn = !r.view.action ? '' : '<button type="button" class="mini-btn' + (r.view.action === 'connect' || r.view.action === 'use' ? ' go' : '') + '" data-' + r.view.action + '="' + escapeHtml(r.act[r.view.action]) + '">' + r.view.button + '</button>'
+    return '<li class="ob-dev" data-tone="' + r.view.tone + '"><span class="ob-dot" aria-hidden="true"></span><span class="ob-dev-text"><b>' + escapeHtml(r.name) + '</b><small>' + escapeHtml(status) + '</small></span>' + btn + '</li>'
+  }).join('')
+  const list = $('obDevices')
+  if (list.dataset.html !== html) { list.dataset.html = html; list.innerHTML = html }
+}
+
+// The current step's text, panel and buttons, from the live state. Safe to call any time (fillKbPorts and
+// 'keylight:midi' call it while the setup is closed).
 function renderSetup() {
   if (!setup.open) return
   const step = SETUP_STEPS[setup.step]
   const ob = $('onboarding')
   if (ob.dataset.step !== step) ob.dataset.step = step
-  // MIDI access takes a moment at start-up: say "looking" until it has had a chance.
-  // A port that was unplugged stays picked but reads 'disconnected'.
-  const kb = midiInput && midiInput.state !== 'disconnected' ? 'on' : !midi && performance.now() - setup.openedAt < 3000 ? 'checking' : 'off'
+  const choice = normalizeChoice(settings.kbChoice)
+  const info = setupKeyboardInfo()
+  const kb = info.connected ? 'on' : midiOpening || (!midi && performance.now() - setup.openedAt < 3000) ? 'checking' : 'off'
   const lights = setupLightsState()
-  const canLight = lights === 'on' || lights === 'midi'
-  const noKeyboard = kb === 'checking' ? ['wait', 'Looking for your keyboard…'] : kbAsk ? ['warn', 'Several MIDI inputs found. Choose your keyboard below.'] : ['warn', 'No keyboard found yet. Plug it in over USB and switch it on.']
-  const lit = lights === 'on' ? ' (it’s lit)' : ''
+  const canLight = lights === 'on' || lights === 'midi' || lights === 'party'
+  $('obMidiRetry').classList.toggle('hidden', !(step === 'connect' && (midiOpenFailure || (midiOutputFailure && !framesDrive()) || midiAccessFailed || (partyBound() && partyStatus.state === 'error'))))
   let v
-  if (step === 'sound') {
-    const heard = setup.heard != null && noteName(setup.heard)
-    v = {
-      title: 'Press any key on your keyboard',
-      copy: 'You should hear a note. If you don’t, turn the volume up.',
-      check: heard ? (settings.volume > 0 ? ['ok', 'Got ' + heard + ' from your keyboard'] : ['warn', 'Got ' + heard + ', but the volume is all the way down'])
-        : kb === 'on' ? ['wait', 'Waiting for a key…'] : noKeyboard
+  if (step === 'welcome') {
+    v = { title: IS_IOS ? 'Learn piano with light' : 'Learn piano with light.', copy: 'Follow falling notes on a lit keyboard, any MIDI keyboard, or your screen.', next: 'Get started', skip: 'Play on screen' }
+  } else if (step === 'pick') {
+    v = { title: 'How will you play?', copy: 'You can change this any time in Settings.', next: null, skip: null }
+    renderPick()
+  } else if (step === 'connect') {
+    const twoApart = !!midiInput2
+    const copy = connectCopy(choice || 'midi', { ios: IS_IOS })
+    // Bluetooth says connected a moment before its MIDI port appears: that already counts as connected here
+    const bleOn = ble.api ? ble.devices.find((d) => d.state === 'connected') : null
+    const linked = info.connected || !!bleOn
+    v = linked
+      ? { title: 'You’re connected', copy: [info.connected ? info.name || (midiInput && midiInput.name) : ble.devices.filter((d) => d.state === 'connected').map((d) => d.name).join(' and '), info.connected ? keysText(info) : ''].filter(Boolean).join(', ') + '. Play a key to test.' }
+      : { title: copy.title, copy: copy.copy }
+    v.next = linked ? (setup.connectOnly ? 'Done' : 'Continue') : null
+    v.skip = setup.connectOnly || linked ? null : 'Play on screen for now'
+    // the message line: a failed open, several inputs, the key range, the two keyboards
+    const lightProblem = lightFallbackMessage()
+    v.check = midiOpening ? ['wait', 'Connecting…'] : midiOpenFailure || midiAccessFailed ? ['warn', midiConnectionStatus()]
+      : kbAsk && !info.connected ? ['warn', 'Several keyboards found. Tap Use this next to yours.']
+      : setup.ranging ? (setup.wrongKey != null ? ['warn', 'That was ' + noteName(setup.wrongKey) + '. Start with the key at the far left']
+        : setup.lowKey == null ? ['wait', 'Press the key at the far left'] : ['wait', 'Now press the key at the far right'])
+      : setup.rangeDone ? ['ok', 'Got it: your keys play ' + keysRange()]
+      : twoApart && setup.sidesDone ? ['ok', 'Got it. Left and right are set.']
+      : lightProblem ? ['warn', lightProblem]
+      : lights === 'party' && info.connected ? ['ok', partyStateText()] : null
+    // searching, or the Bluetooth radio is off
+    const bt = ble.api ? ble.bluetooth : 'on'
+    const search = $('obSearch')
+    search.classList.toggle('hidden', linked || !!midiOpenFailure || midiAccessFailed)
+    const [b, small] = bt === 'off' ? ['Bluetooth is off', 'Turn it on in Control Center or Settings.']
+      : bt === 'unauthorized' ? ['Keylight can’t use Bluetooth', 'Allow it in Settings, Keylight, Bluetooth.']
+      : choice === 'partykeys' ? ['Looking for keyboards…', IS_IOS ? 'Keep it close and switched on.' : 'Plug it in, or hold the power button for 3 seconds and keep it close.']
+      : kb === 'checking' ? ['Looking for keyboards…', 'Keep it close and switched on.']
+      : ['Looking for keyboards…', IS_IOS ? 'Keep it close and switched on.' : 'Plug it in, or keep it close and switched on.']
+    setText(search.querySelector('b'), b)
+    setText(search.querySelector('small'), small)
+    renderDeviceRows(setupDeviceRows(), info)
+    // connected: what you played, the volume and a test note
+    $('obLive').classList.toggle('hidden', !info.connected)
+    setText($('obNoteName'), setup.heard != null ? noteName(setup.heard) : '–')
+    $('obNoteChip').classList.toggle('hit', setup.heard != null && performance.now() - setup.heardAt < 600)
+    $('obPairSide').classList.toggle('hidden', !(twoApart && !setup.sidesDone))
+    $('obLightsHint').classList.toggle('hidden', !(info.connected && canLight && choice !== 'midi'))
+    $('obSwapLights').classList.toggle('hidden', !(info.connected && twoApart && canLight && canSwapLights()))   // two separate keyboards only
+    $('obRangeBox').classList.toggle('hidden', !(info.connected && choice === 'midi' && !twoApart))
+    setText($('obRange'), setup.ranging ? 'Cancel' : setup.rangeDone ? 'Set key range again' : 'Set key range')
+    setText($('obRangeText'), setup.ranging ? '' : 'Keys play ' + keysRange())
+    // having trouble: Apple's list only on iPhone/iPad; the light-service steps only on a Mac without the bundled service
+    $('obApplePair').classList.toggle('hidden', !IS_IOS)
+    $('obTipBt').classList.toggle('hidden', !IS_IOS && choice !== 'roli')
+    $('obTipTwo').classList.toggle('hidden', choice === 'midi' || choice === 'partykeys' || partyBound())
+    $('obInstall')?.classList.toggle('hidden', !(choice !== 'midi' && choice !== 'partykeys' && !partyBound() && lights !== 'checking' && (BUNDLED_DAEMON ? svcState === 'failed' : lights === 'off')))
+    if (BUNDLED_DAEMON && svcState === 'failed') {
+      setText($('obInstallIntro'), 'The key lights could not start in this copy of Keylight (' + (svcReason || 'the light service stopped') + '), so the keys light from MIDI notes instead.')
+      setText($('obInstallSummary'), 'Advanced: install the light service by hand')
     }
-  } else if (step === 'keyboard') {
-    v = {
-      title: 'Press the lowest key',
-      copy: midiInput2 ? 'That’s the key at the far left of your left keyboard. Then press the far-right key of your right keyboard, so Keylight knows which is which.'
-        : 'That’s the key at the far left. Then press the one at the far right, so the lights land on the keys you play.',
-      check: setup.rangeDone ? ['ok', 'Got it: your keys play ' + keysRange()]
-        : kb !== 'on' ? noKeyboard
-        : setup.otherKeyboard ? ['warn', 'That’s the same keyboard. Now press the far-right key of the other one']
-        : setup.wrongKey != null ? ['warn', 'That was ' + noteName(setup.wrongKey) + '. Start with the key at the far left' + lit]
-        : setup.lowKey == null ? ['wait', 'Keyboard connected. Press the key at the far left' + lit]
-        : ['wait', 'Now press the key at the far right' + lit]
-    }
-  } else if (step === 'lights') {
-    v = {
-      title: canLight ? 'Watch your keys' : 'Light up your keys',
-      copy: canLight ? 'A light runs along your keys from left to right.'
-        : noteLightsOnly() ? 'Your keys light up to show you what to play next, and stay dark otherwise.'
-        : bundledOk() ? 'Key lights are ready: your keys light up to show you what to play next.'
-        : 'Your keys light up to show you what to play next. A free helper, blocksd, drives the lights.',
-      check: canLight
-        ? (setup.lights === 'yes' ? ['ok', 'Your keys light up']
-          : setup.lights === 'no' ? ['warn', 'Check the keyboard is switched on and plugged in over USB, then show the lights again.']
-          : ['wait', 'Did your keys light up?'])
-        : lights === 'no-device' ? ['warn', (bundledOk() ? 'Key lights are ready, but they can’t find your keyboard.' : 'The light service is running but can’t find your keyboard.') + ' Plug it in over USB and switch it on.']
-        : lights === 'checking' ? ['wait', noteLightsOnly() || bundledOk() ? 'Looking for your keyboard…' : 'Looking for the light service…']
-        : lights === 'no-output' ? ['warn', 'No keyboard found yet. Plug it in over USB and switch it on.']
-        : lights === 'no-light-port' ? ['warn', canChooseLights() ? 'Your keyboard plays, but its name doesn’t say it can light up. If this is your light-up keyboard, choose it by name below.'
-          : 'Your keyboard plays, but Keylight doesn’t recognise its name, and on most keyboards light notes would play as music. So its keys stay unlit.']
-        : bundledOk() ? ['warn', 'The key lights are still starting. If this stays, quit and reopen Keylight.']
-        : BUNDLED_DAEMON ? ['warn', 'The light service could not start. Keys that can light from MIDI notes still do; the steps below add the full-colour lights.']
-        : ['warn', 'The light service isn’t running, so your keys can’t light up yet.'],
-      skip: canLight && setup.lights == null ? 'Skip' : 'Play without lights'
-    }
+    // Bluetooth headphones are the usual cause of a long output delay
+    const ac = audioContext()
+    const out = ac ? ac.outputLatency || 0 : 0
+    $('obLatency').classList.toggle('hidden', !(info.connected && out > 0.05))
+    if (out > 0.05) setText($('obLatency'), 'Your speakers or headphones add about ' + Math.round(out * 1000) + ' ms of delay. Wired headphones keep you in time.')
+  } else if (step === 'level') {
+    renderLevel()
+    // on-screen keys end here: the buttons are the last screen's, once there is an answer
+    const last = !nextStep(setupPlan(), 'level')
+    const ready = readyView(setup.level)
+    v = { title: 'How much piano have you played?', copy: 'This sets your starting point. You can change it any time in Settings.',
+      next: setup.level ? (last ? ready.next : 'Continue') : null, alt: last && setup.level ? ready.alt : null, skip: 'Skip' }
   } else {
-    const all = SETUP_STEPS.slice(0, 3).every(setupPassed)
-    v = {
-      title: all ? 'You’re ready to play' : 'Ready when you are',
-      copy: 'Lesson 1 shows you your first notes: watch it once, then play it yourself.',
-      check: null, next: 'Start your first lesson', skip: 'Go to Home'
-    }
+    renderSetupSummary(info, lights)
+    const ready = setupReady()
+    v = { title: ready.title, copy: ready.copy, next: ready.next, alt: ready.alt, skip: ready.skip }
   }
-  const passed = step === 'ready' || setupPassed(step)
   setText($('obStepTitle'), v.title)
   setText($('obStepCopy'), v.copy)
   const chk = $('obCheck')
@@ -785,60 +1378,97 @@ function renderSetup() {
     if (chk.dataset.state !== v.check[0]) chk.dataset.state = v.check[0]
     setText($('obCheckText'), v.check[1])
   }
-  $('obAnswer').classList.toggle('hidden', !(step === 'lights' && canLight && setup.lights == null))
   for (const p of ob.querySelectorAll('.ob-panel')) p.classList.toggle('hidden', p.dataset.panel !== step)
-  // the keyboard list: when there's a choice to make, or the lights depend on it
-  const inputs = midi ? [...midi.inputs.values()].filter((p) => p.state !== 'disconnected').length : 0
-  $('obPortRow').classList.toggle('hidden', !(step === 'lights' ? lights === 'no-light-port' && canChooseLights()
-    : step !== 'ready' && (settings.kbPort || inputs > 1 || (inputs && !midiInput))))
-  setText($('obOctaveHint'), (keysStayAt() != null ? 'Later, in the player, − and + at the top right line the screen up with your keys if they ever differ. Z and X do the same.'
-    : 'Later, in the player, − and + at the top right move your keys an octave down or up. Z and X do the same.').replace(TOUCH ? ' Z and X do the same.' : '\u0000', ''))
-  // Bluetooth headphones are the usual cause of a long output delay
-  const ac = audioContext()
-  const out = ac ? ac.outputLatency || 0 : 0
-  $('obLatency').classList.toggle('hidden', !(out > 0.05))
-  if (out > 0.05) setText($('obLatency'), 'Your speakers or headphones add about ' + Math.round(out * 1000) + ' ms of delay; wired headphones keep you in time. Bluetooth is the usual cause.')
-  // No Terminal steps when the app carries its own light service; if it could not start, the old manual route stays, folded away
-  $('obInstall').classList.toggle('hidden', !(lights !== 'checking' && (BUNDLED_DAEMON ? svcState === 'failed' : lights === 'off')))
-  if (BUNDLED_DAEMON && svcState === 'failed') {
-    setText($('obInstallIntro'), 'The key lights could not start in this copy of Keylight (' + (svcReason || 'the light service stopped') + '), so the keys light from MIDI notes instead.')
-    setText($('obInstallSummary'), 'Advanced: install the light service by hand')
+  // the port list stays for anything that still reads it; the device rows replace it on screen
+  $('obPortRow').classList.add('hidden')
+  // Back on every step after the welcome; the progress dots for the steps this run has
+  // the dots count pick, connect and ready (a keyboard run) so the picker shows how far there is to go
+  const plan = setupPlan().includes('connect') || step === 'pick' ? planFor('roli', { first: setup.first }) : setupPlan()
+  const back = $('obBack')
+  back.hidden = step === 'welcome' || !canGoBack(setup.history)   // the first step of a run from Settings closes with the X
+  const at = plan.indexOf(step)
+  for (const li of ob.querySelectorAll('#obSteps li')) {
+    const i = plan.indexOf(li.dataset.for)
+    li.classList.toggle('hidden', i === -1 || setup.connectOnly || step === 'welcome')
+    li.classList.toggle('on', li.dataset.for === step)
+    li.classList.toggle('done', i !== -1 && i < at)
   }
-  $('obLightsAgain').classList.toggle('hidden', !(canLight && setup.lights === 'no'))
-  $('obSwapLights').classList.toggle('hidden', !(step === 'lights' && canLight && canSwapLights()))
-  if (step === 'ready') renderSetupSummary(lights)
-  ob.querySelectorAll('#obSteps li').forEach((li, i) => {
-    const done = setupPassed(SETUP_STEPS[i]) && i !== setup.step
-    li.classList.toggle('on', i === setup.step)
-    li.classList.toggle('done', done)
-    const b = li.firstElementChild
-    b.disabled = i > setup.furthest
-    if (i === setup.step) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current')
-    const mark = done ? 'done' : String(i + 1)
-    if (b.dataset.mark !== mark) { b.dataset.mark = mark; b.firstElementChild.innerHTML = done ? SETUP_CHECK : mark }
-  })
   const next = $('obNext'), skip = $('obSkip')
-  setText(next, v.next || 'Continue')
-  next.disabled = !passed
-  setText(skip, v.skip || 'Skip')
-  skip.classList.toggle('hidden', passed && step !== 'ready')
+  next.classList.toggle('hidden', !v.next)
+  if (v.next) setText(next, v.next)
+  next.disabled = false
+  skip.classList.toggle('hidden', !v.skip)
+  if (v.skip) setText(skip, v.skip)
+  const alt = $('obAlt')
+  alt.classList.toggle('hidden', !v.alt)
+  if (v.alt) setText(alt, v.alt)
   // the drawn keyboard marks the end key to press next
   const keys = $('obKeys').children
-  const guide = step === 'keyboard' && !setup.rangeDone && kb === 'on' ? (setup.lowKey == null ? 0 : keys.length - 1) : -1
+  const guide = step === 'connect' && setup.ranging && kb === 'on' ? (setup.lowKey == null ? 0 : keys.length - 1) : -1
   for (let i = 0; i < keys.length; i++) if (keys[i].classList.contains('guide') !== (i === guide)) keys[i].classList.toggle('guide', i === guide)
 }
 
-function renderSetupSummary(lights) {
+// The picker (#obPick): one card per way to play. Choosing applies it at once (Settings > Number of keys does the same) and moves on.
+// the sale line switches by date (partykeys.js)
+function syncPartyKeysOffer() { for (const p of document.querySelectorAll('[data-partykeys-offer]')) p.textContent = partyKeysOffer() }
+function renderPick() {
+  if (typeof syncPartyKeysOffer === 'function') syncPartyKeysOffer()   // typeof: a test runs this function on its own
+  const list = $('obPick')
+  if (!list) return
+  const chosen = normalizeChoice(settings.kbChoice)
+  const html = listProfiles(false, { touch: IS_IOS }).map((p) => `<button type="button" role="radio" class="kb-opt" data-kb="${p.id}" aria-checked="${p.id === chosen}"><span class="kb-glyph">${glyphSVG(p.glyph)}</span><span class="kb-text"><b>${p.name}</b><small>${p.sub}</small></span><svg class="kb-go" aria-hidden="true"><use href="#i-chevron"/></svg></button>`).join('')
+  if (list.dataset.html !== html) { list.dataset.html = html; list.innerHTML = html }
+  $('obPartyKeys')?.classList.toggle('hidden', !showPartyKeysInPicker(settings))   // optional shop row: always offered here (partykeys.js)
+}
+// The level step (#obLevel): three cards; the answer waits for Continue. The daily goal chips are optional.
+function renderLevel() {
+  const list = $('obLevel')
+  if (!list) return
+  const marks = { new: '1', some: '2', experienced: '3' }
+  const html = EXPERIENCES.map((e) => `<button type="button" role="radio" class="kb-opt" data-level="${e.id}" aria-checked="${e.id === setup.level}"><span class="kb-glyph"><b>${marks[e.id]}</b></span><span class="kb-text"><b>${escapeHtml(e.name)}</b><small>${escapeHtml(e.sub)}</small></span><svg class="kb-go" aria-hidden="true"><use href="#i-chevron"/></svg></button>`).join('')
+  if (list.dataset.html !== html) { list.dataset.html = html; list.innerHTML = html }
+  const goal = setup.goal || 0
+  for (const b of document.querySelectorAll('#obGoal [data-goal]')) b.setAttribute('aria-checked', String(Number(b.dataset.goal) === goal))
+}
+function chooseKeyboard(id) {
+  const p = profileById(id)
+  if (!p) return
+  keyboardSelectionGeneration++
+  settings.kbChoice = p.id
+  if (p.keys != null && !$('kbKeys').disabled) {
+    $('kbKeys').value = String(p.keys)
+    $('kbKeys').onchange({ target: $('kbKeys') })    // exactly what choosing it in Settings does
+  }
+  saveSettings()
+  haptic('select')
+  syncKeyboardChoice()
+  if (midi) bindMidiPorts()    // the picked keyboard outranks another one that is also connected (pickPorts prefer)
+  console.log('SETUP keyboard=' + p.id + ' keys=' + (p.keys == null ? 'unchanged' : p.keys || 'automatic'))
+  if (setup.open) renderSetup()
+}
+// Settings > Your keyboard shows what is connected (model and keys), or the choice made
+function syncKeyboardChoice() {
+  const p = profileById(settings.kbChoice)
+  const info = typeof keyboardInfo === 'function' ? keyboardInfo() : null
+  const live = info && info.connected ? [info.name, keysText(info)].filter(Boolean).join(', ') : ''
+  setText($('kbChoiceValue'), live || (p ? p.name : 'Not chosen yet'))
+  const noLights = settings.kbChoice === 'screen' || settings.kbChoice === 'midi' || settings.kbChoice === 'other'
+  const hideLights = noLights && !midiOutput && !midiOutput2 && !daemon?.ready
+  $('setLights').classList.toggle('hidden', hideLights)
+  document.querySelector('#settingsJump [data-jump="setLights"]').classList.toggle('hidden', hideLights)
+}
+
+// Ready: a row of chips for what was set up
+function renderSetupSummary(info, lights) {
+  const choice = normalizeChoice(settings.kbChoice)
+  const on = info.connected
   const rows = [
-    ['Sound', setup.heard != null, setup.heard != null ? 'Your keyboard plays and sounds' : 'Skipped'],
-    ['Keyboard', setup.rangeDone, setup.rangeDone ? 'Your keys play ' + keysRange() : 'Skipped: Keylight also learns your keys as you play'],
-    ['Lights', setup.lights === 'yes', setup.lights === 'yes' ? 'Your keys light up'
-      : lights === 'off' ? 'Off for now: the light service isn’t running'
-      : lights === 'no-output' ? 'Off for now: no keyboard found'
-      : lights === 'no-light-port' ? (canChooseLights() ? 'Off for now: choose your keyboard by name in Settings' : 'Off: Keylight doesn’t recognise this keyboard')
-      : setup.lights === 'no' ? 'Not seen yet: run the setup again from Settings' : 'Skipped']
-  ]
-  const html = rows.map(([name, ok, text]) => `<li data-state="${ok ? 'ok' : 'skip'}"><span class="ob-mark">${SETUP_CHECK}</span><b>${name}</b><span>${text}</span></li>`).join('')
+    [on, on ? info.name || 'Keyboard' : choice === 'screen' ? 'On-screen keys' : 'No keyboard yet'],
+    on && keysText(info) ? [true, keysText(info)] : null,
+    profileById(choice)?.lights || (on && (lights === 'on' || lights === 'midi' || lights === 'party')) ? [on && (lights === 'on' || lights === 'midi' || lights === 'party'), on && (lights === 'on' || lights === 'midi' || lights === 'party') ? 'Lights on' : 'Lights when connected'] : null,
+    [setup.heard != null, setup.heard != null ? 'Sound checked' : 'Sound on']
+  ].filter(Boolean)
+  const html = rows.map(([ok, text]) => `<li data-state="${ok ? 'ok' : 'skip'}"><span class="ob-mark">${SETUP_CHECK}</span><span>${escapeHtml(text)}</span></li>`).join('')
   const list = $('obSummary')
   if (list.dataset.html !== html) { list.dataset.html = html; list.innerHTML = html }
 }
@@ -852,26 +1482,66 @@ function wireFirstRunUI() {
   document.addEventListener('keydown', onOctaveKey)
   syncOctaveUI()
   // setup
-  $('runSetup').onclick = () => openSetup(1)
+  $('runSetup').onclick = () => openSetup('pick')
+  $('kbChoose').onclick = () => openSetup('pick')
+  // ios-ble.js falls back to Apple's sheet unless the event is taken: say it is (cancel + ack)
+  window.addEventListener('keylight:open-connect', (e) => { e.preventDefault(); e.detail?.ack?.(); openConnect() })
+  for (const b of document.querySelectorAll('[data-partykeys-open]')) b.onclick = () => openExternal(PARTYKEYS_URL)
+  syncPartyKeysOffer()
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) syncPartyKeysOffer() })   // an app left open past the sale
+  $('obPick').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-kb]')
+    if (!b) return
+    chooseKeyboard(b.dataset.kb)
+    // a tap is the answer: move on once the card has shown it is picked
+    setTimeout(() => { if (setup.open && SETUP_STEPS[setup.step] === 'pick') setupNext() }, 200)
+  })
+  syncKeyboardChoice()
+  $('obLevel').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-level]')
+    if (!b) return
+    setup.level = normalizeExperience(b.dataset.level)
+    haptic('select')
+    renderSetup()
+  })
+  $('obGoal').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-goal]')
+    if (!b) return
+    const g = Number(b.dataset.goal)
+    setup.goal = GOAL_CHOICES.includes(g) && setup.goal !== g ? g : 0
+    haptic('select')
+    renderSetup()
+  })
+  $('obAlt').onclick = setupAlt
   $('obNext').onclick = setupNext
   $('obSkip').onclick = setupSkip
+  $('obBack').onclick = setupBack
   $('obClose').onclick = closeSetup
-  for (const b of document.querySelectorAll('#obSteps button')) b.onclick = () => goSetupStep(Number(b.dataset.step))
   $('obVolume').oninput = (e) => {
     settings.volume = Number(e.target.value); saveSettings(); setVolume(settings.volume / 100)
     $('volume').value = e.target.value
+    setText($('onboarding').querySelector('.range-out[for="obVolume"]'), settings.volume + '%')
     renderSetup()
   }
   $('obTestNote').onclick = () => { initAudio(); noteOn(72, 96, 0); setTimeout(() => noteOff(72, 0), 450) }
-  $('obLightsYes').onclick = () => answerLights(true)
-  $('obLightsNo').onclick = () => answerLights(false)
-  $('obLightsAgain').onclick = () => { setup.lights = null; renderSetup(); sweepSetupLights() }
-  $('obSwapLights').onclick = () => { swapLights(); setup.lights = null; renderSetup(); sweepSetupLights() }
+  $('obLightsAgain').onclick = () => sweepSetupLights()
+  $('obSwapLights').onclick = () => { swapLights(); sweepSetupLights() }
+  $('obRange').onclick = () => { Object.assign(setup, { ranging: !setup.ranging, lowKey: null, wrongKey: null, rangeDone: false }); renderSetup() }
+  $('obApplePair').onclick = () => iosPairBluetooth()
+  $('obNotListed').onclick = keyboardNotListed
+  $('obDevices').addEventListener('click', (e) => {
+    const b = e.target.closest('button')
+    if (!b) return
+    if (b.dataset.connect != null) bleConnectTo(b.dataset.connect)
+    else if (b.dataset.identify != null) identify(/^\d$/.test(b.dataset.identify) ? Number(b.dataset.identify) : b.dataset.identify)
+    else if (b.dataset.use != null) { settings.kbPort = b.dataset.use; saveSettings(); bindMidiPorts(); fillKbPorts(); haptic('light') }
+  })
   $('swapLights').onclick = () => { swapLights(); runLightTest() }
-  $('obCopy').onclick = async () => {
+  if ($('obCopy')) $('obCopy').onclick = async () => {   // not in the iPhone/iPad page
     try { await copyText($('obCode').textContent); status('Copied: paste it into Terminal') } catch { status('Select the two lines and copy them with ⌘C') }
   }
   for (const id of ['kbPort', 'obKbPort']) $(id).onchange = (e) => { settings.kbPort = e.target.value; saveSettings(); bindMidiPorts(); fillKbPorts() }
+  $('kbRetry').onclick = $('obMidiRetry').onclick = retryMidiOpen
   $('kbKeys').onchange = (e) => {
     const keys = Number(e.target.value)
     if (keys) settings.kbKeysFor[kbLabel()] = keys
@@ -882,22 +1552,35 @@ function wireFirstRunUI() {
   }
   document.addEventListener('keydown', onSetupKeydown)
   // the engine announces keyboard connection changes; the poll above covers older builds
-  window.addEventListener('keylight:midi', () => renderSetup(), true)
+  window.addEventListener('keylight:midi', (e) => {
+    renderSetup()
+    const d = e.detail || {}
+    if (d.status !== 'Connecting...') connBanner?.update({ connected: !!d.connected, name: setupKeyboardInfo().name || d.name || '' })
+  }, true)
+  // the keyboard model changing (a second block snapped on or off, keyboardInfo in app.js)
+  window.addEventListener('keylight:keyboard', () => { syncKeyboardChoice(); renderSetup() })
+  connBanner = mountConnBanner()
+  wireBle()
 }
 
-// In the setup, Return takes the step's main button once its check has passed (focus sits
-// on the step title, where Return does nothing), and Escape closes a setup run from Settings.
+// In the setup, Return takes the step's main button (focus sits on the step title, where Return does nothing),
+// and Escape goes back (or closes a run from Settings).
 function onSetupKeydown(e) {
   if (!setup.open || e.repeat || e.metaKey || e.ctrlKey || e.altKey) return
-  if (e.key === 'Escape' && store.get('lumi.onboarded', false)) { e.preventDefault(); closeSetup(); return }
+  if (e.key === 'Escape') {
+    if (canGoBack(setup.history)) { e.preventDefault(); setupBack() }
+    else if (setup.connectOnly || store.get('lumi.onboarded', false)) { e.preventDefault(); closeSetup() }
+    return
+  }
   const t = e.target
   if (e.key !== 'Enter' || (t && t.closest && t.closest('button, input, select, textarea, a'))) return
-  if (!$('obNext').disabled) { e.preventDefault(); setupNext() }
+  const next = $('obNext')
+  if (!next.disabled && !next.classList.contains('hidden')) { e.preventDefault(); setupNext() }
 }
 
 // Z / X move the keys an octave in the player (the main keydown handler has Space, 1-3 and Esc)
 function onOctaveKey(e) {
-  if (screen !== 'play' || setup.open || e.repeat || e.metaKey || e.ctrlKey || e.altKey) return
+  if (screen !== 'play' || setup.open || document.querySelector('dialog[open]') || e.repeat || e.metaKey || e.ctrlKey || e.altKey) return
   const t = e.target
   if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
   if (!$('results').classList.contains('hidden') || viewMenuOpen()) return
@@ -914,14 +1597,78 @@ function showAudioLatency() {
   const l = latencyInfo()
   el.textContent = l.output
     ? Math.round((l.base + l.output) * 1000) + ' ms (' + (l.base * 1000).toFixed(1) + ' buffer + ' + Math.round(l.output * 1000) + ' output)'
-    : '—'
+    : 'Not set'
+}
+
+// Settings > Appearance and accessibility: vibration feedback (iPhone/iPad) and the text size slider; the Settings search; haptics on taps
+function syncLargeText() {
+  const root = document.documentElement
+  const userScale = Number(root.style.getPropertyValue('--ts-user')) || 1
+  const hostScale = Number(root.style.getPropertyValue('--ts-host')) || 1
+  const large = userScale * hostScale >= 1.3
+  if (root.classList.contains('ts-large') !== large) root.classList.toggle('ts-large', large)
+}
+
+function applyTextScale() {
+  const v = Math.max(0.9, Math.min(1.4, Number(settings.textScale) || 1))
+  document.documentElement.style.setProperty('--ts-user', String(v))
+  syncLargeText()
+}
+function wireFeelSettings() {
+  setHapticsEnabled(settings.haptics !== false)
+  $('hapticsToggle').checked = settings.haptics !== false
+  $('hapticsToggle').onchange = (e) => { settings.haptics = e.target.checked; saveSettings(); setHapticsEnabled(settings.haptics); if (settings.haptics) haptic('select') }
+  const ts = $('textScale')
+  ts.value = String(Math.round((Number(settings.textScale) || 1) * 100))
+  ts.oninput = () => { settings.textScale = Number(ts.value) / 100; applyTextScale() }
+  ts.onchange = () => { settings.textScale = Number(ts.value) / 100; saveSettings(); applyTextScale() }
+  applyTextScale()
+  if (IS_IOS) new MutationObserver(syncLargeText).observe(document.documentElement, { attributeFilter: ['style', 'class'] })
+  const rm = $('reduceMotion')
+  const applyMotion = () => document.documentElement.classList.toggle('reduce-motion', settings.reduceMotion === 'on')
+  rm.value = settings.reduceMotion === 'on' ? 'on' : 'system'
+  rm.onchange = () => { settings.reduceMotion = rm.value; saveSettings(); applyMotion() }
+  applyMotion()
+  mountSettingsSearch(document)
+  // a tap for choosing: tabs, chips, segments, switches and pickers. Never for falling notes or MIDI keys.
+  document.addEventListener('click', (e) => {
+    const t = e.target && e.target.closest ? e.target.closest('#nav button, .chips button, .chip-btn, .kl-seg button, .seg button, .level-chips button, button.primary, .kb-opt') : null
+    // no tap while recording: the host plays stop feedback only after the microphone is closed
+    if (!t || t.disabled || t.classList.contains('kb-opt') || t.id === 'impRecordStop') return
+    haptic(t.matches('button.primary') ? 'light' : 'select')
+  }, true)
+  document.addEventListener('change', (e) => {
+    const t = e.target
+    if (t && t.closest && t.closest('#screen-settings') && (t.type === 'checkbox' || t.tagName === 'SELECT') && t.id !== 'hapticsToggle') haptic('select')
+  }, true)
 }
 
 function wireUI() {
+  $('homeExperienceChoices').innerHTML = EXPERIENCES.map((e) => `<button class="ghost" type="button" data-level="${e.id}"><b>${escapeHtml(e.name)}</b><small>${escapeHtml(e.sub)}</small><svg class="hx-ch" aria-hidden="true"><use href="#i-chevron"/></svg></button>`).join('')
+  $('homeExperienceChoices').onclick = (e) => {
+    const choice = e.target.closest('[data-level]')
+    if (choice && applyExperience(choice.dataset.level)) $('continuePlay').focus()
+  }
+  $('homeExperienceDismiss').onclick = () => { dismissExperienceCard(); $('continuePlay').focus() }
   wireKeysUI()
   performanceControls = mountPerformanceControls(status)
   mountBackupControls($('backupControls'), { listSongs: listImported, saveSongs: saveImportedBatch, storage: localStorage, notice: status, onRestored: () => location.reload() })
-  $('editSong').onclick = () => { guided.close(); player?.pause(); endTake('editing notes'); editor.open() }
+  mountReminders({ settings, save: saveSettings, notice: status })   // daily practice reminder, iPhone/iPad only
+  // a paid library piece opened from a placement exam plays for free, but it cannot be copied into
+  // the library as an imported song: the editor is where that copy is saved, so it opens the paywall
+  $('editSong').onclick = () => {
+    if (editorBlocked()) { void openPaywall(); return }
+    cancelSongGuide()
+    guided.close(); player?.pause(); endTake('editing notes'); rollEditor.open()
+  }
+  // the same editor from the More sheet, for narrow windows where the top-bar Edit notes button is hidden
+  $('btnEditNotes').onclick = () => { if (!$('editSong').disabled) $('editSong').click() }
+  $('btnEditLyrics').onclick = () => {
+    if (!canEditLyrics()) return
+    playerHud.closeMore()
+    void lyricsEditor.open(song)
+  }
+  new MutationObserver(() => { $('btnEditNotes').disabled = $('editSong').disabled }).observe($('editSong'), { attributes: true, attributeFilter: ['disabled'] })
   const onScreenKeys = () => keyboardGeometry && keyboardGeometry.keys[0]?.pitch === player?.windowStart ? keyboardGeometry.keys : null
   airSource = mountAirwaveSource({ settings, save: saveSettings, getKeys: onScreenKeys, notice: status,
     platform: IS_ANDROID ? 'Android' : IS_IOS ? 'iOS' : IS_WIN ? 'Windows' : 'Mac',
@@ -929,16 +1676,22 @@ function wireUI() {
     airwaveMidi: () => !!midi && [...midi.inputs.values()].some((port) => /airwave/i.test(portLabel(port))) })
   cameraCoach = mountCameraCoach({ settings, save: saveSettings, getTracker: () => (airSource.selected() ? airSource.tracker : tracker),
     getKeys: onScreenKeys, getKeyCount: kbKeys, sourceName: () => (airSource.selected() ? 'Airwave sensor' : 'camera') })
+  const appQuery = new URLSearchParams(location.search)
+  const version = appQuery.get('appVersion') || 'development checkout'
+  const build = appQuery.get('appBuild')
+  const displayVersion = build ? `${version} (${build})` : version
   mountDiagnostics(() => ({
-    version: new URLSearchParams(location.search).get('appVersion') || 'development checkout',
+    version: displayVersion,
     platform: IS_ANDROID ? 'Android' : IS_IOS ? 'iOS' : IS_WIN ? 'Windows' : 'Mac',
     midiAvailable: !!midi,
+    midiStatus: midiConnectionStatus(),
     inputs: midi ? [...midi.inputs.values()] : [], outputs: midi ? [...midi.outputs.values()] : [],
     keyboard: midiInput?.name, keyboard2: midiInput2?.name,
     range: keysRange(), lightOutput: midiOutput?.name,
-    lights: { transport: framesDrive() ? 'Full colour frames' : noteLightsOnly() ? 'MIDI notes' : 'No active transport', state: daemonState, boards: daemon?.count || 0 },
-    audio: latencyInfo(), camera: { running: cameraOn(), calibrated: !!tracker?.calib }, ...performanceControls.describe()
-  }))
+    lights: { transport: pageDrives() ? 'Full colour (in app)' : daemonFrames() ? 'Full colour frames' : partyBound() ? partyDetailText() : midiOutput || midiOutput2 ? 'MIDI notes' : 'No active transport', state: daemonIssue() || lightFallbackMessage() || (partyBound() ? partyStateText() : '') || daemonState, boards: daemon?.count || 0 },
+    audio: latencyInfo(), camera: { running: cameraOn(), calibrated: !!tracker?.calib },
+    failures: [...diagnosticFailures], ...performanceControls.describe()
+  }), { share: IS_IOS, getNativeLog: IS_IOS ? tvNativeLog : null })
   {
     const query = new URLSearchParams(location.search)
     const fake = query.has('devicefake')     // a stand-in keyboard, for screenshots and the self-test
@@ -948,22 +1701,42 @@ function wireUI() {
       usbProbe: () => (fakeSupportMidi ? fakeUsb() : usbProbe()),
       boundInputs: () => [midiInput, midiInput2],
       appKeys: () => kbKeys(),
-      lightRoute: () => (framesDrive() ? 'full colour frames' : noteLightsOnly() && midiOutput ? 'MIDI notes' : 'none'),
-      canTestLights: () => (!!midiOutput || framesDrive()) && !$('testLights').disabled,
+      lightRoute: () => (pageDrives() ? 'full colour (in app)' : framesDrive() ? 'full colour frames' : partyBound() ? (partyUsable() ? 'key lights (' + partyDiagnostics().profile + ')' : 'none') : hasNoteLightPort() ? 'MIDI notes' : 'none'),
+      keyLights: () => (partyBound() ? partyDiagnostics() : null),
+      lightsNote: () => (partyBound() && !partyUsable() ? lightFallbackMessage() || partyStateText() : ''),
+      canTestLights: () => (hasNoteLightPort() || framesDrive() || partyUsable()) && !$('testLights').disabled,
       testLights: () => runLightTest(),
       cancelLights: () => cancelLightTest(),
       copy: (text) => copyText(text),
-      openLink: (url) => openExternal(url)
+      openLink: (url) => openExternal(url),
+      openLinkAsync: (url) => openExternalAsync(url),   // the mail flow waits for the real answer
+      ios: IS_IOS,
+      // iPhone/iPad: the report leaves through the share sheet (renderer/ios-export.js, HostTools.swift)
+      share: IS_IOS ? (text) => import('./ios-export.js').then(({ exportBlob }) => exportBlob(new Blob([text], { type: 'text/plain;charset=utf-8' }), 'keylight-device-report.txt')) : null
     })
     window.keylightDeviceSupport = fake || query.has('selftest') ? deviceSupport : undefined
   }
   mountStageTouch()
+  if (IS_IOS) {
+    document.querySelector('#topbar .top-actions').append($('openImport'))
+    document.querySelector('#onboarding .ob-rain')?.remove()      // P9: no ghost strip of falling notes behind the welcome (the desktop keeps its own)
+    buildSongsHeader()
+    $('openImport').setAttribute('aria-label', 'Add a song')
+    moveSettingsFooters(document)
+    mountSheetDrag({ closeImport: closeImportSheet, closeFilters: () => closeFilterSheet(true), closeMore: () => $('hudMoreClose').click() })
+  }
   for (const b of document.querySelectorAll('#nav button')) b.onclick = () => showScreen(b.dataset.screen, { tab: true })
-  $('back').onclick = () => nav.back()
+  $('back').onclick = () => {
+    const exerciseBack = IS_IOS && screen === 'exercise' && $('screen-exercise').querySelector('.cr-back')
+    if (exerciseBack) exerciseBack.click()
+    else nav.back()
+  }
+  $('playHintReset').onclick = resetPlayHint
+  $('playHintDismiss').onclick = () => { playHintDismissed = $('playHintText').textContent; syncPlayHint() }
   $('openSettings').onclick = () => showScreen('settings')
   for (const b of document.querySelectorAll('#speedTrack button')) b.onclick = () => setSpeed(b.dataset.speed)
   $('btnWatch').onclick = toggleWatch
-  for (const c of document.querySelectorAll('#searchChips button')) c.onclick = () => { searchChip = c.dataset.chip; renderLibrary() }
+  for (const c of document.querySelectorAll('#searchChips [data-chip], #libMenu [data-chip]')) c.onclick = () => { searchChip = IS_IOS && searchChip === c.dataset.chip && (searchChip === 'fav' || searchChip === 'imported') ? 'songs' : c.dataset.chip; renderLibrary() }
   $('sortBtn').onclick = () => {
     const modes = Object.keys(SORT_LABELS)
     sortMode = modes[(modes.indexOf(sortMode) + 1) % modes.length]
@@ -972,7 +1745,7 @@ function wireUI() {
   $('accompanyToggle').checked = settings.accompany !== false
   $('accompanyToggle').onchange = (e) => { settings.accompany = e.target.checked; saveSettings(); if (player) player.epoch++; status(settings.accompany ? 'The app plays the other hand for you' : 'Only your own playing sounds') }
   $('btnPlay').onclick = togglePlay
-  $('btnRestart').onclick = () => { if (player) { player.restart(); } }
+  $('btnRestart').onclick = () => restartSong()
   $('btnMetro').onclick = () => toggleSetting('metronome')
   $('btnLabels').onclick = cycleLabels
   $('btnHands').onclick = cycleHands
@@ -1003,7 +1776,7 @@ function wireUI() {
     else {
       tracker.calib = { a: tracker._pickA, b: { x, y } }
       settings.camCalib = tracker.calib; saveSettings(); camPicking = null
-      camStatus('Tracking — keys set')
+      camStatus('Tracking. Keys set.')
     }
   }
   $('btnCamera').onclick = () => {
@@ -1012,11 +1785,19 @@ function wireUI() {
   }
   refreshCameraList()
   $('openImport').onclick = openImportSheet
+  onEntitlementChange(() => {
+    renderLibrary()
+    updateHome()
+    if (screen === 'course') course.render()
+  })
+  mountPremium()
   wireComposerMenu()
+  wireLibraryChrome()
   mountInfoDialogs({
-    version: new URLSearchParams(location.search).get('appVersion') || 'development checkout',
+    version: displayVersion,
     songCount: LIBRARY.length, mutopiaCount: MUTOPIA_SONGS.length,
-    canOpen: () => $('results').classList.contains('hidden') && !setup.open && !viewMenuOpen()
+    canOpen: () => $('results').classList.contains('hidden') && !setup.open && !viewMenuOpen(),
+    licencesBundled: IS_IOS
   })
   for (const host of [$('searchEmpty'), $('bestList'), $('recentList')]) host.addEventListener('click', (e) => {
     const b = e.target.closest('[data-empty]')
@@ -1029,12 +1810,30 @@ function wireUI() {
   for (const b of document.querySelectorAll('#settingsJump [data-jump]')) b.onclick = () => jumpSettings(b.dataset.jump)
   $('daemonRetry').onclick = retryDaemon
   $('importClose').onclick = closeImportSheet
+  $('impCancel').onclick = closeImportSheet
   $('importFile').onchange = async (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) await handleImportFile(f) }
-  $('impPlay').onclick = async () => { await renameImported(); closeImportSheet(); if (importedRecord) openImported(importedRecord.id) }
-  $('impAnother').onclick = async () => { await renameImported(); openImportSheet() }
+  if (IS_IOS) {
+    $('dropZone').hidden = true
+    $('impChooseIOS').hidden = false
+    $('impChooseIOS').onclick = () => void androidRequest('incomingChoose').catch((error) => status(error.message))
+    $('impSimplifyLabel').textContent = 'Simplify solo recordings to melody and bass'
+  }
+  wireSongRecorder()
+  mountIncomingFile({ handle: async (file, options) => {
+    while (songRecording) await songRecording.closed
+    return handleImportFile(file, options)
+  } })     // files opened in or shared to the app (iPhone and iPad)
+  $('impPlay').onclick = async () => {
+    if (!await renameImported()) return
+    closeImportSheet()
+    if (importedRecord) await openImported(importedRecord.id)
+  }
+  $('impAnother').onclick = async () => { if (await renameImported()) await openImportSheet() }
   $('impTitle').onchange = renameImported
   $('impArtist').onchange = renameImported
+  $('impDifficulty').onchange = (event) => void renameImported(event.target.value)
   $('btnSheet').onclick = () => {
+    if (IS_IOS && matchMedia('(max-height: 520px) and (orientation: landscape)').matches) return chooseView('SHEET')
     settings.sheet = !settings.sheet
     saveSettings()
     // drawing a score holds everything up for a moment, which playing notes can't wait for
@@ -1053,25 +1852,29 @@ function wireUI() {
     dragDepth = 0
     $('dropOverlay').classList.add('hidden'); $('dropZone').classList.remove('over')
     const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]
-    if (f) handleImportFile(f)
+    if (f && !songRecording) handleImportFile(f)
   })
   $('backingFile').onchange = async (e) => {
     const f = e.target.files[0]; e.target.value = ''; if (!f) return
+    const generation = mediaToken
     try {
       const d = await loadBackingFile(f, 'backing')
+      if (d == null || mediaToken !== generation) return
       backingName = f.name
       $('backingState').textContent = `${f.name} (${d.toFixed(1)}s)`
       status('Accompaniment attached (piano muted): ' + f.name)
-    } catch (err) { status('Could not decode audio: ' + err.message) }
+    } catch (err) { if (mediaToken === generation) status('Could not decode audio: ' + err.message) }
   }
   $('fullMixFile').onchange = async (e) => {
     const f = e.target.files[0]; e.target.value = ''; if (!f) return
+    const generation = mediaToken
     try {
       const d = await loadBackingFile(f, 'full')
+      if (d == null || mediaToken !== generation) return
       fullName = f.name
       $('fullState').textContent = `${f.name} (${d.toFixed(1)}s)`
       status('Full mix attached (used in Watch): ' + f.name)
-    } catch (err) { status('Could not decode audio: ' + err.message) }
+    } catch (err) { if (mediaToken === generation) status('Could not decode audio: ' + err.message) }
   }
   $('waitMode').value = settings.waitMode || 'pauseAndSnap'
   $('waitMode').onchange = (e) => {
@@ -1088,14 +1891,35 @@ function wireUI() {
   $('userColor').value = settings.userColor
   $('userColor').oninput = (e) => { settings.userColor = e.target.value; saveSettings(); stylePreviewAt = performance.now() }
   $('userColorRow').classList.toggle('hidden', settings.keyboardMode !== 'User')
+  // a key-light keyboard: the screen's colours on a direct PartyKeys (One colour through the speaker relay); a change restarts the controller cleanly
+  $('partyColor').value = partyColorMode()
+  $('partyColor').onchange = (e) => {
+    settings.partyColor = ['one', 'hands', 'rgb'].includes(e.target.value) ? e.target.value : 'rgb'
+    settings.partyColorPicked = true
+    saveSettings()
+    syncPartyLights(true)
+    refreshPartyUi()
+    status(settings.partyColor === 'rgb' ? 'Lights colour: the same colours as the screen' : settings.partyColor === 'one' ? 'Lights colour: one colour' : 'Lights colour: hand colours. This is a try-it option: if the keys look wrong, go back to the screen’s colours')
+  }
   $('exprToggle').checked = !!settings.expression
-  $('mpeState').textContent = settings.expression ? 'waiting for bend/pressure…' : 'off'
+  $('glideToggle').checked = !!settings.glide
+  $('mpeState').textContent = exprStateText()
   $('exprToggle').onchange = (e) => {
     settings.expression = e.target.checked
+    diagIn.expr = ''
     saveSettings()
     applyDeviceMode()
-    $('mpeState').textContent = settings.expression ? 'waiting for bend/pressure…' : 'off'
-    status(settings.expression ? 'Pitch bend and pressure on: wiggle or press into a key' : 'Pitch bend and pressure off: keys play like a piano')
+    $('mpeState').textContent = exprStateText()
+    status(settings.expression ? 'Pressure on: press into a held key to swell strings, flute and synths' : 'Pressure off')
+  }
+  // Rocking a key sideways bends its pitch: off unless asked for (a piano key doesn't bend)
+  $('glideToggle').onchange = (e) => {
+    settings.glide = e.target.checked
+    diagIn.expr = ''
+    saveSettings()
+    applyDeviceMode()
+    $('mpeState').textContent = exprStateText()
+    status(settings.glide ? 'Pitch bend on: rock a held key left or right to bend it' : 'Pitch bend off: rocking a key no longer changes its pitch')
   }
   $('exactColors').checked = !!settings.exactColors
   $('exactColors').onchange = (e) => {
@@ -1130,12 +1954,34 @@ function wireUI() {
   $('fxMode').onchange = (e) => { settings.fx = e.target.value === 'lite' ? 'lite' : 'full'; saveSettings(); window.keylightSetFx?.(settings.fx); status('Visual effects: ' + (settings.fx === 'lite' ? 'Lite' : 'Full')) }
   $('goalMin').value = String(settings.goalMin)
   $('goalMin').onchange = (e) => { settings.goalMin = cleanGoal(e.target.value); saveSettings(); updateGoal(); status('Daily goal: ' + settings.goalMin + ' minutes') }
+  syncLevelSettings()
+  $('experienceSel').onchange = (e) => {
+    const id = normalizeExperience(e.target.value)
+    if (!id) { settings.experience = ''; saveSettings(); course.refreshExperience(); return status('Level cleared. Your other settings stay as they are') }
+    applyExperience(id)
+    const name = EXPERIENCES.find((x) => x.id === id).name
+    status('Level: ' + name + '. Finger numbers, speed and hand placement are set to suit it')
+  }
+  $('handGuideSel').onchange = (e) => {
+    settings.handGuide = ['auto', 'always', 'off'].includes(e.target.value) ? e.target.value : 'off'
+    settings.handGuideRuns = 0
+    handGuideShownKey = ''
+    saveSettings()
+    status(settings.handGuide === 'off' ? 'Hand placement off' : settings.handGuide === 'always' ? 'Hand placement before every new hand position' : 'Hand placement on until you play well')
+  }
   $('goalRing').onclick = () => jumpSettings('setPractice', true)
+  wireFeelSettings()
   $('openToolbox').onclick = () => showScreen('toolbox')
   $('brightness').value = String(settings.brightness)
   $('volume').value = String(settings.volume)
   $('backingVolume').value = String(settings.backingVolume)
-  $('brightness').oninput = (e) => { settings.brightness = Number(e.target.value); saveSettings(); daemon && daemon.brightness(settings.brightness) }
+  $('brightness').oninput = (e) => { settings.brightness = Number(e.target.value); saveSettings(); if (daemonFrames()) daemon.brightness(settings.brightness); lightSink.resend() }
+  // Keys waiting for you and the next notes: styles for the full-colour light frames (buildKeyFrame).
+  // Changing either previews both styles on the keys for 2.5 s (drawNextPreview).
+  $('waitStyle').value = settings.waitStyle || 'breathe'
+  $('nextStyle').value = settings.nextStyle || 'glow'
+  $('waitStyle').onchange = (e) => { settings.waitStyle = e.target.value; saveSettings(); nextPreviewAt = performance.now() }
+  $('nextStyle').onchange = (e) => { settings.nextStyle = e.target.value; saveSettings(); nextPreviewAt = performance.now() }
   $('volume').oninput = (e) => { settings.volume = Number(e.target.value); saveSettings(); setVolume(settings.volume / 100) }
   // Audio output: which device the sound goes to, and how long it takes to get there
   const outSel = $('audioOutput')
@@ -1151,11 +1997,15 @@ function wireUI() {
     }
     outSel.value = settings.audioOutput || ''
   }
+  let outputSelection = 0
   outSel.onchange = async () => {
+    const selection = ++outputSelection
+    const label = outSel.selectedOptions[0]?.textContent || 'System default'
     settings.audioOutput = outSel.value
     saveSettings()
     const ok = await setOutput(settings.audioOutput)
-    status(ok ? 'Sound plays on ' + outSel.selectedOptions[0].textContent : 'That output is not available, using the system default')
+    if (selection !== outputSelection) return
+    status(ok ? 'Sound plays on ' + label : 'That output is not available, using the system default')
     setTimeout(showAudioLatency, 1500)   // the output figure settles once the device has played a moment
   }
   navigator.mediaDevices.addEventListener('devicechange', fillOutputs)
@@ -1167,24 +2017,39 @@ function wireUI() {
   const PROGRESS_KEY = /^lumi\.(best|game|lesson|lessonwatched|lessonpractised|exercise|course|practice|days|streak|recent|guided\.(progress|weak|section))(\.|$)/
   $('resetProgress').onclick = async () => {
     if (!(await askConfirm('Reset your progress on ' + THIS_COMPUTER + '?', 'This erases your stars and best scores, lessons, games, Scales & chords, guided practice progress and weak bars, your Practice results, minutes played, your streak and recently played songs. Your settings, guided practice preferences, favourites, added songs and Jam sessions are kept.', 'Reset progress'))) return
-    for (const k of Object.keys(localStorage)) if (PROGRESS_KEY.test(k)) localStorage.removeItem(k)
+    try {
+      for (const k of Object.keys(localStorage)) if (PROGRESS_KEY.test(k)) localStorage.removeItem(k)
+    } catch (error) {
+      recordDiagnosticFailure('Storage', 'Reset progress', error)
+      showSettingsStorageError(SETTINGS_WRITE_ERROR)
+      return
+    }
     location.reload()
   }
   if ($('resetSettings')) $('resetSettings').onclick = async () => {
     if (!(await askConfirm('Put every setting back to its default?', 'This resets sound, lights, practice options, your colour and the keyboard octave calibration. Your progress is kept.', 'Reset settings'))) return
-    localStorage.removeItem('lumi.settings')
+    try { localStorage.removeItem('lumi.settings') } catch (error) {
+      recordDiagnosticFailure('Storage', 'Reset settings', error)
+      showSettingsStorageError(SETTINGS_WRITE_ERROR)
+      return
+    }
+    if (IS_IOS) await androidRequest('reminderClear').catch(() => {})
     location.reload()
   }
   // results actions
-  $('resAgain').onclick = () => { hideResults(); cancelCeremony(); if (player) { player.restart(); } }
+  // Watch again / Try again start by themselves: Wait mode arms (the first key starts it), the rest count in
+  $('resAgain').onclick = () => { hideResults(); restartSong(true) }
   $('resPractice').onclick = () => {
     hideResults()
     // Watch → Practise → Challenge (Play), and back to Practise after a Play run
     const target = lastMode === 'WATCH' ? 'PRACTISE' : lastMode === 'PRACTISE' ? 'PLAY' : 'PRACTISE'
     const lesson = lessonMeta && LESSONS.find((l) => l.id === lessonMeta.id)
     if (lesson) return startLessonStep(lesson, target)
-    setMode(target)
-    if (player) { player.restart() }
+    if (courseRun?.item.params.watchFirst && target === 'PRACTISE') {
+      $('subtitle').textContent = 'Course' + dot() + 'aim for ' + passText(courseRun.item)
+    }
+    setMode(target, { guide: false })
+    restartSong(true)
   }
   $('resClose').onclick = hideResults
   // progress seek / loop markers
@@ -1209,7 +2074,9 @@ function wireUI() {
     seekTo(player.currentPosition() + (e.key === 'ArrowRight' ? 5 : -5))
   })
   document.addEventListener('keydown', (e) => {
-    if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT')) return
+    if (e.target && ['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return
+    if (document.querySelector('dialog[open]')) return
+    if (setup.open) return   // the setup screen covers the app: Space, Escape and 1-3 are not for the player behind it (onSetupKeydown has its own)
     // The results are a dialog: its keys never reach the player behind it (a focused
     // Play button used to restart the finished song on Space)
     if (!$('results').classList.contains('hidden')) {
@@ -1225,6 +2092,7 @@ function wireUI() {
     }
     if (viewMenuOpen() && handleViewMenuKey(e)) return
     if (e.key === 'Escape') {
+      if (handGuideRun && handGuideRun.kind === 'intro') return finishHandIntro('back')
       if (screen === 'play' || screen === 'exercise' || screen === 'jam') nav.back()
       return
     }
@@ -1314,11 +2182,13 @@ function mountStageTouch() {
 // false only on Home with nothing to go back to, where the app then leaves. Dialogs and sheets close first (the rules above),
 // then the same navigation stack as the on-screen back button and Escape.
 globalThis.__keylightBack = () => {
+  if (closeTour()) return true
   const dialog = [...document.querySelectorAll('dialog[open]')].pop()
   if (dialog) { if (dialog.dispatchEvent(new Event('cancel', { cancelable: true }))) dialog.close(); return true }
   if (!$('results').classList.contains('hidden')) { hideResults(); return true }
   if (!$('onboarding').classList.contains('hidden')) { closeSetup(); return true }
   if (!$('importSheet').classList.contains('hidden')) { closeImportSheet(); return true }
+  if (filterSheetOpen()) { closeFilterSheet(true); return true }
   const guidedRoot = document.querySelector('.guided:not(.hidden)')
   if (guidedRoot) { guidedRoot.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); return true }
   if (!$('composerPop').classList.contains('hidden')) { closeComposerMenu(true); return true }
@@ -1329,7 +2199,7 @@ globalThis.__keylightBack = () => {
 /* ============================== screens ============================== */
 // Search has no title: its "Search here" pill sits in the middle of the top bar instead
 const SCREEN_TITLES = {
-  home: ['', ''], course: ['Course', 'Learn piano step by step'], search: ['', ''], achievements: ['Achievements', 'Your progress on ' + THIS_COMPUTER],
+  home: ['', ''], course: ['Course', 'Learn piano step by step'], search: ['Songs', ''], achievements: ['Achievements', 'Your progress on ' + THIS_COMPUTER],
   quiz: ['', ''], exercise: ['Course', 'Learn piano step by step'], practice: ['Practice', 'Exercises, the Playground and a metronome'], jam: ['Jam', 'Loop and layer your own music'],
   toolbox: ['Scales & chords', 'Pick a key, then practise it'], games: ['Games', 'Hit the notes in time, beat the pass mark'],
   settings: ['Settings', 'Lights, sound and practice']
@@ -1358,12 +2228,13 @@ const NAV_SCREENS = {
   jam: { transient: true },
   exercise: {
     transient: true,
-    handleBack: () => { if (!courseExerciseRun) return false; course.openOwner(courseExerciseRun.ownerId); return true }
+    handleBack: () => { if (!courseExerciseRun) return false; course.returnToOwner(courseExerciseRun.ownerId); return true }
   }
 }
+const scrollOf = {}           // the last scroll of each screen, so a back swipe can show the screen below where it was left
 function saveScroll(entry) {
   const el = $('screen-' + entry.screen)
-  if (el) entry.scroll = el.scrollTop
+  if (el) scrollOf[entry.screen] = entry.scroll = el.scrollTop
 }
 const nav = createNav({
   screens: NAV_SCREENS,
@@ -1376,9 +2247,12 @@ const nav = createNav({
       if (p.chip) searchChip = p.chip
     }
     if (back && entry.screen === 'toolbox' && p.tb) Object.assign(tb, p.tb)
+    const changed = screen !== entry.screen
+    if (back) motionKind = 'back'
     showScreenNow(entry.screen)
     const el = $('screen-' + entry.screen)
     if (back && el && entry.scroll) el.scrollTop = entry.scroll
+    else if (!back && changed && el) el.scrollTop = 0   // a new screen opens at its top, not where the last visit left it
   }
 })
 // A song or a course item was just passed: the next time the user is back on Home is a calm moment
@@ -1386,34 +2260,49 @@ const nav = createNav({
 let calmPending = false
 const markCalm = (passed) => { if (passed) calmPending = true }
 
+let motionKind = 'tab'    // how the next screen arrives (ios-motion.js): 'tab' fades, 'forward' drills in, 'back' returns
+const cameFrom = {}
 function showScreen(name, opts = {}) {
-  if (name === 'learn') name = 'search'
+  if (name === 'learn' || name === 'songs' || name === 'library') name = 'search'   // the Songs tab is the search screen
+  if (typeof name !== 'string' || !document.getElementById('screen-' + name)) name = 'home'   // never a blank app
   if (name === 'play' && !song && !freeplay) {
     const r = recent()[0]
-    if (r) { openLibrary(r.file); return }
+    const item = r && findSong(r.file)
+    if (item) { openItem(item); return }
   }
+  motionKind = name === 'home' || opts.tab ? 'tab' : 'forward'
   if (name === 'home' || opts.tab) nav.resetTo(name)
   else nav.go(name)
 }
 function showScreenNow(name) {
+  if (name !== 'play') lyricsEditor.close()
   closeViewMenu()
-  if (name !== 'quiz') quiz = null
+  if (name !== 'play') cancelSongGuide()
+  if (name === 'play' && !tvLayoutOn(name)) enterPlayer(); else leavePlayer()     // iPhone: the player is held in landscape (free for the TV's remote layout); a no-op elsewhere
+  if (name !== 'quiz' && quiz) { quiz.releasePad?.(); quiz = null }
   if (name !== 'exercise' && exercise) { exercise.destroy(); exercise = null }
   if (name !== 'exercise') { courseExerciseRun = null; practiceRun = null }
   if (name !== 'jam' && jamUi) { const j = jamUi; jamUi = null; jamLit = new Set(); j.destroy() }
   if (name !== 'practice' && practiceUi) practiceUi.stopMetronome()      // the metronome only runs while its screen is open
   if (name !== 'quiz' && name !== 'play') courseRun = null
   if (screen === 'play' && name !== 'play') {
+    announcedWaitNotes = null
+    playerLive?.replaceChildren()
     endTake('left the player')
     clearNoteLights()
     if (player && player.active) { player.pause(); stopBacking(); pauseRecording() }
   }
+  const prevScreen = screen
+  if (prevScreen !== name && motionKind !== 'back') cameFrom[name] = prevScreen    // where a back swipe from here reveals
   screen = name
+  if (name === 'play') refreshPlayingCover()
   document.body.dataset.screen = name
   document.body.classList.toggle('freeplay', name === 'play' && freeplay)
   for (const s of document.querySelectorAll('.screen')) s.classList.add('hidden')
   const el = $('screen-' + name)
   if (el) { el.classList.remove('hidden'); el.style.animation = 'none'; void el.offsetWidth; el.style.animation = '' }
+  if (el && IS_IOS && screen !== prevScreen) enterScreen(el, motionKind)
+  motionKind = 'tab'
   for (const b of document.querySelectorAll('#nav button')) {
     const active = b.dataset.screen === (name === 'exercise' ? (practiceRun ? 'practice' : 'course') : name)
     b.classList.toggle('on', active)
@@ -1429,16 +2318,63 @@ function showScreenNow(name) {
   }
   if (name === 'settings') showAudioLatency()
   if (name === 'course') course.show()
-  if (name === 'search') { renderLibrary(); setTimeout(() => $('search').focus(), 50) }
+  if (name !== 'search') closeFilterSheet()
+  if (name === 'search') { renderLibrary(); if (!TOUCH && !IS_NATIVE_HOST) setTimeout(() => $('search').focus(), 50) }   // on a touch screen focusing would open the keyboard over the songs
   if (name === 'achievements') renderAchievements()
   if (name === 'practice' && practiceUi) practiceUi.refresh()
   if (name === 'jam' && !jamUi) jamUi = mountJam($('screen-jam'), jamDeps())
   if (name === 'games') renderGames()
   if (name === 'toolbox') renderToolbox()
-  if (name === 'settings') { refreshProgressUI(); syncKbRange() }
+  if (name === 'settings') { refreshProgressUI(); syncKbRange(); if ($('setDiagnostics')?.open) diagDraw() }
   if (name === 'play') { $('title').textContent = song ? song.title : freeplay ? 'Playground' : 'Play'; $('subtitle').textContent = song ? (song.artist || '') : '' }
   resize()
+  tvSyncLayout()
+  tvSendScreen()
 }
+
+/* ---- the interactive back swipe (iPhone, ios-motion.js): the Course lesson, exam and quiz card, and the drill-in screens ---- */
+const SWIPE_DRILLS = ['exercise', 'quiz', 'achievements', 'toolbox', 'games']
+const swipeBlocked = () => !!document.querySelector('dialog[open], #results:not(.hidden), #onboarding:not(.hidden), #tvCalib:not(.hidden), #importSheet:not(.hidden), .cr-sheet-back, body.filters-open, body.hud-more, .guided:not(.hidden)')
+function backSwipeTarget() {
+  if (!IS_IOS || screen === 'play' || swipeBlocked() || !nav.canGoBack()) return null
+  if (screen === 'course') {
+    const v = course.view
+    if (v.name === 'map' && !v.itemId) return null
+    const cur = $('screen-course')
+    return {
+      cur,
+      prepare() {
+        const peek = course.peekBack()
+        course.holdRender(true)
+        const under = document.createElement('section')
+        // the real screen keeps its id for its own styles; the copy under it borrows the same id for the length of the gesture only (inert, hidden from assistive tech)
+        under.id = 'screen-course'; under.className = 'screen course'; under.inert = true; under.setAttribute('aria-hidden', 'true')
+        under.dataset.view = v.itemId ? 'lesson' : 'map'
+        under.innerHTML = (peek && peek.html) || ''
+        under.querySelectorAll('[id]').forEach((n) => n.removeAttribute('id'))
+        cur.parentElement.appendChild(under)
+        under.scrollTop = (peek && peek.scroll) || 0
+        return { under, cleanup() { under.remove(); course.holdRender(false) } }
+      },
+      commit() { course.holdRender(false); course.back() }
+    }
+  }
+  const from = cameFrom[screen]
+  if (!SWIPE_DRILLS.includes(screen) || nav.depth() < 2 || !from || from === 'play' || from === screen) return null
+  const cur = $('screen-' + screen), below = $('screen-' + from)
+  if (!cur || !below) return null
+  return {
+    cur,
+    prepare() {
+      const hid = below.classList.contains('hidden')
+      below.classList.remove('hidden')                  // mounted again, not rebuilt: its scroll and content are what Back shows
+      below.scrollTop = scrollOf[from] || 0
+      return { under: below, cleanup() { if (hid && screen !== from) below.classList.add('hidden') } }
+    },
+    commit() { $('back').click() }
+  }
+}
+installBackSwipe({ target: backSwipeTarget })
 
 function tileAction(go) {
   if (go === 'search' || go === 'learn') return showScreen('search')
@@ -1451,15 +2387,29 @@ function tileAction(go) {
 
 /* ============================== achievements ============================== */
 function totalStars() {
+  const covers = new Map()
   let n = 0
   for (const k of Object.keys(localStorage)) {
     if (!/^lumi\.(best|game|lesson|exercise)\./.test(k)) continue
     if (k.endsWith('.bpm') || k.startsWith('lumi.best.lumi.')) continue   // exercise speed / duplicate of the exercise key
     const v = Number(store.get(k, 0))
-    if (Number.isInteger(v) && v >= 0 && v <= 5) n += v
+    if (!Number.isInteger(v) || v < 0 || v > 5) continue
+    if (k.startsWith('lumi.best.imported:')) {
+      const file = k.split('.cover-v1.', 1)[0]
+      covers.set(file, Math.max(covers.get(file) || 0, v))
+    } else n += v
   }
+  for (const v of covers.values()) n += v
   return n
 }
+function practiceWeek(days) {
+  const today = new Date()
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - (6 - i))
+    return { d, secs: days[dayKey(d)] || 0 }
+  })
+}
+
 function renderAchievements() {
   const days = store.get('lumi.days', {})
   const minutes = Math.round(Object.values(days).reduce((a, b) => a + b, 0) / 60)
@@ -1475,12 +2425,7 @@ function renderAchievements() {
   // this week, in local days
   const week = $('weekBars')
   week.replaceChildren()
-  const today = new Date()
-  const vals = []
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i)
-    vals.push({ d, secs: days[dayKey(d)] || 0 })
-  }
+  const vals = practiceWeek(days)
   const max = Math.max(60, ...vals.map((v) => v.secs))
   vals.forEach((v, i) => {
     const el = document.createElement('div')
@@ -1493,7 +2438,8 @@ function renderAchievements() {
   const lessonsDone = LESSONS.filter(lessonComplete).length
   const BADGES = [
     { name: 'First notes', sub: 'Play your first song', on: played >= 1, icon: 'i-keys' },
-    { name: 'Five stars', sub: 'Get 5 stars on a song', on: songs.some((l) => bestFor(l.file) >= 5), icon: 'i-star' },
+    IS_IOS ? { name: 'Three stars', sub: 'Get 3 stars on a song', on: songs.some((l) => starsShown(bestFor(l.file)) >= 3), icon: 'i-star' }
+      : { name: 'Five stars', sub: 'Get 5 stars on a song', on: songs.some((l) => bestFor(l.file) >= 5), icon: 'i-star' },
     { name: 'On a roll', sub: '3-day streak', on: streak >= 3, icon: 'i-flame' },
     { name: 'Week warrior', sub: '7-day streak', on: streak >= 7, icon: 'i-flame' },
     { name: 'Student', sub: 'Finish a lesson', on: lessonsDone >= 1, icon: 'i-check' },
@@ -1507,7 +2453,7 @@ function renderAchievements() {
   const bl = $('bestList')
   const rows = songs.map((l) => ({ l, b: bestFor(l.file) })).filter((x) => x.b > 0).sort((a, b) => b.b - a.b)
   bl.innerHTML = rows.length
-    ? rows.map(({ l, b }) => `<div class="best-row">${itemCover(l, { showTitle: false })}<div class="br-name">${escapeHtml(l.title)}<div class="tile-sub">${escapeHtml(l.artist)}</div></div><span class="g-stars">${Array.from({ length: 5 }, (_, i) => `<svg class="${i < b ? 'on' : ''}"><use href="#i-star"/></svg>`).join('')}</span></div>`).join('')
+    ? rows.map(({ l, b }) => `<div class="best-row">${itemCover(l, { size: 'thumb' })}<div class="br-name">${escapeHtml(l.title)}<div class="tile-sub">${escapeHtml(l.artist)}</div></div><span class="g-stars">${starRowHTML(b)}</span></div>`).join('')
     : '<div class="empty" style="padding:24px 0">Finish a song to see your best scores here.<div class="empty-actions"><button class="mini-btn" data-empty="lessons">Play a lesson</button><button class="mini-btn" data-empty="add">Add a song</button></div></div>'
 }
 
@@ -1518,95 +2464,134 @@ function pushRecent(file) {
   list.unshift({ file, at: Date.now() })
   store.set('lumi.recent', list.slice(0, 6))
 }
-function bestFor(file) { return store.get('lumi.best.' + file, 0) }
-
-// Square cover art generated per song in the original library's style: a duotone field,
-// one big shape (a rising sun, waves, a diagonal split or keys) and the title in caps along
-// the top. A song's own cover image, when it has one, is laid over it (see itemCover).
-const COVER_PALETTES = [
-  ['#ffd1b3', '#a1006b', '#8a005c'], ['#ff8a4c', '#c2302a', '#8f1d18'], ['#c9f3ff', '#a3106f', '#7a0b53'],
-  ['#ff8fc8', '#7b1fa2', '#5c1180'], ['#13213f', '#ffe08a', '#ffe08a'], ['#1f8a99', '#ffc2d4', '#ffe3ec'],
-  ['#ff4b4b', '#c9f3ff', '#ffffff'], ['#7a12c4', '#ffe68a', '#ffe68a'], ['#2448d8', '#ff8a7a', '#ffd9d2'],
-  ['#9ff0d0', '#123a7a', '#123a7a'], ['#ffd84d', '#2a1f8f', '#2a1f8f'], ['#d9c7ff', '#008a73', '#3b1d8f']
-]
-// FNV-1a with a final bit mix, so the low bits that pick the palette and shape spread out
-function hashStr(str) {
-  let h = 2166136261
-  for (const c of str) h = Math.imul(h ^ c.charCodeAt(0), 16777619)
-  h ^= h >>> 16; h = Math.imul(h, 0x7feb352d); h ^= h >>> 15
-  return h >>> 0
+function bestFor(file) {
+  const record = file?.startsWith('imported:') ? importedSongs.find((r) => r.file === file) : null
+  const arrangement = record?.coverRaw ? record.coverArrangement : null
+  const current = HAS_COVERS && arrangement ? { difficulty: arrangement.difficulty, keyRange: coverKeyRange() } : arrangement
+  return store.get('lumi.best.' + coverScoreFile(file, current), 0)
 }
-// img: an image laid over the art; level: the teal badge; extra: more overlay markup
-function coverHTML(item, { stars = 0, showTitle = true, img = null, level = null, extra = '' } = {}) {
-  // each built-in song has its own palette and shape; anything else is picked by a hash
-  const lib = LIBRARY.findIndex((l) => l.file === item.file)
-  const h = lib >= 0 ? lib : hashStr(item.file || item.title)
-  const [bg, fg, ink] = COVER_PALETTES[h % COVER_PALETTES.length]
-  const kind = (lib >= 0 ? lib : h >>> 4) % 4
-  const svg = (body) => `<svg class="c-art" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${body}</svg>`
-  let art
-  if (kind === 0) art = svg(`<circle cx="50" cy="104" r="46" fill="${fg}"/>`)
-  else if (kind === 1) art = svg(`<path d="M0 66 Q25 50 50 66 T100 66 V100 H0Z" fill="${fg}"/><path d="M0 82 Q25 66 50 82 T100 82 V100 H0Z" fill="${ink}" opacity=".35"/>`)
-  else if (kind === 2) art = svg(`<path d="M0 100 L100 34 V100Z" fill="${fg}"/><path d="M40 100 L100 62 V100Z" fill="${ink}" opacity=".3"/>`)
-  else art = svg([18, 34, 50, 66, 82].map((x, i) => `<rect x="${x - 5}" y="${44 + (i % 2) * 10}" width="10" height="${60 - (i % 2) * 10}" rx="3" fill="${fg}"/>`).join(''))
-  const title = showTitle ? `<div class="c-title" style="color:${ink}">${escapeHtml(item.title)}</div>` : ''
+// The iPhone/iPad app shows three stars everywhere (Illuminated Studio). Progress is still saved as 0 to 5 (scoring.js,
+// course-engine.js, storage-validation.js), so a saved 4 or 5 reads as three, 2 or 3 as two and 1 as one: nothing stored changes.
+const STAR_SLOTS = IS_IOS ? 3 : 5
+const starsShown = (n) => (IS_IOS ? Math.ceil(Math.max(0, Math.min(5, n || 0)) * 3 / 5) : n)
+const starsOffer = (n) => `${starsShown(n)} of ${STAR_SLOTS} ${STAR_SLOTS === 1 ? 'star' : 'stars'}`
+const starRowHTML = (n, cls = '') => Array.from({ length: STAR_SLOTS }, (_, i) => `<svg class="${i < starsShown(n) ? 'on' : ''}"${cls}><use href="#i-star"/></svg>`).join('')
+
+// Covers are drawn from the song itself (cover-art.js): its opening notes on a composer-family colour, no pictures, no text.
+// A built-in song's notes come from the generated cover-prints.js, an imported song's from its own record.
+// size: 'card' (default) | 'thumb' (about 64px and below) | 'hero'; img: a real picture to lay over it (the import result only);
+// level: the teal badge; extra: more overlay markup; lesson: a lesson's art, which stays visibly different from a song's.
+function coverHTML(item, { stars = 0, size = 'card', img = null, level = null, extra = '', lesson = false } = {}) {
+  const art = coverArt(item, { size, fp: item.imported ? null : COVER_PRINTS[item.file] || null, lesson, hero: size === 'hero' })
   const photo = img ? `<img class="c-img" src="${img}" alt="" draggable="false">` : ''
   const badge = level ? `<span class="c-level">${escapeHtml(level)}</span>` : ''
-  const starRow = stars ? `<div class="c-stars" title="Best: ${stars} of 5 stars">${'<svg><use href="#i-star"/></svg>'.repeat(stars)}</div>` : ''
-  return `<div class="cover" style="background:${bg}">${art}${title}${photo}${badge}${starRow}${extra}</div>`
+  const starRow = stars ? `<div class="c-stars" title="Best: ${starsOffer(stars)}">${'<svg><use href="#i-star"/></svg>'.repeat(starsShown(stars))}</div>` : ''
+  return `<div class="cover${lesson ? ' is-lesson' : ''}" style="background:${art.bg}">${art.svg}${photo}${badge}${starRow}${extra}</div>`
 }
 const isFav = (file) => store.get('lumi.fav.' + file, false)
+const NOTICE_KEY = 'lumi.importNotice.'     // older versions kept the importer's note here; saved records carry it now, this is the fallback
 let searchChip = 'songs'
 let sortMode = 'title'
 const SORT_LABELS = { title: 'Title', level: 'Level', recent: 'Recently played' }
-// Imported songs show their own cover, built-in ones their covers/ file, both over the
-// generated art: a cover that fails to load is removed (wireUI) and the art shows instead.
-const missingCovers = new Set()      // cover files that failed to load, not asked for again
-const retriedCovers = new Set()      // cover files that failed once and were asked for again
-function coverSrc(item) {
-  // only validated base64 image data URLs (imported covers) and our own covers/ files go in the page
-  if (isSafeCover(item.cover)) return item.cover
-  return /^covers\/[\w-]+\.png$/.test(item.cover || '') && !missingCovers.has(item.cover) ? item.cover : null
-}
+// Every cover is generated; only the import result may lay the real picture found for a recording over it (opts.photo).
+// A picture that fails to load is removed (wireUI) and the generated art shows.
+const missingCovers = new Set()      // kept for the error handler below
+const retriedCovers = new Set()
 // opts.level false hides the level badge (imported songs never have one)
 function itemCover(item, opts = {}) {
-  return coverHTML(item, { ...opts, img: coverSrc(item), level: opts.level === false || item.imported ? null : item.level })
+  const { photo, ...rest } = opts
+  return coverHTML(item, { ...rest, img: photo && isSafeCover(item.cover) ? item.cover : null, level: opts.level === false || item.imported ? null : levelName(item.level) })
 }
 const escapeHtml = (t) => String(t || '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
 function allSongs() {
-  const mine = importedSongs.map((r) => ({ file: r.file, id: r.id, title: r.title, artist: r.artist || (r.source === 'audio' ? 'Recording' : 'Imported'), cover: r.cover, imported: true }))
+  const mine = importedSongs.map((r) => ({ file: r.file, id: r.id, title: r.title, artist: r.artist || (r.source === 'audio' ? 'Recording' : 'Imported'), cover: r.cover, imported: true, notes: r.notes, tempo: r.tempo, duration: r.duration, notice: r.importNotice || store.get(NOTICE_KEY + r.file, '') }))
   return [...mine, ...LIBRARY]
 }
 const findSong = (file) => allSongs().find((l) => l.file === file)
+const songLocked = (item) => !item.imported && !libraryAllowed(item.file)
+const songLockBadge = (item) => songLocked(item)
+  ? '<span class="premium-song-lock" title="Keylight Premium"><svg aria-hidden="true"><use href="#i-lock"/></svg></span>' : ''
 async function removeImportedSong(item) {
   if (!(await askConfirm(`Remove "${item.title}" from your library?`, 'The song and its best score are deleted from ' + THIS_COMPUTER + '. This can’t be undone.', 'Remove'))) return
-  await deleteImported(item.id)
-  localStorage.removeItem('lumi.best.' + item.file)
-  localStorage.removeItem('lumi.fav.' + item.file)
+  try { await deleteImported(item.id) } catch { return }
+  libTiles.delete(item.file)
+  const scores = ['lumi.best.', 'lumi.bestacc.'].map((prefix) => prefix + item.file)
+  try {
+    for (const key of Object.keys(localStorage)) {
+      if (scores.some((score) => key === score || key.startsWith(score + '.cover-v1.'))) localStorage.removeItem(key)
+    }
+    localStorage.removeItem('lumi.fav.' + item.file)
+    localStorage.removeItem(NOTICE_KEY + item.file)
+  } catch (error) {
+    recordDiagnosticFailure('Storage', 'Remove saved song progress', error)
+    showSettingsStorageError(SETTINGS_WRITE_ERROR)
+  }
   store.set('lumi.recent', recent().filter((r) => r.file !== item.file))
   await loadImportedLibrary()
   renderRecent()
 }
 function openItem(item) { return item.imported ? openImported(item.id) : openLibrary(item.file) }
-async function loadImportedLibrary() {
-  try { importedSongs = (await listImported()).sort((a, b) => (b.added || 0) - (a.added || 0)) } catch (e) { console.log('IMPORT library unavailable: ' + e.message); importedSongs = [] }
+function loadImportedLibrary() {
+  if (!pendingLibraryRead) pendingLibraryRead = refreshImportedLibrary().finally(() => { pendingLibraryRead = null })
+  return pendingLibraryRead
+}
+
+async function refreshImportedLibrary() {
+  try {
+    importedSongs = (await listImported()).sort((a, b) => (b.added || 0) - (a.added || 0))
+    importedLibraryLoaded = true
+    libraryReadFailed = false
+    $('libraryStorageNotice').classList.add('hidden')
+  } catch {
+    // Leave the last successfully read songs in place.
+  }
   renderLibrary(); updateHome()
 }
 
+async function readSongStorage(read) {
+  try { return await read() } catch (error) {
+    recordDiagnosticFailure('Storage', 'Read saved songs', error)
+    libraryReadFailed = true
+    const notice = $('libraryStorageNotice')
+    notice.textContent = LIBRARY_READ_ERROR
+    notice.classList.remove('hidden')
+    status(LIBRARY_READ_ERROR)
+    throw new Error(LIBRARY_READ_ERROR)
+  }
+}
+async function writeSongStorage(write) {
+  if (pendingLibraryRead) await pendingLibraryRead
+  if (libraryReadFailed) {
+    status(LIBRARY_READ_ERROR)
+    throw new Error(LIBRARY_READ_ERROR)
+  }
+  try { return await write() } catch (error) {
+    recordDiagnosticFailure('Storage', 'Write saved songs', error)
+    status(LIBRARY_WRITE_ERROR)
+    throw new Error(LIBRARY_WRITE_ERROR)
+  }
+}
+const listImported = () => readSongStorage(dbListSongs)
+const getImported = (id) => readSongStorage(() => dbGetSong(id))
+const saveImported = (record) => writeSongStorage(() => dbSaveSong(record))
+const saveImportedBatch = (records) => writeSongStorage(() => dbSaveSongs(records))
+const deleteImported = (id) => writeSongStorage(() => dbDeleteSong(id))
+
 function coverTile(item) {
+  if (IS_IOS) return libTile(item, 'grid')   // Home rails, Recent and the Songs grid share one tile (Illuminated Studio)
   const b = document.createElement('div')
   b.className = 'cover-tile'
   const extra = item.imported
     ? '<span class="c-badge">YOURS</span><span class="c-del" title="Remove from library"><svg><use href="#i-close"/></svg></span>'
     : ''
   const fav = isFav(item.file)
-  b.innerHTML = `<button class="cover-btn">${itemCover(item, { stars: bestFor(item.file), extra })}</button>
-    <div class="tile-meta"><div><div class="tile-name">${escapeHtml(item.title)}</div><div class="tile-sub">${escapeHtml(item.artist)}${item.heavy ? '<span class="long-tag" title="A long or note-dense piece: slow it down with the speed buttons">Long piece</span>' : ''}</div></div>
+  b.innerHTML = `<button class="cover-btn" aria-label="${escapeHtml(item.title + (songLocked(item) ? ', Keylight Premium' : ''))}">${itemCover(item, { stars: bestFor(item.file), extra })}</button>
+    <div class="tile-meta"><div><div class="tile-name">${escapeHtml(item.title)}${songLockBadge(item)}</div><div class="tile-sub">${escapeHtml(item.artist)}${item.heavy ? '<span class="long-tag" title="A long or note-dense piece: slow it down with the speed buttons">Long piece</span>' : ''}</div></div>
     <button class="heart ${fav ? 'on' : ''}" title="Favourite" aria-label="Favourite" aria-pressed="${fav}"><svg><use href="#i-heart"/></svg></button></div>`
   b.querySelector('.cover-btn').onclick = (e) => {
     if (e.target.closest('.c-del')) {
       e.stopPropagation()
-      removeImportedSong(item)
+      void removeImportedSong(item).catch((error) => status('Could not remove song: ' + error.message))
       return
     }
     openItem(item)
@@ -1615,6 +2600,69 @@ function coverTile(item) {
     e.stopPropagation()
     store.set('lumi.fav.' + item.file, !isFav(item.file))
     renderLibrary()
+    renderRecent()
+  }
+  return b
+}
+
+// ---- the Songs tab: a dense grid (or list) of song cards ----
+const VIEW_KEY = 'lumi.libview'
+let libView = store.get(VIEW_KEY, 'grid') === 'list' ? 'list' : 'grid'
+const LEVEL_DOTS = { 'Level 1': 1, 'Level 2': 1, Beginner: 1, Easy: 2, Intermediate: 2, Advanced: 3, Virtuoso: 3 }
+const clock = (secs) => { const t = Math.round(secs); return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0') }
+const songSeconds = (item) => (item.imported ? item.duration : SONG_SECONDS[item.file]) || 0
+// One card of the Songs grid. The cover button, the title block and the heart are siblings (no button inside a button);
+// the cover button stretches over the whole card, the heart and the remove cross sit above it. CSS (library.css) shows
+// the difficulty dots and length on the art in the grid and as text in the list.
+// A tile is rebuilt only when something it shows has changed, so typing in search re-parses no cover SVG.
+const libTiles = new Map()      // file -> { sig, node }
+function pruneLibTiles(everything) {
+  const live = new Set(everything.map((i) => i.file))
+  for (const k of libTiles.keys()) if (!live.has(k)) libTiles.delete(k)
+}
+function libTileCached(item) {
+  const sig = [item.file, item.id, item.notice, item.heavy, item.level, item.duration, isFav(item.file), bestFor(item.file), libView, premium(), coverSignature(item, item.imported ? null : COVER_PRINTS[item.file])].join('~')
+  const hit = libTiles.get(item.file)
+  if (hit && hit.sig === sig) return hit.node
+  const node = libTile(item)
+  libTiles.set(item.file, { sig, node })
+  return node
+}
+function libTile(item, view = libView) {
+  const b = document.createElement('div')
+  b.className = 'cover-tile lib-tile' + (item.imported ? ' is-imported' : '')
+  const secs = songSeconds(item), len = secs ? clock(secs) : ''
+  const dots = LEVEL_DOTS[item.level] || 0
+  const flag = item.imported ? '<span class="lib-flag">Imported</span>'
+    : dots ? `<span class="lib-dots" role="img" aria-label="Level: ${escapeHtml(levelName(item.level))}">${[1, 2, 3].map((n) => `<i class="${n <= dots ? 'on' : ''}"></i>`).join('')}</span>` : ''
+  const extra = flag + (len ? `<span class="lib-len">${len}</span>` : '')
+  const fav = isFav(item.file)
+  const stars = bestFor(item.file)
+  // the app always shows the row (empty stars for a song not played yet), so every tile has the same height
+  const starRow = stars || IS_IOS ? `<span class="lib-stars" role="img" aria-label="${stars ? 'Best: ' + starsOffer(stars) : 'No stars yet'}">${starRowHTML(stars)}</span>` : ''
+  const levelText = item.imported ? 'Imported' : levelName(item.level || '')
+  const notice = item.notice ? `<div class="lib-notice" title="${escapeHtml(item.notice)}"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8v.01"/></svg><span>${escapeHtml(item.notice)}</span></div>` : ''
+  const premiumLabel = songLocked(item) ? ', Keylight Premium' : ''
+  b.innerHTML = `<button class="cover-btn" aria-label="${escapeHtml(`${item.title}, ${item.artist}${levelText ? ', ' + levelText : ''}${len ? ', ' + len : ''}${premiumLabel}`)}">${itemCover(item, { level: false, extra, size: view === 'list' ? 'thumb' : 'card' })}</button>
+    <div class="tile-meta"><div><div class="tile-name">${escapeHtml(item.title)}${songLockBadge(item)}</div><div class="tile-sub"><span class="lib-artist">${escapeHtml(item.artist)}</span>${item.heavy ? '<span class="long-tag" title="A long or note-dense piece: slow it down with the speed buttons">Long piece</span>' : ''}</div>${starRow}${notice}</div></div>
+    <span class="lib-trail"><span class="lib-level">${escapeHtml(levelText)}</span><span class="lib-len-text">${len}</span></span>
+    <button class="heart ${fav ? 'on' : ''}" title="Favourite" aria-label="${escapeHtml('Favourite: ' + item.title)}" aria-pressed="${fav}"><svg><use href="#i-heart"/></svg></button>
+    ${item.imported ? `<button class="lib-del" title="Remove from library" aria-label="${escapeHtml('Remove from library: ' + item.title)}"><svg><use href="#i-close"/></svg></button>` : ''}`
+  b.querySelector('.cover-btn').onclick = () => openItem(item)
+  const del = b.querySelector('.lib-del')
+  if (del) del.onclick = (e) => {
+    e.stopPropagation()
+    void removeImportedSong(item).catch((error) => status('Could not remove song: ' + error.message))
+  }
+  const heart = b.querySelector('.heart')
+  heart.onclick = (e) => {
+    e.stopPropagation()
+    const on = !isFav(item.file)
+    store.set('lumi.fav.' + item.file, on)
+    if (searchChip === 'fav') renderLibrary()          // it leaves this list
+    else { heart.classList.toggle('on', on); heart.setAttribute('aria-pressed', String(on)) }   // keeps focus and scroll
+    libTiles.delete(item.file)   // the cached tile's signature still has the old heart: rebuild it next time
+    refreshSongRail()
     renderRecent()
   }
   return b
@@ -1633,30 +2681,52 @@ function sortSongs(list) {
 }
 // Level and composer filters on the song list (remembered between runs)
 const FILTER_KEY = 'lumi.libfilter'
-let libFilter = (() => { const f = store.get(FILTER_KEY, {}); return { level: (f && f.level) || '', composer: (f && f.composer) || '' } })()
-let levelChipsKey = ''
+// A saved filter from an older version (level and composer only) or a damaged one is cleaned again on every render
+let libFilter = (() => { const f = store.get(FILTER_KEY, {}); const t = (v) => (typeof v === 'string' ? v : ''); return { level: t(f && f.level), composer: t(f && f.composer), era: t(f && f.era), mood: t(f && f.mood), length: t(f && f.length) } })()
+const chipKeys = new Map()      // chip group id -> the values it was built for
+const NO_FILTER = { level: '', composer: '', era: '', mood: '', length: '' }
 function setFilter(next) {
   libFilter = { ...libFilter, ...next }
-  store.set(FILTER_KEY, libFilter)
+  store.set(FILTER_KEY, storableFilter(libFilter))
   renderLibrary()
 }
 function clearFilters() {
   searchTerm = ''; $('search').value = ''
-  setFilter({ level: '', composer: '' })
+  setFilter(NO_FILTER)
 }
-function renderLevelChips(levels) {
-  const host = $('levelChips')
-  const key = levels.join('|')
-  if (key !== levelChipsKey) {
-    levelChipsKey = key
-    host.replaceChildren(...['', ...levels].map((l) => {
+// One group of filter chips: [{ value, label }] with an optional first "all" chip; tapping the chosen one again clears it.
+function renderFilterChips(hostId, field, options, allLabel) {
+  const host = $(hostId)
+  const key = options.map((o) => o.value + '=' + o.label).join('|')
+  if (chipKeys.get(hostId) !== key) {
+    chipKeys.set(hostId, key)
+    host.replaceChildren(...(allLabel ? [{ value: '', label: allLabel }, ...options] : options).map((o) => {
       const b = document.createElement('button')
-      b.type = 'button'; b.dataset.level = l; b.textContent = l || 'All levels'
-      b.onclick = () => setFilter({ level: l && l === libFilter.level ? '' : l })
+      b.type = 'button'; b.dataset[field] = o.value; b.textContent = o.label
+      b.onclick = () => setFilter({ [field]: o.value && o.value === libFilter[field] ? '' : o.value })
       return b
     }))
   }
-  for (const b of host.children) { const on = b.dataset.level === libFilter.level; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)) }
+  for (const b of host.children) { const on = b.dataset[field] === libFilter[field]; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)) }
+}
+const renderLevelChips = (levels) => renderFilterChips('levelChips', 'level', levels.map((l) => ({ value: l, label: levelName(l) })), 'All levels')
+// Quick browse above the grid: moods and the composers with most pieces (shown while nothing is typed or filtered)
+function renderBrowse(everything) {
+  const moods = moodsPresent(everything), comps = topComposers(everything, 8)
+  const key = moods.join('|') + '#' + comps.map((c) => c.name + c.count).join('|')
+  const host = $('libBrowse')
+  if (host.dataset.key === key) return
+  host.dataset.key = key
+  const chip = (text, count, set) => {
+    const b = document.createElement('button')
+    b.type = 'button'; b.textContent = text
+    if (count != null) { const n = document.createElement('small'); n.textContent = count; b.appendChild(n); b.setAttribute('aria-label', `${text}, ${count} ${count === 1 ? 'piece' : 'pieces'}`) }
+    b.onclick = () => setFilter(set)
+    return b
+  }
+  $('browseMoods').replaceChildren(...moods.map((m) => chip(m, null, { mood: m })))
+  $('browseComposers').replaceChildren(...comps.map((c) => chip(c.name, c.count, { composer: c.name })))
+  host.dataset.has = moods.length || comps.length ? '1' : ''
 }
 let composerList = []
 function renderComposerList() {
@@ -1712,6 +2782,60 @@ function wireComposerMenu() {
   $('clearFilters').onclick = clearFilters
 }
 
+// ---- Songs tab chrome: the filter sheet (phone), the grid / list switch ----
+const filterSheetOpen = () => document.body.classList.contains('filters-open')
+function openFilterSheet() {
+  document.body.classList.add('filters-open')
+  $('openFilters').setAttribute('aria-expanded', 'true')
+  // a sheet (modal) on a phone, an inline panel (not modal) on wider windows
+  const sheet = matchMedia('(max-width: 699px)').matches
+  $('filterBar').setAttribute('role', sheet ? 'dialog' : 'group')
+  if (sheet) { $('filterBar').setAttribute('aria-modal', 'true'); $('filterBar').setAttribute('aria-labelledby', 'filterTitle'); $('filterClose').focus({ preventScroll: true }) }
+}
+function closeFilterSheet(focusButton) {
+  if (!filterSheetOpen()) return
+  closeComposerMenu(false)
+  document.body.classList.remove('filters-open')
+  $('openFilters').setAttribute('aria-expanded', 'false')
+  $('filterBar').setAttribute('role', 'group'); $('filterBar').removeAttribute('aria-modal'); $('filterBar').removeAttribute('aria-labelledby')
+  if (focusButton) $('openFilters').focus({ preventScroll: true })
+}
+function setLibView(v) {
+  libView = v === 'list' ? 'list' : 'grid'
+  store.set(VIEW_KEY, libView)
+  renderLibrary()
+}
+function wireLibraryChrome() {
+  $('openFilters').onclick = () => (filterSheetOpen() ? closeFilterSheet(true) : openFilterSheet())
+  $('filterClose').onclick = $('filterDone').onclick = () => closeFilterSheet(true)
+  $('filterScrim').onclick = () => closeFilterSheet(true)
+  $('filterClear').onclick = () => { clearFilters() }
+  $('viewGrid').onclick = () => setLibView('grid')
+  $('viewList').onclick = () => setLibView('list')
+  // Escape closes the composer list first (its own handler), then the sheet
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && filterSheetOpen() && !composerMenuOpen()) { e.preventDefault(); e.stopPropagation(); closeFilterSheet(true) }
+  }, true)
+  // the sheet is modal only on a phone: when the window changes size, keep the panel open but fix its role
+  matchMedia('(max-width: 699px)').addEventListener('change', (m) => {
+    if (!filterSheetOpen()) return
+    const f = $('filterBar')
+    f.setAttribute('role', m.matches ? 'dialog' : 'group')
+    if (m.matches) { f.setAttribute('aria-modal', 'true'); f.setAttribute('aria-labelledby', 'filterTitle') } else { f.removeAttribute('aria-modal'); f.removeAttribute('aria-labelledby') }
+  })
+}
+
+// The Home rail shows the whole library whatever is typed in search: it is rebuilt only when what it shows changes
+// (a rename, an edit, a favourite, a best score, a delete, an import), so every such change calls this.
+function refreshSongRail(everything = allSongs()) {
+  const rail = $('songRail')
+  if (!rail) return
+  const sig = premium() + '|' + everything.map((i) => [i.file, i.id, levelName(i.level), isFav(i.file), bestFor(i.file), coverSignature(i, i.imported ? null : COVER_PRINTS[i.file])].join('~')).join('|')
+  if (rail.dataset.sig === sig) return
+  rail.dataset.sig = sig
+  rail.replaceChildren()
+  for (const item of everything) rail.appendChild(coverTile(item))
+}
 function renderLibrary() {
   const grid = $('libraryGrid')
   grid.replaceChildren()
@@ -1720,33 +2844,99 @@ function renderLibrary() {
   const everything = allSongs()
   const levels = levelsPresent(everything, LEVELS)
   composerList = composersOf(everything)
-  const safe = cleanFilter(libFilter, levels, composerList)
-  if (safe.level !== libFilter.level || safe.composer !== libFilter.composer) { libFilter = safe; store.set(FILTER_KEY, libFilter) }
-  let lib = everything.filter((i) => !searchTerm || [i.title, i.artist, i.genre, i.level].join(' ').toLowerCase().includes(searchTerm))
+  const eras = erasPresent(everything), moods = moodsPresent(everything)
+  const lengths = lengthsPresent(everything.filter((i) => !i.imported), songSeconds)   // offered only when every built-in song has a known length
+  const safe = cleanFilter(libFilter, levels, composerList, { eras, moods, lengths: lengths.map((l) => l.id) })
+  if (importedLibraryLoaded && !libraryReadFailed && Object.keys(safe).some((k) => safe[k] !== libFilter[k])) {
+    libFilter = safe
+    store.set(FILTER_KEY, storableFilter(libFilter))
+  }
+  // search: every typed word must be found (accents and case ignored); better matches come first, then the chosen sort
+  const words = searchWords(searchTerm)
+  let lib = everything
+  let ranks = null
+  if (words.length) {
+    ranks = new Map()
+    lib = everything.filter((i) => { const r = searchRank(i, words, levelName); if (r) ranks.set(i, r); return r > 0 })
+  }
   if (searchChip === 'fav') lib = lib.filter((i) => isFav(i.file))
   if (searchChip === 'imported') lib = lib.filter((i) => i.imported)
-  lib = applyFilter(lib, libFilter)
-  for (const item of sortSongs(lib)) grid.appendChild(coverTile(item))
-  const rail = $('songRail')
-  if (rail) { rail.replaceChildren(); for (const item of everything) rail.appendChild(coverTile(item)) }
+  lib = applyFilter(lib, libFilter, songSeconds)
+  let shown = sortSongs(lib)
+  if (ranks) shown = shown.sort((a, b) => ranks.get(b) - ranks.get(a))      // stable: equal matches keep the chosen sort
+  for (const item of shown) grid.appendChild(libTileCached(item))
+  refreshSongRail(everything)
+  // tiles of songs that are gone (deleted, or not imported any more) leave the cache on every library change
+  pruneLibTiles(everything)
   const showSongs = searchChip === 'songs' || searchChip === 'fav' || searchChip === 'imported'
   grid.classList.toggle('hidden', !showSongs)
   $('lessonList').classList.toggle('hidden', searchChip !== 'lessons')
   $('searchGames').classList.toggle('hidden', searchChip !== 'games')
-  const filterOn = !!(libFilter.level || libFilter.composer)
-  const noMatch = showSongs && !lib.length
+  const nFilters = filterCount(libFilter)
+  const filterOn = nFilters > 0
+  const noMatch = showSongs && !libraryReadFailed && !lib.length
   const offerClear = noMatch && (filterOn || !!searchTerm)
   $('searchEmpty').classList.toggle('hidden', !noMatch)
-  $('searchEmptyActions').classList.toggle('hidden', searchChip === 'fav' || offerClear)
+  // what the empty state says: no match for a search or filter, no favourites yet, no imported songs yet
+  const emptyKind = offerClear ? 'clear' : searchChip === 'fav' ? 'fav' : searchChip === 'imported' ? 'imported' : 'none'
+  const typed = ($('search').value || '').trim()
+  const EMPTY = (IS_IOS ? {
+    clear: ['#i-search', searchTerm ? `No match for \u201c${typed.slice(0, 40)}\u201d` : 'Nothing matches those filters', searchTerm ? 'Check the spelling, try a composer, or add the song from your own files.' : 'Remove a filter to widen the list, or add a file of your own.'],
+    fav: ['#i-heart-empty', 'No saved songs yet', 'Tap the heart on any piece to keep it here.'],
+    imported: ['#i-note', 'No songs added yet', 'Bring in a recording, MIDI or MusicXML file and Keylight turns it into notes on this device.'],
+    none: ['#i-note', 'No songs here', 'Nothing matches yet.']
+  } : {
+    clear: ['#i-search', searchTerm ? 'Not in the library yet' : 'No songs match these filters', searchTerm ? 'Nothing matches that. Try a composer, a mood or part of a title, or add the piece from a file of your own.' : 'Try fewer filters, or add a piece from a file of your own.'],
+    fav: ['#i-heart-empty', 'No favourites yet', 'Tap the heart on any song to keep it here.'],
+    imported: ['#i-note', 'Bring your own music', 'Add a recording, video, MIDI or MusicXML file and it becomes notes you can play along with.'],
+    none: ['#i-note', 'No songs here', 'Nothing matches yet.']
+  })[emptyKind]
+  $('searchEmptyIcon').firstElementChild.setAttribute('href', EMPTY[0])
+  $('searchEmptyTitle').textContent = EMPTY[1]
+  $('searchEmptyText').textContent = EMPTY[2]
+  $('searchEmptyActions').classList.toggle('hidden', offerClear)
   $('searchEmptyClear').classList.toggle('hidden', !offerClear)
-  $('searchEmptyText').textContent = offerClear ? (filterOn ? 'No songs match these filters.' : 'No songs match that search.')
-    : searchChip === 'fav' ? 'Tap the heart on a song to keep it here.' : searchChip === 'imported' ? 'Songs you add show up here.' : 'No songs match that search.'
-  for (const c of document.querySelectorAll('#searchChips button')) {
-    c.classList.toggle('on', c.dataset.chip === searchChip)
-    if (c.dataset.chip === 'imported') c.classList.toggle('hidden', !hasImported && searchChip !== 'imported')
+  $('searchEmptyClear').querySelector('[data-empty="clear"]').hidden = !filterOn && !searchTerm
+  if (IS_IOS) {
+    $('searchEmptyClear').querySelector('[data-empty="clear"]').textContent = searchTerm ? 'Clear search' : 'Clear filters'
+    $('searchEmptyClear').querySelector('[data-empty="add"]').textContent = 'Add a song'
   }
+  const emptyBtn = (k) => $('searchEmptyActions').querySelector(`[data-empty="${k}"]`)
+  emptyBtn('add').hidden = emptyKind === 'fav'
+  emptyBtn('lessons').hidden = emptyKind !== 'none'
+  emptyBtn('recent').hidden = emptyKind !== 'fav'
+  for (const c of document.querySelectorAll('#searchChips [data-chip], #libMenu [data-chip]')) {
+    c.classList.toggle('on', c.dataset.chip === searchChip)
+    c.setAttribute('aria-pressed', String(c.dataset.chip === searchChip))
+  }
+  if (IS_IOS) {
+    const songsTab = $('searchChips').querySelector('[data-chip="songs"]')
+    songsTab.classList.toggle('on', showSongs)
+    songsTab.setAttribute('aria-pressed', String(showSongs))
+  }
+  // the Add a song card is the big invitation until there is a song of your own, then a slim row
+  $('openImport').classList.toggle('hidden', !showSongs || (IS_IOS && noMatch))
+  $('openImport').classList.toggle('is-first', !hasImported)
+  $('libAddSub').textContent = hasImported ? (IS_IOS ? 'From your device, or shared from another app' : 'Audio, video, MIDI or MusicXML') : (IS_IOS ? 'Turn a recording, MIDI or MusicXML file into notes you can play.' : 'Turn a recording, video, MIDI or MusicXML file into notes you can play.')
   $('filterBar').classList.toggle('hidden', !showSongs)
+  $('openFilters').classList.toggle('hidden', !showSongs)
+  $('libMeta').classList.toggle('hidden', !showSongs)
+  $('libMenuBtn')?.classList.toggle('hidden', !showSongs)
+  $('filterBadge').textContent = nFilters; $('filterBadge').classList.toggle('hidden', !nFilters)
+  $('openFilters').classList.toggle('active', nFilters > 0)
+  $('openFilters').setAttribute('aria-label', nFilters ? `Filters, ${nFilters} on` : 'Filters')
+  $('filterDone').textContent = lib.length ? `Show ${countLabel(lib.length)}` : 'Show songs'
+  grid.classList.toggle('is-list', libView === 'list')
+  for (const [id, v] of [['viewGrid', 'grid'], ['viewList', 'list']]) $(id).setAttribute('aria-pressed', String(libView === v))
   renderLevelChips(levels)
+  renderFilterChips('eraChips', 'era', eras.map((e) => ({ value: e, label: e })))
+  renderFilterChips('moodChips', 'mood', moods.map((m) => ({ value: m, label: m })))
+  renderFilterChips('lengthChips', 'length', lengths.map((l) => ({ value: l.id, label: `${l.label} (${l.hint.toLowerCase()})` })))
+  $('eraSect').classList.toggle('hidden', !eras.length)
+  $('moodSect').classList.toggle('hidden', !moods.length)
+  $('lengthSect').classList.toggle('hidden', !lengths.length)
+  renderBrowse(everything)
+  $('libBrowse').classList.toggle('hidden', !(showSongs && searchChip === 'songs' && !searchTerm && !filterOn && $('libBrowse').dataset.has))
   $('composerLabel').textContent = libFilter.composer || 'All'
   $('composerBtn').classList.toggle('active', !!libFilter.composer)
   $('libCount').textContent = countLabel(lib.length)
@@ -1773,33 +2963,191 @@ function renderRecent() {
   }
 }
 
+function syncExperienceCard() {
+  const show = store.get('lumi.onboarded', false) && !normalizeExperience(settings.experience) && !store.get('lumi.experienceCardDismissed', false)
+  $('homeExperience').classList.toggle('hidden', !show)
+}
+function dismissExperienceCard() {
+  store.set('lumi.experienceCardDismissed', true)
+  syncExperienceCard()
+}
+
+// the first lesson's line on the app's Home (the course data keeps its own goal text)
+const HOME_FIRST_LINE = { 'l1-find-c': 'Use the groups of two black keys to find every C on your keyboard.' }
 function updateHome() {
+  syncExperienceCard()
   const hour = new Date().getHours()
-  $('greeting').textContent = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
-  $('streakChip').textContent = store.get('lumi.streak.count', 0)
-  $('minutesChip').textContent = Math.round((store.get('lumi.days', {})[todayKey()] || 0) / 60)
+  // the app has no greeting (Illuminated Studio); the heading stays for screen readers and is hidden by ios.css
+  $('greeting').textContent = IS_IOS ? 'Home' : hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
+  const streak = store.get('lumi.streak.count', 0)
+  $('streakChip').textContent = streak
+  $('streakLabel').textContent = streak >= 1 ? 'day streak' : 'start a streak'
+  $('streakTile').classList.toggle('lit', streak >= 2)
+  const days = store.get('lumi.days', {})
+  $('minutesChip').textContent = IS_IOS
+    ? practiceWeek(days).filter(({ secs }) => secs > 0).length
+    : Math.floor((days[todayKey()] || 0) / 60)
+  if (IS_IOS) $('minutesLabel').textContent = 'days this week'
   const r = recent()[0]
   const item = (r && findSong(r.file)) || LIBRARY.find((l) => l.file === 'twinkle.xml')
-  $('continueKicker').textContent = r ? 'Continue learning' : 'Start here'
-  $('continueTitle').textContent = item.title
+  const lead = IS_IOS ? course.upNext() : null        // iPhone/iPad: Home leads with the next lesson, not the last song
+  $('continueKicker').textContent = IS_IOS ? (r ? 'Last played' : 'Up next') : r ? 'Continue learning' : 'Start here'
+  $('continueTitle').innerHTML = escapeHtml(item.title) + songLockBadge(item)
   const best = bestFor(item.file)
-  $('continueSub').innerHTML = `${escapeHtml(item.artist)}<span class="hero-meta">${best ? best + ' of 5 stars' : 'Not played yet'}</span>`
-  $('continueArt').innerHTML = itemCover(item, { stars: best })
+  const heroMeta = IS_IOS && best ? `<span class="lib-stars" role="img" aria-label="Best: ${starsOffer(best)}">${starRowHTML(best)}</span>`
+    : best ? best + ' of 5 stars' : r && r.file === item.file ? 'No stars yet' : 'Not played yet'
+  $('continueSub').innerHTML = `${escapeHtml(item.artist)}<span class="hero-meta">${heroMeta}</span>`
+  $('continueArt').innerHTML = itemCover(item, { stars: best, size: 'hero' })
   $('continuePlay').onclick = () => openItem(item)
-  $('continuePractise').onclick = () => openItem(item).then(() => setMode('PRACTISE'))
+  $('continuePractise').onclick = () => {
+    if (songLocked(item)) return openPaywall()
+    return openItem(item).then(() => setMode('PRACTISE'))
+  }
   // first run: Start here leads into the course's first lesson
   if (!r && !Object.keys(course.progress.lessons).length) {
     const first = COURSE.levels[0].lessons[0]
     $('continueTitle').textContent = first.title
-    $('continueSub').innerHTML = `${escapeHtml(first.goal)}<span class="hero-meta">Lesson 1 of the piano course · ${first.minutes} min</span>`
-    $('continuePlay').lastChild.textContent = 'Start lesson 1'
+    if (IS_IOS) {
+      const total = COURSE.levels.reduce((n, l) => n + l.lessons.length, 0)
+      $('continueKicker').textContent = `Lesson 1 of ${total}`
+      $('continueSub').innerHTML = `${escapeHtml(HOME_FIRST_LINE[first.id] || first.goal)}<span class="hero-meta">About ${first.minutes} min</span>`
+      $('continuePlay').lastChild.textContent = 'Start lesson'
+    } else {
+      $('continueSub').innerHTML = `${escapeHtml(first.goal)}<span class="hero-meta">Lesson 1 of the piano course · ${first.minutes} min</span>`
+      $('continuePlay').lastChild.textContent = 'Start lesson 1'
+    }
     $('continuePlay').onclick = () => course.openStep()
     $('continuePractise').classList.add('hidden')
   } else { $('continuePlay').lastChild.textContent = 'Play'; $('continuePractise').classList.remove('hidden') }
+  if (lead) {
+    // "Up next": the lesson's own title and goal, one ivory button, and the rail plays the lesson's first bar once (playUpNextBar)
+    $('continueKicker').textContent = 'Up next'
+    $('continueTitle').textContent = lead.title
+    const meta = lead.kind === 'lesson' ? `<span class="hero-meta">${lead.fresh ? 'About ' + lead.minutes + ' min' : 'Lesson ' + lead.number + ' of ' + lead.count + dot() + lead.minutes + ' min'}</span>` : ''
+    $('continueSub').innerHTML = `${escapeHtml((lead.fresh && HOME_FIRST_LINE[lead.id]) || lead.goal)}${meta}`
+    $('continueArt').replaceChildren()
+    $('continuePlay').lastChild.textContent = lead.kind === 'exam' ? 'Take the exam' : lead.fresh ? 'Start lesson' : 'Continue'
+    $('continuePlay').onclick = () => course.openStep()
+    $('continuePractise').classList.add('hidden')
+  }
+  document.body.classList.toggle('lead-lesson', !!lead)
+  // the date line replaces the welcome sentence once the first lesson has been started
+  const firstRun = !r && !Object.keys(course.progress.lessons).length
+  document.body.classList.toggle('first-run', firstRun)
+  $('greetingSub').textContent = IS_IOS ? '' : firstRun ? 'Ready to play? Your keys will show you the way.'
+    : new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })
   course.refreshHome()
   renderRecent()
   renderPracticeRail()
   updateGoal()
+  if (IS_IOS) {
+    // the Today numbers wait for the first practice; the light field takes the colours of what the hero shows
+    document.body.classList.toggle('no-practice', !Object.values(days).some((v) => v > 0))
+    const lesson = COURSE.levels[0].lessons[0]
+    const goalMin = store.get('lumi.days', {})[todayKey()] || 0
+    $('todayLine').textContent = `${streak >= 1 ? streak + (streak === 1 ? ' day' : ' days') + ' in a row' : 'Start a streak'}${dot()}${Math.floor(goalMin / 60)} of ${settings.goalMin} min`
+    const amb = lead ? ambientColors({ id: lead.id, title: lead.title }) : firstRun ? ambientColors({ id: lesson.id, title: lesson.title }) : ambientColors(item, item.imported ? null : COVER_PRINTS[item.file] || null)
+    ambientCrossfade(amb)
+    if (!homeLight) homeLight = mountHomeLight($('continueCard'), { isHome: () => screen === 'home' && !setup.open && !handGuideRun && !tourIsOpen() && !document.querySelector('dialog[open]'), shot: SHOT_MODE, soundOn: homeRailSoundOn, playNote: homeRailNote })
+    // the light takes its colours from the notes of what the hero shows (a lesson names the key it teaches: every C)
+    const fp = item.imported ? item.fp || (item.notes ? fingerprintOf(item) : null) : COVER_PRINTS[item.file] || null
+    const bar = lead && lead.bar
+    homeLight?.setPiece(bar ? new Map(bar.map((n) => [((n.p % 12) + 12) % 12, n.hand])) : firstRun ? new Map([[0, 'r']]) : fp ? handsFromNotes(fp.o) : null)
+    homeLight?.launch()
+    playUpNextBar(bar)
+  }
+}
+// The rail plays the next lesson's first bar once, 400ms after Home first paints (never under reduced motion, Lite effects or screenshot mode).
+let upNextPlayed = false
+function playUpNextBar(bar) {
+  if (upNextPlayed || !bar || !homeLight || document.hidden) return
+  const root = document.documentElement
+  const calm = root.classList.contains('shot') || root.classList.contains('fx-lite') || root.classList.contains('reduce-motion') || (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches)
+  if (calm || SHOT_MODE) return
+  upNextPlayed = true
+  const BEAT = 360
+  const rail = homeLight.rail
+  // quiet: Home is in front with no sheet, dialog, tour or hand guide over it, and the app is visible
+  const quiet = () => screen === 'home' && !document.hidden && !setup.open && !handGuideRun && !tourIsOpen() && !document.querySelector('dialog[open]')
+  setTimeout(() => {
+    if (!quiet()) { upNextPlayed = false; return }   // the first bar waits for a quiet Home
+    for (const n of bar) {
+      const key = rail.keys.find((k) => k.semi === ((n.p % 12) + 12) % 12)
+      if (!key) continue
+      let pressed = false   // only a key this bar pressed is released, so a key held by touch or MIDI stays down
+      setTimeout(() => { if (quiet()) { rail.press(key.semi, 0.85); pressed = true } }, n.at * BEAT)
+      setTimeout(() => { if (pressed) rail.release(key.semi) }, n.at * BEAT + Math.min(n.beats * BEAT, 300))
+    }
+  }, 400)
+}
+// a tap on the rail sounds one note only when the app's sound is on (volume above zero, not muted for a TV), through the app's own audio path
+const homeRailSoundOn = () => settings.volume > 0 && !(tvOn() && settings.tvSound === 'muted')
+function homeRailNote(pitch) {
+  initAudio()
+  noteOn(pitch, 84)
+  setTimeout(() => noteOff(pitch), 420)
+}
+// Home's light field: two static gradient layers (#ambient .a and .b) that crossfade by opacity, 500ms, once when the hero item
+// changes. No @property, no animated gradient, no loop. The first colours simply are there (no fade in from nothing).
+function ambientCrossfade(amb) {
+  const body = document.body
+  let host = document.getElementById('ambient')
+  if (!host) {
+    host = document.createElement('div')
+    host.id = 'ambient'
+    host.setAttribute('aria-hidden', 'true')
+    host.innerHTML = '<i class="a"></i><i class="b"></i>'
+    body.prepend(host)
+  }
+  const key = amb.a + '|' + amb.b
+  if (body.dataset.ambKey === key) return
+  const first = !body.dataset.ambKey
+  body.dataset.ambKey = key
+  const next = body.dataset.ambFront === 'a' ? 'b' : 'a'
+  const layer = host.querySelector('.' + next)
+  layer.style.setProperty('--c1', amb.a)
+  layer.style.setProperty('--c2', amb.b)
+  if (first) host.classList.add('still')
+  body.dataset.ambFront = next
+  if (first) requestAnimationFrame(() => requestAnimationFrame(() => host.classList.remove('still')))
+}
+
+/* ============================== the Songs header on iPhone/iPad (P6) ============================== */
+// Six rows become three: the title row, the search field with the filter button inside it, and the segments with the mood strip. Sort,
+// view, Favourites, Imported and Clear filters live in ONE menu behind the ... button; every one of them is the same element as before,
+// only moved, so each keeps its id, its handler and its state.
+function buildSongsHeader() {
+  const field = document.querySelector('#topbar .top-search')
+  if (field) field.append($('openFilters'))
+  const strip = $('searchChips')
+  strip.append($('libBrowse'))                                  // the mood and composer shortcuts scroll on the same row as the segments
+  const btn = document.createElement('button')
+  btn.type = 'button'; btn.id = 'libMenuBtn'; btn.className = 'iconbtn'
+  btn.setAttribute('aria-label', 'Sort and view'); btn.title = 'Sort and view'; btn.setAttribute('aria-haspopup', 'true'); btn.setAttribute('aria-expanded', 'false'); btn.setAttribute('aria-controls', 'libMenu')
+  btn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.5" cy="12" r="1.7" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none"/><circle cx="18.5" cy="12" r="1.7" fill="currentColor" stroke="none"/></svg>'
+  $('openImport').before(btn)
+  const menu = document.createElement('div')
+  menu.id = 'libMenu'; menu.className = 'lib-menu hidden'; menu.setAttribute('role', 'group'); menu.setAttribute('aria-label', 'Sort and view')
+  const row = (label, ...els) => { const d = document.createElement('div'); d.className = 'lm-row'; if (label) { const l = document.createElement('span'); l.className = 'lm-l'; l.textContent = label; d.append(l) } d.append(...els); return d }
+  const shortcuts = document.querySelector('#searchChips .song-shortcuts')
+  menu.append(row('Sort', $('sortBtn')), row('View', document.querySelector('.lib-view')), row('Show', ...shortcuts.querySelectorAll('[data-chip]')), row('', $('clearFilters')))
+  shortcuts.remove()
+  document.body.append(menu)
+  const open = () => {
+    const r = btn.getBoundingClientRect()
+    menu.style.setProperty('--lm-top', Math.round(r.bottom + 6) + 'px')
+    menu.classList.remove('hidden'); btn.setAttribute('aria-expanded', 'true')
+    menu.querySelector('button:not(.hidden)')?.focus({ preventScroll: true })
+  }
+  const close = (focus) => {
+    if (menu.classList.contains('hidden')) return
+    menu.classList.add('hidden'); btn.setAttribute('aria-expanded', 'false')
+    if (focus) btn.focus({ preventScroll: true })
+  }
+  btn.onclick = () => (menu.classList.contains('hidden') ? open() : close(true))
+  document.addEventListener('pointerdown', (e) => { if (!menu.classList.contains('hidden') && !menu.contains(e.target) && e.target !== btn && !btn.contains(e.target)) close(false) }, true)
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !menu.classList.contains('hidden')) { e.preventDefault(); e.stopPropagation(); close(true) } }, true)
+  new MutationObserver(() => close(false)).observe(document.body, { attributes: true, attributeFilter: ['data-screen'] })
 }
 
 /* ============================== games ============================== */
@@ -1817,8 +3165,8 @@ function gameCard(g) {
   const card = document.createElement('button')
   card.className = 'game-card'
   card.innerHTML = `<div class="g-art" style="background:${GAME_ART[g.id] || GAME_ART.cascade}"><div class="g-name">${g.name}</div></div>
-    <div class="g-meta"><span>${g.sub} · pass ${Math.round(g.threshold * 100)}%</span>
-    <span class="g-stars">${Array.from({ length: 5 }, (_, i) => `<svg class="${i < stars ? 'on' : ''}"><use href="#i-star"/></svg>`).join('')}</span></div>`
+    <div class="g-meta"><span>${g.sub}${dot()}pass ${Math.round(g.threshold * 100)}%</span>
+    <span class="g-stars">${starRowHTML(stars)}</span></div>`
   card.onclick = () => startGame(g)
   return card
 }
@@ -1828,7 +3176,7 @@ function noteGameCard(g) {
   card.className = 'game-card'
   card.innerHTML = `<div class="g-art" style="background:${GAME_ART[g.id]}"><div class="g-name">${g.name}</div></div>
     <div class="g-meta"><span>${g.sub}</span>
-    <span class="g-stars">${Array.from({ length: 5 }, (_, i) => `<svg class="${i < stars ? 'on' : ''}"><use href="#i-star"/></svg>`).join('')}</span></div>`
+    <span class="g-stars">${starRowHTML(stars)}</span></div>`
   card.onclick = () => startQuiz(g)
   return card
 }
@@ -1850,37 +3198,61 @@ function showQuizQuestion() {
   el.classList.remove('wrong')
   if (quiz.game.kind === 'name') el.textContent = quiz.q.name
   else el.innerHTML = staffSvg(quiz.q.pitch, quiz.game.clef)
-  $('quizHelp').textContent = 'Any octave counts'
+  if (quiz.every) showQuizFound()
+  else $('quizHelp').textContent = 'Any octave counts'
+}
+function showQuizFound() {
+  for (const key of $('quizPad').querySelectorAll('.ex-key')) key.classList.toggle('ok', quiz.found.has(Number(key.dataset.p)))
+  $('quizHelp').textContent = `Keys found: ${quiz.found.size} of ${quiz.targets.size}. Play each ${quiz.q.name} once.`
+}
+function syncQuizWindow() {
+  const base = kbBase(), keys = kbKeys()
+  if (base !== quiz.base || keys !== quiz.keys) {
+    Object.assign(quiz, { base, keys, targets: new Set(matchingPitches(quiz.q, base, keys)), found: new Set() })
+    mountQuizPad()
+    return true
+  }
+  return false
 }
 function askQuiz(now = performance.now()) {
   quiz.q = nextQuestion(quiz.game, quiz.q)
   quiz.askedAt = now
+  quiz.missed = false
+  if (quiz.every && !syncQuizWindow()) {
+    quiz.targets = new Set(matchingPitches(quiz.q, quiz.base, quiz.keys))
+    quiz.found.clear()
+  }
   showQuizQuestion()
 }
 function startQuiz(g, run = null) {
   initAudio()
+  quiz?.releasePad?.()
   courseRun = run ? { ownerId: run.ownerId, item: run.item } : null
-  quiz = { game: g, score: 0, wrong: 0, rounds: run ? run.rounds : 0, course: !!run, until: performance.now() + ROUND_SECONDS * 1000, q: null, askedAt: 0, over: false }
+  quiz = { game: g, every: g.mode === 'every', score: 0, correctKeys: 0, wrong: 0, rounds: run ? run.rounds : 0, course: !!run, until: performance.now() + ROUND_SECONDS * 1000, q: null, askedAt: 0, over: false }
   $('quizAgain').classList.add('hidden')
   $('quizBack').classList.add('hidden')
   $('quizAgain').onclick = () => startQuiz(g, run)
   showScreen('quiz')
-  mountQuizPad()
+  if (!quiz.every) mountQuizPad()
   courseRun = run ? { ownerId: run.ownerId, item: run.item } : null
-  $('title').textContent = g.name
-  $('subtitle').textContent = run ? `Course · ${run.rounds} right answers, one minute` : 'Games · one minute'
+  $('title').textContent = (quiz.every && run?.item.title) || g.name
+  $('subtitle').textContent = run ? `Course${dot()}${run.rounds} ${quiz.every ? 'rounds' : 'right answers'}, one minute` : 'Games' + dot() + 'one minute'
   askQuiz()
   updateQuiz()
 }
-// Touch screens get a one-octave keyboard under the question (every game accepts the note in any octave), so a game is
-// playable without a MIDI keyboard. Each finger is its own pointer, so chords and quick runs both work.
+// Every-key questions show the full row. Other games offer a one-octave pad on touch screens.
 function mountQuizPad() {
   const host = $('quizPad')
-  const wanted = TOUCH || IS_NATIVE_HOST
+  quiz.releasePad?.()
+  const wanted = quiz.every || TOUCH || IS_NATIVE_HOST
   host.classList.toggle('hidden', !wanted)
   if (!wanted) { host.replaceChildren(); return }
-  host.innerHTML = padSvg([60, 71], { names: true })
+  host.innerHTML = quiz.every ? padSvg([quiz.base, quiz.base + quiz.keys - 1], { names: false }) : padSvg([60, 71], { names: true })
   const held = new Map()
+  quiz.releasePad = () => {
+    for (const p of new Set(held.values())) handleNoteOff(p)
+    held.clear()
+  }
   const release = (e) => {
     const p = held.get(e.pointerId)
     if (p === undefined) return
@@ -1903,8 +3275,26 @@ function mountQuizPad() {
 }
 function quizPress(pitch, now = performance.now()) {
   if (!quiz || quiz.over || screen !== 'quiz') return
-  if (isRight(quiz.q, pitch)) { quiz.score++; if (quiz.rounds && quiz.score >= quiz.rounds) finishQuiz(); else askQuiz(now) }
-  else { quiz.wrong++; $('quizPrompt').classList.add('wrong'); $('quizHelp').textContent = 'Not that one: try again' }
+  if (quiz.every && syncQuizWindow()) showQuizQuestion()
+  if (quiz.every ? !quiz.targets.has(pitch) : !isRight(quiz.q, pitch)) {
+    quiz.wrong++; quiz.missed = true
+    haptic('warning')
+    $('quizPrompt').classList.add('wrong')
+    $('quizHelp').textContent = 'Try another key'
+    return
+  }
+  if (quiz.every) {
+    if (quiz.found.has(pitch)) return
+    quiz.found.add(pitch)
+    $('quizPrompt').classList.remove('wrong')
+    showQuizFound()
+    if (quiz.found.size < quiz.targets.size) { haptic('soft'); return }
+    quiz.correctKeys += quiz.found.size
+  }
+  quiz.score++
+  haptic('soft')
+  if (quiz.rounds && quiz.score >= quiz.rounds) finishQuiz()
+  else askQuiz(now)
 }
 function finishQuiz() {
   quiz.over = true
@@ -1912,19 +3302,22 @@ function finishQuiz() {
   const stars = starsFor(quiz.score)
   if (stars > gameBest(quiz.game.id)) store.set('lumi.game.' + quiz.game.id, stars)
   $('quizPrompt').classList.remove('wrong')
-  $('quizPrompt').textContent = '★'.repeat(stars) + '☆'.repeat(5 - stars)
+  $('quizPrompt').textContent = '★'.repeat(starsShown(stars)) + '☆'.repeat(STAR_SLOTS - starsShown(stars))
   $('quizHelp').textContent = quiz.score + (quiz.score === 1 ? ' note' : ' notes') + ' in a minute'
   $('quizAgain').classList.remove('hidden')
 }
-// A note game inside the course: accuracy is right answers over answers given (at least the rounds asked)
+// Every-key rounds must be completed and accuracy is measured per key.
 function finishCourseQuiz() {
-  const acc = noteGameAccuracy(quiz.rounds, quiz.score, quiz.wrong)
+  const acc = quiz.every
+    ? Math.min(quiz.score / quiz.rounds, noteGameAccuracy(0, quiz.correctKeys, quiz.wrong))
+    : noteGameAccuracy(quiz.rounds, quiz.score, quiz.wrong)
   const r = course.record(courseRun.ownerId, courseRun.item, { accuracy: acc, seconds: ROUND_SECONDS })
   courseRun.passed = r.passed
   markCalm(r.passed)
   $('quizPrompt').classList.remove('wrong')
   $('quizPrompt').textContent = Math.round(acc * 100) + '%'
-  $('quizHelp').textContent = `${quiz.score} right, ${quiz.wrong} wrong · ${r.passed ? 'item passed' : 'aim for ' + passText(courseRun.item)}${r.lessonDone ? ' · lesson complete' : ''}`
+  const result = quiz.every ? `${quiz.score} of ${quiz.rounds} rounds complete, ${quiz.wrong} wrong keys` : `${quiz.score} right, ${quiz.wrong} wrong`
+  $('quizHelp').textContent = `${result}${dot()}${r.passed ? 'item passed' : 'aim for ' + passText(courseRun.item)}${r.lessonDone ? dot() + 'lesson complete' : ''}`
   $('quizAgain').classList.remove('hidden')
   const next = course.nextAction(courseRun.ownerId, courseRun.item.id, r.passed)
   $('quizBack').textContent = next.label
@@ -1937,20 +3330,22 @@ function finishCourseQuiz() {
 }
 function updateQuiz(now = performance.now()) {
   if (!quiz || quiz.over) return
+  if (quiz.every && syncQuizWindow()) showQuizQuestion()
   const left = Math.max(0, Math.ceil((quiz.until - now) / 1000))
   setText($('quizTime'), Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0'))
-  setText($('quizScore'), String(quiz.score) + ' right')
+  setText($('quizScore'), quiz.every ? `Round ${quiz.score + 1} of ${quiz.rounds}` : quiz.score + ' right')
   if (left <= 0) finishQuiz()
 }
-// Stuck on a question: its keys light up after a few seconds.
+// In the course, a wrong key earns a hint. Standalone games give a timed hint.
 function quizHintPitches(now = performance.now()) {
-  if (!quiz || quiz.over || screen !== 'quiz' || now - quiz.askedAt < HINT_AFTER_SECONDS * 1000) return []
-  const base = kbBase(), out = []
-  for (let i = 0; i < kbKeys(); i++) if (pitchClass(base + i) === pitchClass(quiz.q.pitch)) out.push(base + i)
-  return out
+  if (!quiz || quiz.over || screen !== 'quiz' || !quiz.q) return []
+  if (quiz.course ? !quiz.missed : now - quiz.askedAt < HINT_AFTER_SECONDS * 1000) return []
+  const matches = matchingPitches(quiz.q, kbBase(), kbKeys())
+  return quiz.every ? matches.filter((p) => !quiz.found.has(p)) : matches
 }
 
 async function startGame(g) {
+  if (!libraryAllowed(g.file)) { void openPaywall(); return }
   try {
     const res = await fetch('songs/' + g.file)
     if (!res.ok) throw new Error('HTTP ' + res.status)
@@ -1972,9 +3367,9 @@ async function startGame(g) {
     bandEvents = computeBand(song); resetBand(0)
     showScreen('play')
     $('title').textContent = g.name
-    $('subtitle').textContent = 'Arcade · ' + (g.rate !== 1 ? Math.round(g.rate * 100) + '% speed · ' : '') + 'pass mark ' + Math.round(g.threshold * 100) + '%'
+    $('subtitle').textContent = 'Arcade' + dot() + (g.rate !== 1 ? Math.round(g.rate * 100) + '% speed' + dot() : '') + 'pass mark ' + Math.round(g.threshold * 100) + '%'
     syncHudButtons(); resize()
-    status('Game ready — press Play. Score above ' + Math.round(g.threshold * 100) + '% to pass.')
+    status('Game ready. Press Play. Score above ' + Math.round(g.threshold * 100) + '% to pass.')
   } catch (e) { status('Could not start game: ' + e.message) }
 }
 
@@ -2000,7 +3395,7 @@ const LESSON_ART = [
 ]
 const lessonArt = (lesson, idx) => {
   const item = LIBRARY.find((l) => l.file === lesson.file)
-  return item ? itemCover(item, { level: false }) : `<div class="cover" style="background:${LESSON_ART[idx % LESSON_ART.length]}"></div>`
+  return item ? itemCover(item, { level: false, lesson: true, size: 'thumb' }) : `<div class="cover" style="background:${LESSON_ART[idx % LESSON_ART.length]}"></div>`
 }
 const stepLabel = (step) => (step === 'PLAY' ? 'Challenge' : step === 'PRACTISE' ? 'Practice' : 'Watch')
 // The step to open when a lesson card is tapped: the first one not done yet.
@@ -2022,7 +3417,7 @@ function renderLessons() {
     const steps = LESSON_STEPS.map((step) => {
       const stars = step === 'WATCH' ? 0 : lessonStepStars(lesson.id, step)
       const done = lessonStepDone(lesson.id, step)
-      const mark = step === 'WATCH' ? (done ? '✓' : '') : (stars ? '★'.repeat(stars) : '')
+      const mark = step === 'WATCH' ? (done ? '✓' : '') : (stars ? '★'.repeat(starsShown(stars)) : '')
       return `<button class="step ${done ? 'done' : ''}" data-step="${step}">${stepLabel(step)}<span class="st-stars">${mark}</span></button>`
     }).join('')
     card.innerHTML = `<div class="lc-art">${lessonArt(lesson, idx)}</div><div class="lc-body">
@@ -2054,6 +3449,7 @@ function renderLessons() {
 }
 
 async function startLessonStep(lesson, step) {
+  if (!libraryAllowed(lesson.file)) { void openPaywall(); return }
   try {
     const res = await fetch('songs/' + lesson.file)
     if (!res.ok) throw new Error('HTTP ' + res.status)
@@ -2086,7 +3482,7 @@ async function startLessonStep(lesson, step) {
 }
 
 // The subtitle under a lesson's title: the step, and its speed when not full speed.
-const lessonSubtitle = (step, rate) => stepLabel(step) + (step !== 'WATCH' && Math.abs((rate || 1) - 1) > 1e-3 ? ' · ' + Math.round(rate * 100) + '%' : '')
+const lessonSubtitle = (step, rate) => stepLabel(step) + (step !== 'WATCH' && Math.abs((rate || 1) - 1) > 1e-3 ? dot() + Math.round(rate * 100) + '%' : '')
 // The mode can change during a step (the speed track, or keys 1-3): the run then
 // counts as the step actually played, so its result is kept where it belongs.
 function syncLessonStep() {
@@ -2120,9 +3516,9 @@ function renderToolbox() {
     b.onclick = () => { tb.hand = b.dataset.h; renderToolbox() }
   }
   $('tbStart').onclick = startExercise
-  $('tbInfo').textContent = `${TONICS[tb.tonic]} ${tbInfo().name} · ${tb.hand === 'both' ? 'both hands' : tb.hand + ' hand'}`
+  $('tbInfo').textContent = `${TONICS[tb.tonic]} ${tbInfo().name}${dot()}${tb.hand === 'both' ? 'both hands' : tb.hand + ' hand'}`
   const stars = exerciseStars()
-  $('tbStars').textContent = '★'.repeat(stars) + '☆'.repeat(Math.max(0, 5 - stars))
+  $('tbStars').textContent = '★'.repeat(starsShown(stars)) + '☆'.repeat(Math.max(0, STAR_SLOTS - starsShown(stars)))
   // the notes you'll play, in order
   const notesEl = $('tbNotes')
   if (notesEl) {
@@ -2145,7 +3541,7 @@ function makeCadenceSong() {
   notes.sort((a, b) => a.start - b.start || a.pitch - b.pitch)
   assignFingering(notes, { tempo: 60 / beat })
   return {
-    title: `${TONICS[tb.tonic]} ${tbInfo().short} · ${tb.hand === 'both' ? 'both hands' : tb.hand + ' hand'}`,
+    title: `${TONICS[tb.tonic]} ${tbInfo().short}${dot()}${tb.hand === 'both' ? 'both hands' : tb.hand + ' hand'}`,
     notes, windows: null, duration: 8 * beat, tempo: 60 / beat, artist: 'Exercise'
   }
 }
@@ -2179,7 +3575,7 @@ function makeExerciseSong() {
   }
   assignFingering(notes, { tempo: 120 })   // the notes are 0.5 s apart
   return {
-    title: `${TONICS[tb.tonic]} ${tbInfo().short} · ${hands}`,
+    title: `${TONICS[tb.tonic]} ${tbInfo().short}${dot()}${hands}`,
     notes,
     windows,
     duration: notes[notes.length - 1].start + interval,
@@ -2208,7 +3604,265 @@ function startExercise() {
   $('title').textContent = song.title
   $('subtitle').textContent = 'Toolbox exercise'
   syncHudButtons(); resize()
-  status(song.windows ? 'Left hand first, then the keys move up for the right — press Play' : 'Exercise ready — press Play')
+  status(song.windows ? 'Left hand first, then the keys move up for the right. Press Play.' : 'Exercise ready. Press Play.')
+}
+
+/* ============================== hand placement (hand-guide.js) ============================== */
+// "Meet your fingers" (the course's hand-intro item) and "Place your hands" before a song. The keys light one finger
+// at a time (restFrame / buildKeyFrame, and the note lights for keyboards without frames), the card
+// (hand-guide-view.js) shows which finger, and handleNoteOn hands every press here while a guide runs, so a guide
+// press never starts or scores a song. The app trusts the finger and checks the key.
+let handGuideRun = null          // { kind: 'intro'|'song', guide: HandGuide|null, hint, tone, timer, ... }
+let handGuideShownKey = ''       // the last start position shown this session (startPositionKey)
+let handGuideStartPlayer = null  // beginner guide already offered for the current start
+let handGuideAfterIntro = false  // the song started right after a hand-intro skips the guide
+let handIntroNextStarted = false // runCourseItem ran (the course moved on by itself after the intro)
+const FINGER_WORDS = ['', 'thumb', 'pointer finger', 'middle finger', 'ring finger', 'little finger']
+const noteLetter = (p) => noteName(p).replace(/-?\d+$/, '')
+const handGuideView = mountHandGuideView({
+  onSkip: () => handGuideSkip(),
+  onNext: () => handGuideNext(),
+  onKey: (p) => { handleNoteOn(p, 90, 0); setTimeout(() => handleNoteOff(p, 0), 180) }   // the drawn keys play like the real ones
+})
+const courseExamRun = () => !!(courseRun && COURSE.levels.some((L) => L.exam && L.exam.id === courseRun.ownerId))
+
+// The C for a five-finger position that fits the keys, nearest `prefer` (60 right hand, 48 left); null when none fits.
+function fitHandC(start, count, prefer) {
+  let best = null
+  for (let c = Math.ceil(start / 12) * 12; c + 7 < start + count; c += 12) if (best == null || Math.abs(c - prefer) < Math.abs(best - prefer)) best = c
+  return best
+}
+// C D E F G: right hand 1 -> 5 from C; left hand 5 -> 1 (little finger on C)
+function fiveFingerTargets(c, hand) {
+  const steps = [0, 2, 4, 5, 7]
+  return steps.map((d, i) => ({ pitch: c + d, finger: hand === 'left' ? 5 - i : i + 1, hand }))
+}
+
+// ----- the course item -----
+function startHandIntro(run) {
+  if (handGuideRun) endHandGuide('cancel')
+  if (player && player.active) { player.pause(); stopBacking(); syncHudButtons() }
+  const hand = run.item.params.hand === 'left' ? 'left' : 'right'
+  const start = kbBase(), count = kbKeys()
+  const c = fitHandC(start, count, hand === 'left' ? 48 : 60)
+  // the drawn keys: the whole row up to 49 keys (one LUMI, two snapped together, a PartyKeys 36 or a 49-key board look like the
+  // one on the desk; only C and finger numbers carry labels, so 29 white keys still fit a phone), else two octaves around the hand
+  const mini = count <= 49 ? { start, count } : (() => { const s0 = Math.max(start, (c == null ? 60 : c) - 12); return { start: s0, count: Math.min(25, start + count - s0) } })()
+  handGuideRun = { kind: 'intro', run, hand, c, mini, start, count, findC: !!run.item.params.findC, step: 'numbers', guide: null, hint: '', tone: '', timer: 0 }
+  handGuideRun.unBack = nav.pushOverlay(() => finishHandIntro('back'))
+  console.log('HANDGUIDE intro ' + hand + ' window=' + start + '+' + count + ' c=' + c)
+  renderHandIntro()
+}
+function handIntroStep(step) {
+  const r = handGuideRun
+  if (!r || r.kind !== 'intro') return
+  clearTimeout(r.timer)
+  Object.assign(r, { step, hint: '', tone: '' })
+  if (step === 'findC') {
+    const cs = cTargets(r.start, r.count)
+    if (!cs.length) return handIntroStep('place')
+    r.guide = new HandGuide(cs.map((pitch) => ({ pitch, finger: 0, hand: r.hand })), { anyOf: true })
+  } else if (step === 'place') {
+    if (r.c == null) { r.guide = null; return handIntroStep('curve') }
+    r.guide = new HandGuide(fiveFingerTargets(r.c, r.hand))
+  }   // 'curve' keeps the placed keys lit
+  renderHandIntro()
+}
+function renderHandIntro() {
+  const r = handGuideRun
+  if (!r || r.kind !== 'intro') return
+  const handWord = r.hand === 'left' ? 'Left hand' : 'Right hand'
+  const marks = new Map()
+  if (r.guide) for (const [pitch, e] of r.guide.overlay(0, { reduceMotion: true })) marks.set(pitch, e)
+  const keys = { ...r.mini, marks }
+  let v
+  if (r.step === 'numbers') {
+    v = { title: 'Your fingers have numbers', line: 'Your thumb is 1 and your little finger is 5, on both hands.', finger: 'all', keys: null, next: 'Next' }
+  } else if (r.step === 'findC') {
+    v = { title: 'Find C', line: 'C is the white key just left of the two black keys. Press any C.', finger: 0, keys }
+  } else if (r.step === 'place') {
+    const t = r.guide && r.guide.current()
+    v = t
+      ? { title: 'Finger ' + t.finger + ' on ' + noteLetter(t.pitch), line: handWord + ': press the lit key with your ' + FINGER_WORDS[t.finger] + '.', finger: t.finger, keys }
+      : { title: 'Your hand is in place', line: 'Five fingers on five keys, C to G.', finger: 'all', keys }
+  } else {
+    v = { title: 'Keep your fingers curved', line: 'Like holding a small ball, with your wrists level with the keys.', finger: 'all', keys: r.guide ? keys : null, next: 'Done',
+      hint: r.c == null ? 'Your keys don’t reach this hand position yet. Move up an octave to try it later.' : '' }
+  }
+  handGuideView.show({ mode: 'intro', kicker: r.step === 'place' ? handWord : 'Meet your fingers', hand: r.hand, hint: r.hint, tone: r.tone, next: null, skip: 'Skip', ...v, ...(r.hint ? { hint: r.hint } : {}) })
+}
+// how: 'done' | 'skip' record the item and move on; 'back' | 'cancel' just close it (nothing is recorded)
+function finishHandIntro(how = 'done') {
+  const r = handGuideRun
+  if (!r || r.kind !== 'intro') return
+  clearTimeout(r.timer)
+  r.unBack?.()
+  handGuideRun = null
+  handGuideView.hide()
+  if (how === 'back' || how === 'cancel') { console.log('HANDGUIDE intro ' + how); setTimeout(() => homeLight?.resume(), 0); return }     // the hand guide covered Home: its rail repaints (after the setup, if that is what cancelled it)
+  // The intro set the next piece's position for players who only guide on a change.
+  handGuideAfterIntro = true
+  if (r.c != null) handGuideShownKey = startPositionKey(fiveFingerTargets(r.c, r.hand))
+  console.log('HANDGUIDE intro ' + how)
+  handIntroNextStarted = false
+  course.record(r.run.ownerId, r.run.item, { accuracy: 1 })   // starts the next activity (course-ui.js record)
+  if (!handIntroNextStarted && course.view.itemId == null) course.returnToOwner(r.run.ownerId)
+}
+
+// ----- before a song -----
+// Targets from the opening phrase (fingering.js numbers), for the hand being played, on the keys in view.
+function songGuideTargets() {
+  if (!player || !song || !Array.isArray(song.notes)) return []
+  const from = player.sectionStart || 0
+  let notes = song.notes.filter((n) => n && Number.isFinite(n.start) && n.start >= from - 1e-3)
+  if (!notes.some((n) => n.finger >= 1)) { notes = notes.map((n) => ({ ...n })); assignFingering(notes, { tempo: song.tempo || 120 }) }
+  return guideTargets(notes.map((n) => ({ pitch: n.pitch, time: n.start, hand: n.hand === 'left' ? 'left' : 'right', finger: n.finger })),
+    { hand: player.handFilter || 'both', windowStart: player.windowStart, windowKeys: player.windowKeys })
+}
+// Before a fresh start, guide beginners each time and others when their hand position changes.
+// Returns true when the guide took over; `then` runs once it is done or skipped.
+function maybeGuideHands(then = null) {
+  const after = handGuideAfterIntro
+  handGuideAfterIntro = false
+  const beginner = settings.experience === 'new'
+  if (handGuideRun) return handGuideRun.kind === 'song'
+  if ((after && !beginner) || !handGuideOn(settings.handGuide, { experience: settings.experience })) return false
+  if (!player || !song || freeplay || screen !== 'play' || player.mode === 'WATCH' || player.active) return false
+  if (gameMeta || exerciseMeta || courseExamRun() || document.body.classList.contains('tv-on') || tourIsOpen() || setup.open) return false
+  if (!player.finished && player.position > (player.sectionStart || 0) + 1e-3) return false   // a resume, not a start
+  const targets = songGuideTargets()
+  if (!targets.length) return false
+  const key = startPositionKey(targets)
+  if (key === handGuideShownKey && (!beginner || handGuideStartPlayer === player)) return false
+  handGuideShownKey = key
+  handGuideStartPlayer = player
+  handGuideRun = { kind: 'song', guide: new HandGuide(targets), then, hint: '', tone: '', timer: 0 }
+  console.log('HANDGUIDE song ' + key)
+  renderSongGuide()
+  syncHudButtons()
+  return true
+}
+function renderSongGuide() {
+  const r = handGuideRun
+  if (!r || r.kind !== 'song') return
+  const t = r.guide.current()
+  handGuideView.show(t
+    ? { mode: 'song', kicker: 'Place your hands', title: 'Finger ' + t.finger + ' on ' + noteLetter(t.pitch), line: (t.hand === 'left' ? 'Left hand' : 'Right hand') + ': press the lit key with your ' + FINGER_WORDS[t.finger] + '.', finger: t.finger, hand: t.hand, hint: r.hint, tone: r.tone, keys: null, next: null, skip: 'Skip' }
+    : { mode: 'song', kicker: 'Place your hands', title: 'Ready', line: 'Your hands are in place.', finger: null, hand: 'right', hint: r.hint, tone: r.tone, keys: null, next: null, skip: null })
+}
+// reason: 'done' | 'skip' (then runs) | 'cancel' (left the player, another song: nothing runs)
+function endHandGuide(reason, runThen = true) {
+  const r = handGuideRun
+  if (!r) return
+  if (r.kind === 'intro') return finishHandIntro(reason)
+  clearTimeout(r.timer)
+  handGuideRun = null
+  handGuideView.hide()
+  console.log('HANDGUIDE song ' + reason)
+  if (reason === 'cancel') { handGuideStartPlayer = null; return }
+  if (runThen && r.then) r.then()
+  else if (player && screen === 'play') status(player.armed ? 'Ready: play the lit key to start. The song waits for you' : 'Ready. Press Play.')
+  syncHudButtons()
+}
+// The hands or the keys changed under "Place your hands": its targets are stale. Start over for the new position
+// (armed Wait mode now, else on the next Play).
+function reguideAfterChange() {
+  if (!handGuideRun || handGuideRun.kind !== 'song') return
+  endHandGuide('cancel')
+  handGuideShownKey = ''
+  setTimeout(() => { if (player && player.armed && screen === 'play') maybeGuideHands() }, 0)
+}
+function cancelSongGuide() { if (handGuideRun && handGuideRun.kind === 'song') endHandGuide('cancel') }
+function handGuideSkip() {
+  const r = handGuideRun
+  if (!r) return
+  haptic('light')
+  if (r.kind === 'intro') finishHandIntro('skip')
+  else endHandGuide('skip')
+}
+function handGuideNext() {
+  const r = handGuideRun
+  if (!r || r.kind !== 'intro') return
+  haptic('light')
+  if (r.step === 'numbers') handIntroStep(r.findC ? 'findC' : 'place')
+  else if (r.step === 'curve') finishHandIntro('done')
+}
+// A key pressed while a guide runs (handleNoteOn). A wrong key only gets a gentle hint.
+function handGuidePress(pitch) {
+  const r = handGuideRun
+  if (!r || !r.guide) return
+  const res = r.guide.press(pitch)
+  if (res === 'ignored') return
+  const render = r.kind === 'intro' ? renderHandIntro : renderSongGuide
+  if (res === 'wrong') {
+    Object.assign(r, { tone: 'warn', hint: r.kind === 'intro' && r.step === 'findC' ? 'That was ' + noteLetter(pitch) + '. Look for the two black keys, then the white key on their left.' : 'That was ' + noteLetter(pitch) + '. Try the lit key.' })
+    return render()
+  }
+  haptic('light')
+  if (res === 'ok') { Object.assign(r, { hint: '', tone: '' }); return render() }
+  clearTimeout(r.timer)
+  if (r.kind === 'intro') {
+    Object.assign(r, { tone: 'ok', hint: r.step === 'findC' ? 'That’s C. Well found!' : 'Nice. Your hand is in place.' })
+    render()
+    r.timer = setTimeout(() => { if (handGuideRun === r) handIntroStep(r.step === 'findC' ? 'place' : 'curve') }, 1200)
+  } else {
+    Object.assign(r, { tone: 'ok', hint: 'Off you go!' })
+    render()
+    r.timer = setTimeout(() => { if (handGuideRun === r) endHandGuide('done') }, 700)
+  }
+}
+// 'auto' turns itself off after five good runs in a row (not Watch, not one hand of a two-hand song, not an exam or game)
+function noteHandGuideRun(summary) {
+  if (settings.handGuide !== 'auto') return
+  // a hand filtered out of a song that has notes for it does not count; a one-hand piece played with that hand does
+  const hand = player ? player.handFilter : 'both'
+  const filtered = hand !== 'both' && !!(song && song.handCounts && song.handCounts[hand === 'left' ? 'right' : 'left'])
+  const counted = !!summary.totalNotes && !!player && !filtered && !gameMeta && !exerciseMeta && !courseExamRun()
+  const { runs, turnOff } = autoOffUpdate(settings.handGuideRuns || 0, { accuracy: summary.overallAccuracy || 0, counted })
+  settings.handGuideRuns = turnOff ? 0 : runs
+  if (turnOff) {
+    settings.handGuide = 'off'
+    syncLevelSettings()
+    console.log('HANDGUIDE auto off')
+    setTimeout(() => status('You place your hands well now, so hand placement is off. Turn it back on in Settings, Practice, Hand placement'), 2500)
+  }
+  saveSettings()
+}
+// Lights: the next finger pulses in its hand colour, placed keys stay dim; every other key is dark while a guide runs
+const GUIDE_PLACED_LEVEL = 0.22
+const guideRgb = (e) => hexToRgb(e.hand === 'left' ? COLORS.hand.left : COLORS.hand.right)
+function handGuideOverlay(pulseHz = 1) {
+  return handGuideRun && handGuideRun.guide ? handGuideRun.guide.overlay(performance.now(), { pulseHz, reduceMotion: prefersReducedMotion() }) : null
+}
+function drawHandGuide(frame, base) {
+  const map = handGuideOverlay()
+  if (!map) return
+  for (const [pitch, e] of map) {
+    const i = pitch - base
+    if (i < 0 || i >= frame.length) continue
+    const rgb = guideRgb(e)
+    frame[i] = brighter(frame[i], e.kind === 'placed' ? dimRgb(rgb, GUIDE_PLACED_LEVEL) : e.on ? rgb : dimRgb(rgb, 0.08))
+  }
+}
+// Keyboards lit by MIDI notes: the pulse toggles once a second at most (Bluetooth MIDI), steady under reduce motion
+function addHandGuideNoteLights(desired) {
+  const map = handGuideOverlay(0.5)
+  if (!map) return
+  for (const [pitch, e] of map) {
+    const v = noteLightColour(guideRgb(e))
+    desired.set(pitch, e.kind === 'placed' || !e.on ? asNext(v) : v)
+  }
+}
+// The player's drawn keys during "Place your hands": the pulsing key as a key to press, placed keys as next notes
+function songGuideScene() {
+  const map = handGuideRun && handGuideRun.kind === 'song' ? handGuideOverlay() : null
+  if (!map) return null
+  const need = new Set(), waitNotes = [], placed = []
+  for (const [pitch, e] of map) {
+    if (e.kind === 'placed') placed.push({ pitch, hand: e.hand, start: -1e6, dur: 0 })
+    else { waitNotes.push({ pitch, hand: e.hand, start: -1e6, dur: 0 }); if (e.on) need.add(pitch) }   // start/dur: no falling bar is drawn for it
+  }
+  return { need, waitNotes, placed }
 }
 
 /* ============================== course items ============================== */
@@ -2217,20 +3871,27 @@ function startExercise() {
 function runCourseItem(item, ctx) {
   const p = item.params
   const run = { ownerId: ctx.ownerId, item }
+  handIntroNextStarted = true
   try {
+    if (item.type === 'hand-intro') return startHandIntro(run)
     if (item.type === 'notegame') {
       const g = NOTE_GAMES.find((x) => x.id === p.game)
       if (!g) throw new Error('unknown game ' + p.game)
-      return startQuiz(g, { ...run, rounds: p.rounds || 10 })
+      return startQuiz({ ...g, names: p.names, mode: p.mode }, { ...run, rounds: p.rounds || 10 })
     }
-    if (item.type === 'piece') return startCoursePiece(run)
+    if (item.type === 'piece') {
+      return startCoursePiece(run, ctx.levelNum).then(() => {
+        // the first lesson's first piece: a short tour of the controls, once (not under the self-test, which drives the page itself)
+        if (p.watchFirst && ctx.levelNum === 1 && courseRun && courseRun.item === item && !location.search.includes('selftest')) maybeStartTour()
+      })
+    }
     if (EXERCISE_TYPES.has(item.type)) return startCourseExercise(run)
     if (PLAYER_TYPES.has(item.type)) {
       Object.assign(tb, { type: p.tb.type, tonic: p.tb.tonic, hand: p.tb.hand })
       startExercise()
       courseRun = run
       $('title').textContent = item.title
-      $('subtitle').textContent = 'Course · aim for ' + passText(item)
+      $('subtitle').textContent = 'Course' + dot() + 'aim for ' + passText(item)
       return
     }
     status('That kind of exercise is coming soon')
@@ -2248,12 +3909,13 @@ function startCourseExercise(run) {
     title: course.ownerTitle(ownerId),
     record: (r) => { const res = course.record(ownerId, item, r); markCalm(res && res.passed); return res },
     next: (passed) => course.nextAction(ownerId, item.id, passed),
-    back: () => course.openOwner(ownerId)
+    back: () => course.returnToOwner(ownerId)
   })
 }
 function mountExerciseScreen(item, host) {
   initAudio()
   showScreen('exercise')
+  if (IS_IOS) $('exerciseBackLabel').textContent = practiceRun ? 'Practice' : 'Course'
   const ctxNow = () => { const c = audioContext(); return c ? c.currentTime : 0 }
   const deps = {
     now: () => performance.now(),
@@ -2298,16 +3960,16 @@ function startPracticeExercise(activity, level) {
 // The Jam screen's connections to the app. Keyboard notes reach it through handleNoteOn/handleNoteOff/handleMidiMessage
 // (routeToJam), lights through jamLit (read by idleNoteLights and restFrame), saving through the same store as everything else.
 function jamDeps() {
-  const lit = framesDrive() || (noteLightsOnly() && !!midiOutput)
+  const lit = framesDrive() || hasNoteLightPort()
   return {
-    audio: { audioContext, initAudio, createTrack, jamFx, click, instrumentList, sampledPianoStatus, sampledInstrumentStatus, cancelClicks },
+    audio: { audioContext, initAudio, createTrack, jamFx, click, instrumentList, sampledPianoStatus, cancelClicks },
     store,
     lights: lit ? { show: (pitches) => { jamLit = new Set(pitches) }, clear: () => { jamLit = new Set() } } : null,
     exit: () => { nav.back() },
     download: (name, bytes, mime) => downloadFile(new Blob([bytes], { type: mime }), name)
   }
 }
-const routeToJam = () => screen === 'jam' && !!jamUi
+const routeToJam = () => screen === 'jam' && !!jamUi && !setup.open && !tourIsOpen()   // setup's "play a key to test" and the tour stay out of Jam
 // The keys of the keyboard Jam's scale lock lights (and only those the keyboard has).
 function jamLitPitches() {
   if (!jamLit.size || screen !== 'jam') return []
@@ -2344,6 +4006,7 @@ practiceUi = mountPractice($('screen-practice'), {
   launch: launchPractice,
   audio: { init: initAudio, now: () => { const c = audioContext(); return c ? c.currentTime : 0 }, click, cancelClicks }
 })
+const PR_GLYPHS = { playground: 'i-keys', ear: 'i-note', rhythm: 'i-metro', sight: 'i-sheet', echo: 'i-loop', toolbox: 'i-hands', games: 'i-play', jam: 'i-loop', metronome: 'i-metro' }
 function renderPracticeRail() {
   const list = $('practiceRailList')
   if (!list) return
@@ -2353,17 +4016,19 @@ function renderPracticeRail() {
     b.type = 'button'
     b.className = 'pr-chip'
     b.dataset.id = a.id
+    const g = document.createElement('i'); g.className = 'pr-glyph'; g.setAttribute('aria-hidden', 'true')
+    g.innerHTML = `<svg><use href="#${PR_GLYPHS[a.id] || 'i-practice'}"/></svg>`
     const t = document.createElement('b'); t.textContent = a.title
     const d = document.createElement('span'); d.textContent = a.kind === 'exercise' ? `${a.blurb} Level ${suggestLevel(stats, a.id)} next.` : a.blurb
-    b.append(t, d)
+    b.append(g, t, d)
     b.onclick = () => launchPractice(a)
     return b
   }))
 }
-async function startCoursePiece(run) {
+async function startCoursePiece(run, levelNum) {
   const { item } = run, p = item.params
   initAudio()
-  let s, meta = null
+  let s, meta = null, sourceFile = ''
   if (p.song) {
     // lessons name a registered library id; a raw file path from older data still opens
     meta = LIBRARY.find((l) => l.id === p.song || l.file === p.song) || null
@@ -2371,31 +4036,40 @@ async function startCoursePiece(run) {
     if (!file) { status('That piece is not in the library: ' + p.song); return }
     try { s = await loadSongFile(await fetchLibraryFile(file)) } catch (e) { status('Could not load the piece: ' + e.message); return }
     if (meta && meta.tempoScale) applyTempoScale(s, meta.tempoScale)   // the library's default tempo (docs/SONG-TEMPOS.md)
+    sourceFile = file
   } else s = buildPieceSong(p, item.title)
+  if (typeof cancelSongGuide === 'function') cancelSongGuide()   // typeof: scripts/test-course.js runs this function on its own
   resetSession()
   song = s
   song.file = ''                    // not a library song: no best score, sheet or guided practice for it
+  sessionLibraryFile = sourceFile   // set after resetSession cleared it: where a placement/course piece came from
   if (meta && meta.licence) { song.credit = mutopiaCredit(meta); song.creditSource = meta.source; song.heavy = !!meta.heavy }
   song.title = item.title
   song.artist = 'Course'
+  if (levelNum >= 6 && song.notes.length) {
+    let low = 127, high = 0
+    for (const { pitch } of song.notes) { low = Math.min(low, pitch); high = Math.max(high, pitch) }
+    const start = Math.floor(low / 12) * 12
+    run.screenWindow = { start, keys: high - start + 1 }
+  }
+  courseRun = run
   player = new Player({ getCtx: audioContext, onState: onPlayerState, onJudgement: onJudgement, onFinish: onFinish })
   loadIntoPlayer(song)
-  player.setMode('PRACTISE')
+  player.setMode(p.watchFirst ? 'WATCH' : 'PRACTISE')
   player.setAdvancement(settings.waitMode || 'pauseAndSnap')
-  player.setCountIn(settings.countIn)
+  player.setCountIn(p.watchFirst ? 0 : settings.countIn)
   player.setMetronome(settings.metronome)
   player.setView(settings.view)
   player.setNoteLabels(settings.labels)
   player.setHandFilter(pieceHand(p))
   if (p.from != null && p.to != null) player.setSection(p.from, p.to)
-  courseRun = run
   showScreen('play')
-  courseRun = run
   $('title').textContent = item.title
-  $('subtitle').textContent = 'Course · aim for ' + passText(item) + (song.credit ? ' · ' + song.credit : '')
+  $('subtitle').textContent = p.watchFirst ? 'Watch, then play' : 'Course' + dot() + 'aim for ' + passText(item) + (song.credit ? dot() + song.credit : '')
   $('subtitle').title = song.credit ? song.credit + (song.creditSource ? ' (' + song.creditSource + ')' : '') : ''
   syncHudButtons(); resize()
-  status('Ready: press Play. The keys wait for you in Practice')
+  status(p.watchFirst ? 'Press Play to listen and follow the keys' : 'Ready: play the lit key to start. The song waits for you')
+  if (!p.watchFirst && typeof maybeGuideHands === 'function') maybeGuideHands()
 }
 
 /* ============================== song loading ============================== */
@@ -2406,6 +4080,7 @@ async function fetchLibraryFile(file) {
   return /\.midi?$/i.test(file) ? { name: file, arrayBuffer: () => res.arrayBuffer() } : { name: file, text: () => res.text() }
 }
 async function openLibrary(file) {
+  if (!libraryAllowed(file)) { void openPaywall(); return }
   try {
     song = await loadSongFile(await fetchLibraryFile(file))
     const meta = LIBRARY.find((l) => l.file === file) || {}
@@ -2420,12 +4095,15 @@ async function openLibrary(file) {
 }
 
 async function openImported(id) {
+  let rec
+  try { rec = await getImported(id) } catch { return }
   try {
-    const rec = await getImported(id)
-    if (!rec) { status('That song is no longer in your library'); return loadImportedLibrary() }
+    if (!rec) { status('That song is no longer in your library'); await loadImportedLibrary(); return }
+    if (HAS_COVERS && rec.coverRaw) rec = rearrangeCover(rec, rec.coverArrangement?.difficulty || 'easy', coverKeyRange())
     song = { title: rec.title, artist: rec.artist, notes: rec.notes, duration: rec.duration, tempo: rec.tempo,
       timeSignature: rec.timeSignature || null, parts: rec.parts || null, bars: rec.bars || null, score: rec.score || null,
-      cover: rec.cover, lyrics: rec.lyrics, lyricsFromFile: rec.lyricsFromFile, audio: rec.audio, source: rec.source, file: rec.file, importedId: rec.id }
+      cover: rec.cover, coverRaw: rec.coverRaw, coverArrangement: rec.coverRaw ? rec.coverArrangement : null, lyricWords: rec.lyricWords, lyrics: rec.lyrics,
+      lyricsFromFile: rec.lyricsFromFile, audio: rec.audio, source: rec.source, file: rec.file, importedId: rec.id }
     pushRecent(rec.file)
     startSong()
   } catch (e) { status('Could not open song: ' + e.message) }
@@ -2443,6 +4121,9 @@ async function openFile(file) {
 // Every song, lesson, game or exercise start clears what the last one left behind:
 // free play, game/lesson/exercise state and any light ceremony still running.
 function resetSession({ exercise = null, lesson = null, game = null } = {}) {
+  lyricsEditor.close()
+  sessionLibraryFile = ''   // a practice or inline course piece has no library file behind it
+  cancelSongGuide()
   guided.reset()
   performanceControls?.panic()
   cameraCoach?.reset()
@@ -2450,6 +4131,7 @@ function resetSession({ exercise = null, lesson = null, game = null } = {}) {
   endTake('another song')
   takeDeclined = null
   mediaToken++
+  invalidateBackingLoads()
   unloadRecording()            // the last song's recording; stems attached in Settings stay
   stopBacking()
   recordingEpoch = -1
@@ -2461,6 +4143,7 @@ function resetSession({ exercise = null, lesson = null, game = null } = {}) {
   freeplay = false
   exerciseMeta = exercise
   courseRun = null
+  setKeyCount(kbKeys())
   lessonMeta = lesson
   gameMeta = game
   cancelCeremony()
@@ -2468,19 +4151,27 @@ function resetSession({ exercise = null, lesson = null, game = null } = {}) {
 }
 
 // Load a song and move the keyboard's octave to the song's window of keys.
-function loadIntoPlayer(song) {
+function loadIntoPlayer(song, preserveTransport = false) {
   scheduler.reset()
-  player.windowKeys = kbKeys()
-  const stay = keysStayAt()
-  player.load(song, stay)
+  const range = playerRange()
+  setKeyCount(range.keys)
+  const start = HAS_COVERS ? song.coverArrangement?.keyRange.lo ?? range.start : range.start
+  if (preserveTransport) player.replaceArrangement(song, start, range.keys)
+  else {
+    player.windowKeys = range.keys
+    player.load(song, start)
+  }
   song.fitStart = player.windowStart
-  if (stay != null) hintOffKeys(song, stay)
+  if (range.start != null) hintOffKeys(song, range.start)
   setKeyboardWindow(song.fitStart)
   song.handCounts = player.handCounts()     // notes per hand on the keys: Hands skips an empty one
   if (settings.rate && settings.rate !== 1) player.setRate(settings.rate)
 }
 
+let lastSongKey = null, playHintDismissed = ''
 function startSong() {
+  cancelSongGuide()
+  handGuideAfterIntro = false   // a library song is never "right after" a lesson's intro
   cancelLightTest()
   resetSession()
   initAudio()
@@ -2496,20 +4187,27 @@ function startSong() {
   player.setMetronome(settings.metronome)
   player.setView(settings.view)
   player.setNoteLabels(settings.labels)
+  // A different song opens with both hands (a single-hand filter left over from the last song hid half the notes); the view is a preference and stays
+  const songKey = String(song.importedId || song.file || song.title || '')
+  if (songKey !== lastSongKey) { lastSongKey = songKey; if (settings.hands !== 'both') { settings.hands = 'both'; saveSettings() } playHintDismissed = '' }
   // Hands stays as you set it, but a song without that hand's part opens with both
   const missing = settings.hands !== 'both' && !!song.handCounts && !song.handCounts[settings.hands]
   player.setHandFilter(missing ? 'both' : settings.hands)
   player.setAdvancement(settings.waitMode || 'pauseAndSnap')
+  // brand new players (the setup's level answer) start in Wait mode: the song waits for every note
+  if (settings.experience === 'new' && !song.audio) player.setMode('PRACTISE')
   bandEvents = computeBand(song); resetBand(0)
   showScreen('play')
+  tvSyncLayout()
   $('title').textContent = song.title
-  $('subtitle').textContent = `${song.artist || ''} · ${song.notes.length} notes${song.credit ? ' · ' + song.credit : ''}${song.heavy ? ' · long piece' : ''}`
+  $('subtitle').textContent = `${song.artist || ''}${dot()}${song.notes.length} notes${song.credit ? dot() + song.credit : ''}${song.heavy ? dot() + 'long piece' : ''}`
   $('subtitle').title = song.credit ? song.credit + (song.creditSource ? ' (' + song.creditSource + ')' : '') : ''
   applySheet()
   syncHudButtons()
   resize()
-  status(missing ? noHandPart(settings.hands) : song.source === 'audio' ? 'Ready — the recording plays along. Press Play' : 'Ready — press Play')
+  status(missing ? noHandPart(settings.hands) : song.source === 'audio' ? 'Ready. The recording plays along. Press Play.' : player.armed ? 'Ready: play the lit key to start. The song waits for you' : 'Ready. Press Play.')
   guided.onSongLoaded()
+  if (player.armed) maybeGuideHands()   // Wait mode starts on the first key: place the hands now
   $('editSong').disabled = false
 }
 
@@ -2618,6 +4316,82 @@ function syncRecording() {
   if (player.clockRunning) playBacking(Math.max(0, player._anchorPos), player.rate, player.mode === 'WATCH', player._anchorAt)
 }
 
+function canEditLyrics() {
+  return !!song?.importedId && !freeplay && !lessonMeta && !gameMeta && !exerciseMeta && !courseRun && !tvLayoutOn()
+}
+
+function syncLyricEditorButton() {
+  const button = $('btnEditLyrics')
+  const enabled = canEditLyrics()
+  const label = song?.lyricWords?.length || song?.lyrics?.synced?.length ? 'Lyric timing' : 'Add lyrics'
+  button.disabled = !enabled
+  button.classList.toggle('hidden', !enabled)
+  button.querySelector('.lbl').textContent = label
+  button.setAttribute('aria-label', label)
+}
+
+function beginLyricTiming(target) {
+  if (song !== target || screen !== 'play' || !player || !canEditLyrics()) return null
+  cancelSongGuide()
+  endTake('editing lyrics')
+  const p = player
+  p.pause()
+  const { mode, advancement, rate, loop, countIn, sectionStart, endAt, position, finished, score, minRate } = p
+  p.setMode('WATCH')
+  p.setLoop(null, null, false)
+  p.setCountIn(0)
+  p.setSection(0, null)
+  syncRecording()
+  return {
+    transport: {
+      getTime: () => p.currentPosition(),
+      isPlaying: () => p.active,
+      play: () => { initAudio(); p.play(); syncRecording(); pumpAudio() },
+      pause: () => { p.pause(); syncRecording(); pumpAudio() },
+      seek: (t) => {
+        if (p.finished) p.restart(false)
+        p.seek(t)
+        syncRecording()
+        pumpAudio()
+      }
+    },
+    restore() {
+      p.pause()
+      p.setMode(mode)
+      p.setAdvancement(advancement)
+      p.setRate(rate)
+      p.setLoop(loop.a, loop.b, loop.on)
+      p.setCountIn(countIn)
+      p.setSection(sectionStart, endAt)
+      p.seek(position)
+      p.finished = finished
+      p.score = score
+      p.minRate = minRate
+      syncRecording()
+      syncHudButtons()
+      updateLyrics(p.currentPosition())
+    }
+  }
+}
+
+async function saveSongLyrics(target, fingerprint, fields) {
+  const fresh = await getImported(target.importedId)
+  if (!fresh) return { message: 'This song was removed' }
+  if (lyricsFingerprint(fresh) !== fingerprint) {
+    return { message: 'The lyrics changed while you were editing. Open them again.', keepOpen: true }
+  }
+  await saveImported({ ...fresh, ...fields })
+  await loadImportedLibrary()
+  if (song !== target) return
+  Object.assign(song, fields)
+  if (fields.lyricWords) showLyrics = true
+  applySongMedia({ ...song, audio: null })
+  $('btnLyrics').classList.toggle('on', showLyrics)
+  $('btnLyrics').setAttribute('aria-pressed', String(showLyrics))
+  updateLyrics(player.currentPosition())
+  syncHudButtons()
+}
+
 let lyricIndex = -2
 function updateLyrics(pos) {
   const lines = song && song.lyrics && song.lyrics.synced
@@ -2648,6 +4422,7 @@ async function refreshCameraList() {
 }
 
 async function startCamera() {
+  if (IS_IOS) return   // no camera in the iPhone/iPad app
   tracker = tracker || new HandTracker()
   tracker.onEnded = () => { stopCamera(); camStatus('Camera disconnected'); status('The camera disconnected') }
   tracker.mirror = !!settings.camMirror
@@ -2655,7 +4430,7 @@ async function startCamera() {
   camStatus('Starting…')
   try {
     await tracker.start(settings.camId || undefined)
-    camStatus(tracker.calib ? 'Tracking' : 'Tracking — now find the keys')
+    camStatus(tracker.calib ? 'Tracking' : 'Tracking. Now find the keys.')
     $('camToggle').textContent = 'Stop camera'
     $('camEmpty').classList.add('hidden')
     $('btnCamera').classList.add('on')
@@ -2680,10 +4455,10 @@ const cameraOn = () => !!(tracker && tracker.running)
 
 // Light one key (or none) so the camera can find it.
 function lightKey(i) {
-  if (!daemon || !daemon.ready) return
+  if (!lightSink.canSend()) return
   const f = Array.from({ length: lightKeys() }, () => [0, 0, 0])
   if (i != null) f[i] = [255, 255, 255]
-  daemon.send(f)
+  lightSink.send(f)
 }
 // Settings → Test lights. (The keyboard's own buttons are handled in initDaemon.)
 function wireKeysUI() {
@@ -2709,29 +4484,23 @@ function lightTestFrames(base = kbBase()) {
 // The test owns the keys like a ceremony does, so the frame loop waits, then puts the
 // current picture back. A key still marked as held (its note-off got lost) is let go too.
 function runLightTest() {
-  if (noteLightsOnly() && !framesDrive()) { runMidiLightTest(); return }
-  if (!daemon || !daemon.ready) {
-    // without the light service the keyboard lights keys from MIDI notes: switch those off
-    if (midiOutput) { clearLights(midiOutput); litNotes.clear(); litRoutes.clear() }
-    if (daemonState === 'no-device') status('The light service has not found your keyboard: check it is plugged in over USB and switched on. ' + noKeyboardNextStep(), keyboardSettingsAction())
-    else status('The light service is not running, so the lights cannot be tested')
-    return
-  }
+  if (partyBound() && !framesDrive()) { runPartyLightTest(); return }
+  if (noteLightsOnly()) { runMidiLightTest(); return }
   // camera set-up lights one key at a time to find them; a sweep would spoil it
   if (performance.now() < ledOverrideUntil && !ceremonyTimers.length) { status('The keys are busy with the camera. Try again in a moment'); return }
   cancelCeremony()
-  held.clear(); letGoAt.clear()
+  held.clear(); letGoAt.clear(); tvKeys()
   const frames = lightTestFrames()
   const sweep = frames.length - 2
   const at = (i) => (i < sweep ? i * LIGHT_TEST_STEP_MS : sweep * LIGHT_TEST_STEP_MS + (i - sweep) * 150)
   const done = at(frames.length - 1) + 150
   ledOverrideUntil = performance.now() + done + 100
-  ceremonyTimers = frames.map((fr, i) => setTimeout(() => { if (daemon && daemon.ready) daemon.send(fr) }, at(i)))
+  ceremonyTimers = frames.map((fr, i) => setTimeout(() => { if (lightSink.canSend()) lightSink.send(fr) }, at(i)))
   lightTestActive = true
   ceremonyTimers.push(setTimeout(() => {
     ledOverrideUntil = 0
     lightTestActive = false
-    if (daemon) daemon.lastSig = ''      // resend the current picture even if it matches the last frame
+    lightSink.resend()      // resend the current picture even if it matches the last frame
     status('Light test done: every key should have lit up, and stuck lights are cleared')
   }, done))
   // the button comes back on its own timer: a ceremony that cuts the test short clears the others
@@ -2743,15 +4512,15 @@ function runLightTest() {
 }
 async function autoCalibrate() {
   if (!cameraOn()) { status('Start the camera first'); return }
-  if ((IS_WIN || IS_NATIVE_HOST) && !(daemon && daemon.ready)) { status('Finding the keys automatically needs full-colour lighting. Use Click the end keys instead.'); return }
-  if (!daemon || !daemon.ready) { status('The keyboard lights are needed to find the keys'); return }
+  if ((IS_WIN || IS_NATIVE_HOST) && !lightSink.canSend()) { status('Finding the keys automatically needs full-colour lighting. Use Click the end keys instead.'); return }
+  if (!lightSink.canSend()) { status('The keyboard lights are needed to find the keys'); return }
   cancelCeremony()
   ledOverrideUntil = performance.now() + 4000
   camStatus('Finding the keys…')
   const ok = await tracker.autoCalibrate(lightKey)
   ledOverrideUntil = 0
-  if (ok) { settings.camCalib = tracker.calib; saveSettings(); camStatus('Tracking — keys found'); status('Found the keyboard in the camera') }
-  else camStatus('Could not see the lit keys — try "Click the end keys"')
+  if (ok) { settings.camCalib = tracker.calib; saveSettings(); camStatus('Tracking. Keys found.'); status('Found the keyboard in the camera') }
+  else camStatus('Could not see the lit keys. Try "Click the end keys".')
 }
 
 // Draw the camera picture with the hands and the calibrated key row on top.
@@ -2813,82 +4582,460 @@ function drawFingerBadges(g, geo, hover) {
 
 /* ============================== add a song ============================== */
 let importedRecord = null
-function openImportSheet() {
+let activeSongImport = null
+let songRecording = null
+let importOpener = null
+let importResultSave = Promise.resolve(true)
+const editingImportedNotes = () => rollEditor.isOpen() || !!document.querySelector('dialog.ed[open]')
+
+function coverKeyRange() { return coverRange(kbKeys(), keysStayAt() ?? kbWindowZero()) }
+
+function refreshPlayingCover() {
+  if (!HAS_COVERS || screen !== 'play' || !player || !song?.coverArrangement || editingImportedNotes()) return
+  let next
+  try { next = rearrangeCover(song, song.coverArrangement.difficulty, coverKeyRange()) } catch (error) {
+    status(error.message)
+    return
+  }
+  if (next === song) return
+  song = next
+  loadIntoPlayer(song, true)
+  const hand = player.handFilter
+  if (hand !== 'both' && !song.handCounts[hand]) {
+    const wasActive = player.active
+    player.setHandFilter('both')
+    if (wasActive) player.play({ countIn: false, quiet: true })
+  }
+  bandEvents = computeBand(song)
+  resetBand(player.currentPosition())
+  $('subtitle').textContent = `${song.artist || ''}${dot()}${song.notes.length} notes`
+  syncBacking()
+  syncHudButtons()
+  resize()
+}
+
+async function openImportSheet() {
+  try {
+    if (!premium() && !await openPaywall()) return
+    if (premium() && !activeSongImport) showImportSheet()
+  } catch (error) { status('Could not open the import sheet: ' + error.message) }
+}
+function showImportSheet() {
+  if ($('importSheet').classList.contains('hidden')) importOpener = document.activeElement
   $('importSheet').classList.remove('hidden')
   $('impProgress').classList.add('hidden')
   $('impResult').classList.add('hidden')
-  $('dropZone').classList.remove('hidden')
+  $('impSources').hidden = false
+  $('impShareHelp').hidden = true
+  $('impShare').hidden = !IS_IOS
+  $('importTitle').textContent = 'Add a song'
+  $('importClose').focus()
 }
-function closeImportSheet() { $('importSheet').classList.add('hidden') }
+function closeImportSheet() {
+  if (activeSongImport?.canCancel) activeSongImport.controller.abort()
+  closeSongRecorder()
+  $('importSheet').classList.add('hidden')
+  importOpener?.focus()
+  importOpener = null
+}
 
-async function handleImportFile(file) {
-  if (!file) return
+function recordingLevel(level, seconds) {
+  $('impRecordLevel').value = level
+  $('impRecordTime').textContent = recordingTime(seconds)
+}
+
+function renderSongRecorder(state, message = '') {
+  const start = $('impRecordStart')
+  start.classList.toggle('is-recording', state === 'recording')
+  start.setAttribute('aria-label', state === 'recording' ? 'Stop recording' : 'Start recording')
+  start.disabled = state === 'starting' || state === 'finishing'
+  start.hidden = state === 'review'
+  $('impRecordStop').hidden = state !== 'recording'
+  $('impRecordUse').hidden = state !== 'review'
+  $('impRecordSettings').hidden = !IS_IOS || state !== 'denied'
+  $('impRecordStatus').textContent = message || recordingMessages[state] || ''
+}
+
+function openSongRecorder(recovered, message = 'Recording stopped. You can use what you recorded.') {
+  if (songRecording) return
+  let close
+  const closed = new Promise((resolve) => { close = resolve })
+  songRecording = { close, closed, capturing: false, result: recovered }
+  $('importTitle').textContent = 'Record'
+  $('impSources').hidden = true
+  $('impRecorder').hidden = false
+  recordingLevel(0, 0)
+  renderSongRecorder(recovered ? 'review' : 'ready', recovered ? message : '')
+  if (recovered) $('impRecordUse').focus()
+  else $('impRecordStart').focus()
+}
+
+function discardNativeRecording(info) {
+  if (IS_IOS && info?.token) void androidRequest('incomingDone', { token: info.token }).catch(() => {})
+}
+
+function closeSongRecorder() {
+  const session = songRecording
+  if (!session) return
+  songRecording = null
+  if (session.capturing) {
+    if (IS_IOS) {
+      void androidRequest('recordCancel').catch(() => {}).finally(() => {
+        if (!songRecording?.capturing) muteForMicrophone(false)
+      })
+    } else {
+      void session.browser?.finish(true)
+      muteForMicrophone(false)
+    }
+  }
+  discardNativeRecording(session.result?.file)
+  $('impRecorder').hidden = true
+  $('impRecordingKind').hidden = true
+  session.close()
+}
+
+async function startSongRecording() {
+  const session = songRecording
+  if (!session || session.capturing || session.result) return
+  if (tvLink.isConnected()) { renderSongRecorder('tv'); return }
+  if (player?.active || player?.armed || jamUi?.state().playing) { renderSongRecorder('playing'); return }
+  session.capturing = true
+  stopAll()
+  muteForMicrophone(true)
+  recordingLevel(0, 0)
+  renderSongRecorder('starting', 'Waiting for the microphone')
+  $('impRecordCancel').focus()
+  const result = IS_IOS
+    ? await androidRequest('recordStart', {}, 0).catch((error) => ({ status: 'failed', reason: 'bridge ' + (error?.name || 'error') }))
+    : await startBrowserRecording({
+      isCurrent: () => songRecording === session,
+      onLevel: (level, seconds) => { if (songRecording === session) recordingLevel(level, seconds) },
+      onEnded: (result, reason) => { if (songRecording === session) void finishSongRecording(result, reason) }
+    })
+  if (songRecording !== session || session.finishing) return
+  if (result.status !== 'recording') console.log('RECORD start ' + result.status + (result.reason ? ' reason=' + result.reason : ''))
+  if (result.status !== 'recording') {
+    session.capturing = false
+    muteForMicrophone(false)
+    renderSongRecorder(result.status)
+    if (result.status === 'denied' && IS_IOS) $('impRecordSettings').focus()
+    else $('impRecordStart').focus()
+    return
+  }
+  if (!IS_IOS) session.browser = result
+  renderSongRecorder('recording', 'Recording')
+  $('impRecordStop').focus()
+}
+
+function stopSongRecording() {
+  const session = songRecording
+  if (!session?.capturing || session.finishing) return
+  return finishSongRecording(IS_IOS ? androidRequest('recordStop') : session.browser?.finish())
+}
+
+async function finishSongRecording(result, reason) {
+  const session = songRecording
+  if (!session || session.finishing || !result) return
+  session.finishing = true
+  renderSongRecorder('finishing', 'Finishing recording')
+  const stopped = await Promise.resolve(result).catch(() => ({ status: 'failed' }))
+  // An interruption can stage the file immediately before a tap on Stop reaches the host.
+  const outcome = session.interruption?.result ?? stopped
+  reason = session.interruption?.reason ?? reason
+  session.interruption = null
+  if (songRecording !== session) { discardNativeRecording(outcome.file); return }
+  session.finishing = false
+  session.capturing = false
+  session.browser = null
+  muteForMicrophone(false)
+  $('impRecordLevel').value = 0
+  if (outcome.status !== 'saved') {
+    renderSongRecorder(outcome.status)
+    $('impRecordStart').focus()
+    return
+  }
+  session.result = outcome
+  if (reason) {
+    renderSongRecorder('review', reason === 'limit'
+      ? 'Recording reached 10 minutes.'
+      : 'Recording stopped. You can use what you recorded.')
+    $('impRecordUse').focus()
+  } else await useSongRecording()
+}
+
+async function useSongRecording(cover) {
+  const session = songRecording
+  const info = session?.result?.file
+  if (!info || session.finishing) return
+  if (canMakeCovers() && cover === undefined && session.cover === undefined) {
+    $('impRecorder').hidden = true
+    $('impRecordingKind').hidden = false
+    $('impRecordingKindHeading').focus()
+    return
+  }
+  session.cover = cover ?? session.cover
+  $('impRecordingKind').hidden = true
+  $('impRecorder').hidden = false
+  session.finishing = true
+  renderSongRecorder('finishing', 'Opening recording')
+  const incoming = globalThis.keylightIncomingFile
+  let file
+  try { file = IS_IOS ? await incoming.readRecording(info) : info }
+  catch {
+    if (songRecording === session) {
+      session.finishing = false
+      renderSongRecorder('review', 'Could not open the recording. Try again.')
+      $('impRecordUse').focus()
+    }
+    return
+  }
+  if (songRecording !== session) return
+  // Queue the recording before letting any incoming shares resume.
+  const importId = IS_IOS ? incoming.importId(file) : undefined
+  const job = handleImportFile(file, { importId, microphone: true, coverRecording: session.cover })
+  session.result = null
+  closeSongRecorder()
+  const outcome = await job
+  if (IS_IOS && (outcome === 'saved' || outcome === 'discarded')) {
+    await incoming.acknowledge(file).catch(() => {})
+  } else if (IS_IOS && outcome === undefined) {
+    // The library could not be read or written. Keep the recording: offer it again, or release it so the host is not left "busy".
+    if (!$('importSheet').classList.contains('hidden') && !songRecording) {
+      openSongRecorder({ status: 'saved', file: info }, 'Could not save the recording. Try again.')
+      songRecording.cover = session.cover
+    } else await incoming.acknowledge(file).catch(() => {})
+  }
+}
+
+function wireSongRecorder() {
+  $('impRecord').onclick = () => openSongRecorder()
+  $('impRecordStart').onclick = () => songRecording?.capturing ? stopSongRecording() : startSongRecording()
+  $('impRecordStop').onclick = stopSongRecording
+  $('impRecordUse').onclick = () => void useSongRecording()
+  $('impFullRecording').onclick = () => useSongRecording(true)
+  $('impSoloRecording').onclick = () => useSongRecording(false)
+  $('impRecordingKindBack').onclick = () => {
+    $('impRecordingKind').hidden = true
+    $('impRecorder').hidden = false
+    renderSongRecorder('review')
+    $('impRecordUse').focus()
+  }
+  $('impRecordSettings').onclick = () => void androidRequest('recordOpenSettings').catch(() => {})
+  $('impRecordCancel').onclick = () => { closeSongRecorder(); showImportSheet(); $('impRecord').focus() }
+  $('impShare').onclick = () => {
+    $('impSources').hidden = true
+    $('impShareHelp').hidden = false
+    $('impShareHeading').focus()
+  }
+  $('impShareBack').onclick = () => { showImportSheet(); $('impShare').focus() }
+  window.addEventListener('keydown', (event) => {
+    const sheet = $('importSheet')
+    if (sheet.classList.contains('hidden')) return
+    if (document.querySelector('dialog[open]')) return   // a dialog above the sheet owns Escape and Tab
+    event.stopPropagation()
+    if (event.key === 'Escape') { event.preventDefault(); closeImportSheet() }
+    if (event.key !== 'Tab') return
+    const controls = [...sheet.querySelectorAll('button, input, select')].filter((el) => !el.disabled && el.getClientRects().length)
+    const index = controls.indexOf(document.activeElement)
+    if (!controls.length || (index >= 0 && (event.shiftKey ? index > 0 : index < controls.length - 1))) return
+    event.preventDefault()
+    controls[event.shiftKey ? controls.length - 1 : 0].focus()
+  }, true)
+  if (IS_IOS) {
+    window.addEventListener('pagehide', closeImportSheet)
+    androidEvents((event) => {
+      if (event.kind === 'recordLevel' && songRecording?.capturing) recordingLevel(event.level, event.seconds)
+      if (event.kind === 'recordInterrupted' || event.kind === 'recordAutoStopped') {
+        const reason = event.kind === 'recordAutoStopped' ? 'limit' : 'interrupted'
+        if (!songRecording) discardNativeRecording(event.result?.file)
+        else if (songRecording.capturing && songRecording.finishing) songRecording.interruption = { result: event.result, reason }
+        else if (songRecording.capturing) void finishSongRecording(event.result, reason)
+        // A recording nobody is waiting for would keep the host "busy" until the app restarts.
+        else if (event.result?.file?.token !== songRecording.result?.file?.token) discardNativeRecording(event.result?.file)
+      }
+    })
+    void globalThis.keylightIncomingFile?.recoverRecording?.then((file) => {
+      if (!file) return
+      // The person already opened Record or an import is running: do not take over the sheet, and do not leave the token behind
+      // (a recording that is never acknowledged keeps the host "busy").
+      if (songRecording || activeSongImport) { discardNativeRecording(file); return }
+      showImportSheet()
+      openSongRecorder({ status: 'saved', file })
+    })
+  } else {
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && songRecording?.capturing && !songRecording.finishing && songRecording.browser) {
+        void finishSongRecording(songRecording.browser.finish(), 'interrupted')
+      }
+    })
+    window.addEventListener('pagehide', closeSongRecorder)
+  }
+}
+
+const handleImportFile = serializeSongImports(importSongFile, () => status('Wait for the current song to finish importing'))
+
+async function importSongFile(file, { importId, microphone = false, coverRecording = false } = {}) {
+  // Returning "discarded" lets the incoming-file bridge acknowledge a dismissed shared file.
+  if (!premium() && (!await openPaywall() || !premium())) return 'discarded'
   // a lyrics file attaches to the song that's open
   if (isLyricsFile(file)) {
-    const lines = parseLrc(await file.text())
-    if (!lines.length) { status('That file has no timed lyric lines ([mm:ss] stamps), so nothing was changed'); return }
+    let lines
+    try { lines = parseLrc(await file.text()) } catch { status('Could not read these lyrics'); return 'discarded' }
+    if (!lines.length) { status('That file has no timed lyric lines ([mm:ss] stamps), so nothing was changed'); return 'discarded' }
     const lyrics = { synced: lines }
     // the song just added in the sheet, otherwise the song that's open
     const sheetOpen = !$('importSheet').classList.contains('hidden') && importedRecord
-    const targetId = sheetOpen ? importedRecord.id : song && song.importedId
-    if (!sheetOpen && !song) { status('Open a song first, then drop its .lrc lyrics'); return }
-    if (!sheetOpen) {
-      song.lyrics = lyrics
-      song.lyricsFromFile = true
-      applySongMedia({ ...song, audio: null })
-    }
+    const openSong = song
+    const targetId = sheetOpen ? importedRecord.id : openSong?.importedId
+    if (!sheetOpen && !song) { status('Open a song first, then add its .lrc lyrics'); return 'discarded' }
+    if (importId && !targetId) { status('Open a song you added before adding shared lyrics'); return 'discarded' }
+    let saved
     if (targetId) {
-      const rec = await getImported(targetId)
-      if (rec) {
-        const saved = await saveImported({ ...rec, lyrics, lyricsFromFile: true })
-        if (sheetOpen) { importedRecord = saved; showImportResult(saved) }
-      }
+      try {
+        const rec = await getImported(targetId)
+        if (!rec) { status('Could not find the saved song for these lyrics'); return 'discarded' }
+        saved = await saveImported({ ...rec, lyricWords: null, lyrics, lyricsFromFile: true })
+      } catch { return }
     }
-    status(`Lyrics added: ${lines.length} lines`)
-    return
+    lyricsEditor.close()
+    try {
+      if (sheetOpen && importedRecord === sheetOpen) {
+        importedRecord = saved
+        showImportResult(saved)
+      } else if (!sheetOpen && song === openSong) {
+        openSong.lyricWords = null
+        openSong.lyrics = lyrics
+        openSong.lyricsFromFile = true
+        applySongMedia({ ...openSong, audio: null })
+        syncLyricEditorButton()
+      }
+      status(`Lyrics added: ${lines.length} lines`)
+    } catch (error) {
+      status('Could not display the lyrics: ' + error.message)
+    }
+    return 'saved'
   }
-  openImportSheet()
-  $('dropZone').classList.add('hidden')
-  $('impProgress').classList.remove('hidden')
-  const setStage = (text, frac) => {
-    $('impStage').textContent = text + (frac > 0.04 && frac < 1 ? ` · ${Math.round(frac * 100)}%` : '')
-    $('impBar').style.width = Math.round(Math.max(0, Math.min(1, frac)) * 100) + '%'
-  }
+  const controller = new AbortController()
+  const { signal } = controller
+  const job = activeSongImport = { controller, canCancel: false }
+  const cancelButton = $('impCancel')
+  let saved, token = null, keepStaged = false
   try {
+    if (importId && await getImported(importId)) return 'saved'
+    showImportSheet()
+    importedRecord = null
+    const isNotation = /\.(mid|midi|kar|xml|musicxml|mxl)$/i.test(file.name || '')
+    await desktopCoverChecked
+    const coverWanted = isAudioFile(file) && (!microphone || coverRecording)
+    token = coverWanted ? (IS_IOS ? globalThis.keylightIncomingFile?.token?.(file) : desktopCoverReady ? desktopCover.stage(file) : null) : null
+    const makingCover = !!token && coverWanted
+    job.canCancel = IS_IOS || !!importId || makingCover
+    cancelButton.hidden = !job.canCancel
+    $('impSources').hidden = true
+    $('impProgress').classList.remove('hidden')
+    const difficulty = ['some', 'experienced'].includes(settings.experience) ? 'medium' : 'easy'
+    $('impBusyTitle').textContent = isNotation ? 'Reading your music' : makingCover ? 'Piano cover' : 'Turning your song into notes'
+    $('impWait').hidden = isNotation
+    const setStage = (text, frac) => {
+      if (signal.aborted) return
+      const label = text + (frac > 0.04 && frac < 1 ? `${dot()}${Math.round(frac * 100)}%` : '')
+      if ($('impStage').textContent !== label) $('impStage').textContent = label
+      const pct = Math.round(Math.max(0, Math.min(1, frac)) * 100)
+      $('impBar').style.width = pct + '%'
+      $('impBar').parentElement.setAttribute('aria-valuenow', String(pct))
+    }
     const t0 = performance.now()
     const imported = await importFile(file, {
-      ctx: initAudio(), simplify: $('impSimplify').checked, lookup: $('impLookup').checked, onStage: setStage
+      ctx: makingCover ? null : initAudio(), simplify: $('impSimplify').checked, lookup: !microphone && $('impLookup').checked, onStage: setStage,
+      signal, cover: makingCover ? {
+        generate: (options) => generatePianoCover(token, { ...options, onTimeout: status, ...(IS_IOS ? {} : { request: desktopCover.request, subscribe: desktopCover.subscribe }) }),
+        difficulty, keyRange: coverKeyRange
+      } : null
     })
-    importedRecord = await saveImported(imported)
+    if (signal.aborted) return 'discarded'
+    job.canCancel = false
+    if (document.activeElement === cancelButton) $('importClose').focus()
+    cancelButton.hidden = true
+    saved = await saveImported(importId ? { ...imported, id: importId } : imported)
+    importedRecord = saved
     console.log(`IMPORT ${imported.source} "${imported.title}" notes=${imported.notes.length} tempo=${imported.tempo} cover=${!!imported.cover} lyrics=${imported.lyrics ? (imported.lyrics.synced ? 'synced' : 'plain') : 'none'} in ${((performance.now() - t0) / 1000).toFixed(1)}s`)
-    await loadImportedLibrary()
-    showImportResult(importedRecord)
+    const refresh = loadImportedLibrary()
+    if (importId) void refresh.catch((error) => console.log('IMPORT library refresh failed: ' + error.message))
+    else await refresh
+    if (!$('importSheet').classList.contains('hidden')) showImportResult(saved, imported.importNotice)
   } catch (e) {
+    // The host never confirmed the cancel, so it may still be reading the staged file: neither 'saved' nor 'discarded', which
+    // would release it. Keep the staged file for a later retry.
+    if (e?.cancelUnconfirmed) {
+      keepStaged = true
+      console.log('IMPORT cover cancel unconfirmed: keeping the staged file')
+      $('impProgress').classList.add('hidden')
+      $('impSources').hidden = false
+      if (!signal.aborted && e.name !== 'CoverTimeoutError') status('Could not add that song: ' + e.message)
+      return 'unconfirmed'
+    }
+    if (signal.aborted) return 'discarded'
     console.log('IMPORT failed: ' + e.message)
     $('impProgress').classList.add('hidden')
-    $('dropZone').classList.remove('hidden')
-    status('Could not add that song: ' + e.message)
+    $('impSources').hidden = false
+    if (saved) return 'saved'
+    if (e.message === LIBRARY_READ_ERROR || e.message === LIBRARY_WRITE_ERROR) return
+    if (e.name !== 'CoverTimeoutError') status(e.name === 'CoverBusyError' ? e.message : 'Could not add that song: ' + e.message)
+    return 'discarded'
+  } finally {
+    if (token && !IS_IOS && !keepStaged) desktopCover.release(token)
+    activeSongImport = null
+    cancelButton.hidden = true
   }
+  return saved ? 'saved' : undefined
 }
 
-function showImportResult(rec) {
+function showImportResult(rec, notice) {
+  notice = notice || store.get(NOTICE_KEY + rec.file, '')
+  $('impNotice').textContent = notice || ''
+  $('impNotice').classList.toggle('hidden', !notice)
   $('impProgress').classList.add('hidden')
+  $('impSources').hidden = true
   $('impResult').classList.remove('hidden')
-  $('impCover').innerHTML = itemCover({ ...rec, cover: rec.cover })
   $('impTitle').value = rec.title || ''
   $('impArtist').value = rec.artist || ''
-  const secs = Math.round(rec.duration || 0), mins = Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0')
-  const lyr = rec.lyrics ? (rec.lyrics.synced ? 'synced lyrics' : 'lyrics (not timed)') : 'no lyrics found'
-  $('impMeta').innerHTML = `${rec.notes.length} notes · ${mins} · ${Math.round(rec.tempo)} bpm<br>${rec.cover ? 'Cover found' : 'No cover found'} · ${lyr}${rec.source === 'audio' ? '<br>The recording plays along while you play.' : ''}`
+  $('impDifficultyRow').hidden = !HAS_COVERS || !rec.coverRaw
+  updateImportResultMeta(rec)
 }
 
-async function renameImported() {
-  if (!importedRecord) return
+function updateImportResultMeta(rec) {
+  $('impDifficulty').value = rec.coverArrangement?.difficulty || 'easy'
+  $('impCover').innerHTML = itemCover({ ...rec, imported: true, cover: rec.cover }, { photo: true })
+  const secs = Math.round(rec.duration || 0), mins = Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0')
+  const lyr = rec.lyrics ? (rec.lyrics.synced ? 'synced lyrics' : 'lyrics (not timed)') : 'no lyrics found'
+  $('impMeta').innerHTML = `${rec.notes.length} notes${dot()}${mins}${dot()}${Math.round(rec.tempo)} bpm<br>${rec.cover ? 'Cover found' : 'No cover found'}${dot()}${lyr}${rec.source === 'audio' ? '<br>The recording plays along while you play.' : ''}`
+}
+
+function renameImported(difficulty) {
+  const id = importedRecord?.id
+  if (!id) return Promise.resolve(true)
   const title = $('impTitle').value.trim() || importedRecord.title
   const artist = $('impArtist').value.trim()
-  if (title === importedRecord.title && artist === importedRecord.artist) return
-  importedRecord = await saveImported({ ...importedRecord, title, artist })
-  await loadImportedLibrary()
+  importResultSave = importResultSave.then(async () => {
+    const rec = importedRecord
+    if (rec?.id !== id) return false
+    try {
+      const next = HAS_COVERS && rec.coverRaw && typeof difficulty === 'string' ? rearrangeCover(rec, difficulty, coverKeyRange()) : rec
+      if (next === rec && title === rec.title && artist === rec.artist) return true
+      const saved = await saveImported({ ...next, title, artist })
+      if (importedRecord === rec) {
+        importedRecord = saved
+        updateImportResultMeta(saved)
+      }
+      await loadImportedLibrary()
+      return true
+    } catch (error) {
+      if (importedRecord?.id === id) $('impDifficulty').value = importedRecord.coverArrangement?.difficulty || 'easy'
+      status(error.message)
+      return false
+    }
+  })
+  return importResultSave
 }
 
 /* ============================== free play ============================== */
@@ -2987,6 +5134,7 @@ let fpNotes = { key: '', since: 0 }      // the notes sounding now, and since wh
 let fpRinging = new Set()
 let fpPrevHeld = new Set()
 let fpDemo = null
+const noteVel = new Map()   // pitch -> last strike velocity, for the Playground's bloom
 let fpSpell = (pc) => NOTE_PCS[pc]
 const CHORD_SETTLE_MS = 60
 const CHORD_FADE_MS = 1000
@@ -3041,10 +5189,11 @@ function startFreeplay(root) {
   fpNotes = { key: '', since: 0 }
   fpRinging.clear()
   showScreen('play')
+  tvSyncLayout()
   $('title').textContent = 'Playground'
   syncFreeplayBar()
   syncHudButtons()
-  status('Playground — the lit keys are in the scale. Play anything.')
+  status('The lit keys are in the scale. Play anything.')
   resize()
   maybeStartTake()
 }
@@ -3067,11 +5216,14 @@ function syncFreeplayBar() {
 // the daemon knowing the active mode (it often doesn't: it only knows items it
 // has been asked about).
 const MODE_BASE = (modeIndex) => 100 + 7 * modeIndex
+// Pressure (settings.expression) and pitch bend from rocking a key (settings.glide) are separate; MPE if either is on
+const exprStateText = () => !settings.expression && !settings.glide ? 'off'
+  : 'waiting for ' + [settings.glide && 'bend', settings.expression && 'pressure'].filter(Boolean).join('/') + '…'
 function desiredDeviceConfig() {
-  const on = settings.expression ? 1 : 0
+  const pressure = settings.expression ? 1 : 0, glide = settings.glide ? 1 : 0
   const bend = Math.max(1, Math.min(12, settings.bendRange || 12))
-  const want = { 2: on, 41: bend, 3: bend }
-  for (let m = 0; m < 4; m++) { want[MODE_BASE(m) + 2] = on; want[MODE_BASE(m) + 3] = on }
+  const want = { 2: pressure || glide ? 1 : 0, 41: bend, 3: bend }
+  for (let m = 0; m < 4; m++) { want[MODE_BASE(m) + 2] = glide; want[MODE_BASE(m) + 3] = pressure }
   return want
 }
 
@@ -3082,12 +5234,12 @@ function writeDeviceConfig(items) {
   for (const t of configTimers) clearTimeout(t)
   const entries = Object.entries(items)
   configTimers = entries.map(([item, value], i) =>
-    setTimeout(() => { if (daemon && daemon.ready) daemon.setConfig(Number(item), value) }, 120 * i))
-  configTimers.push(setTimeout(() => { if (daemon && daemon.ready) daemon.configGet() }, 900 + 120 * entries.length))
+    setTimeout(() => { if (daemonFrames()) daemon.setConfig(Number(item), value) }, 120 * i))
+  configTimers.push(setTimeout(() => { if (daemonFrames()) daemon.configGet() }, 900 + 120 * entries.length))
 }
 function applyDeviceMode() {
   guardApiMode()
-  if (!daemon || !daemon.ready) return
+  if (!daemonFrames()) return
   configAttempts = 0
   writeDeviceConfig(desiredDeviceConfig())
 }
@@ -3095,7 +5247,7 @@ function applyDeviceMode() {
 // Called with the daemon's copy of the device config: check the writes landed,
 // and write again what didn't (a few times).
 function onDeviceConfig(values) {
-  if (!daemon || !daemon.ready) return
+  if (!daemonFrames()) return
   const want = desiredDeviceConfig()
   const missing = Object.entries(want).filter(([k, v]) => values[k] !== v)
   if (!missing.length) {
@@ -3143,32 +5295,49 @@ function resetBand(pos) {
 // one's port at the note it plays there. Where it was lit is kept, so a light that comes off
 // after the keys have moved still goes to the right place.
 const litRoutes = new Map()    // pitch -> [port, note]
+// Note Ons are for ROLI and LUMI outputs only: a PartyKeys-family port echoes a Note On back as a key press, which
+// would be scored, so it is lit by SysEx through partyLights (below) and never appears here.
+const hasNoteLightPort = () => !!((midiOutput && !isPartyOut(midiOutput)) || (midiOutput2 && !isPartyOut(midiOutput2)))
 function noteRoute(pitch) {
-  if (!midiInput2) return midiOutput ? [midiOutput, pitch] : null
+  if (!midiInput2) return midiOutput && !isPartyOut(midiOutput) ? [midiOutput, pitch] : null
   const i = pitch - kbBase(), side = Math.floor(i / 24)
   if (side !== 0 && side !== 1) return null
   const played = pair.side.indexOf(side)
   const out = settings.kbLightsSwap ? 1 - played : played    // the two ports' outputs can come the other way round
   const port = out ? midiOutput2 : midiOutput
-  return port ? [port, pair.low[played] + i - 24 * side] : null
+  return port && !isPartyOut(port) ? [port, pair.low[played] + i - 24 * side] : null
 }
 const NOTE_DIM = 128            // in updateNoteLights' map: this key is the dim kind (poly aftertouch sets its level)
 const NOTE_DIM_LEVEL = 30
+// Puts a port (every joined block on it) into exact-colour API mode, once; returns the block indices.
+function prepareApi(port) {
+  const devs = blockIndices(port)
+  if (!apiModePorts.has(port) || !apiDevs.has(port)) { apiModePorts.add(port); apiDevs.set(port, new Set()) }
+  const links = linksFor(port), link = links[0] || null, ready = apiDevs.get(port)
+  for (const l of links) l.setApi(true, 'lights')    // begins API mode on each block, and pings or it ends after 5 s
+  for (const dev of devs) {
+    if (ready.has(dev)) continue                    // a block snapped on later gets set up too
+    if (!link) beginApiMode(port, dev)
+    setLightingMode(port, LIGHTING_MODE.playingSong, 1, dev)
+    ready.add(dev)
+  }
+  return devs
+}
 function updateNoteLights(desired) {
   guardApiMode()
-  if (!midiOutput && !midiOutput2) return
+  if (!hasNoteLightPort()) return
   for (const [pitch, vel] of desired) {
     const prev = litNotes.get(pitch)
     if (prev === vel) continue
     const was = litRoutes.get(pitch), route = was || noteRoute(pitch)
     if (!route) continue
+    if (identifyTimers.has(route[0])) continue      // that keyboard is flashing "which one is this?": leave it alone until it ends
     try {
       if (vel & EXACT_FLAG) {                       // true per-key colour: the keyboard's API lighting mode
-        const port = route[0]
-        if (!apiModePorts.has(port)) { beginApiMode(port); setLightingMode(port, LIGHTING_MODE.playingSong, 1); apiModePorts.add(port) }
-        setKeyOn(port, route[1], 0xff000000 | (vel & 0xffffff))
+        const port = route[0], devs = prepareApi(port)    // every joined block gets its copy
+        for (const dev of devs) setKeyOn(port, route[1], 0xff000000 | (vel & 0xffffff), dev)
       } else {
-        if (prev & EXACT_FLAG) setKeyOff(route[0], route[1])
+        if (prev & EXACT_FLAG) for (const dev of blockIndices(route[0])) setKeyOff(route[0], route[1], dev)
         if (vel >= NOTE_DIM || prev >= NOTE_DIM) route[0].send([0xa0, route[1], vel >= NOTE_DIM ? NOTE_DIM_LEVEL : 127])
         route[0].send([0x90, route[1], vel & 0x7f])
       }
@@ -3179,9 +5348,10 @@ function updateNoteLights(desired) {
   for (const pitch of [...litNotes.keys()]) {
     if (desired.has(pitch)) continue
     const route = litRoutes.get(pitch), note = litNotes.get(pitch)
+    if (route && identifyTimers.has(route[0])) continue     // its lights are cleared when the flash ends
     if (route) {
       try {
-        if (note & EXACT_FLAG) setKeyOff(route[0], route[1])
+        if (note & EXACT_FLAG) for (const dev of blockIndices(route[0])) setKeyOff(route[0], route[1], dev)
         else {
           route[0].send([0x80, route[1], 0])
           if (note >= NOTE_DIM) route[0].send([0xa0, route[1], 127])
@@ -3192,49 +5362,638 @@ function updateNoteLights(desired) {
     litRoutes.delete(pitch)
   }
 }
-// With no light service, the keyboard's own colours go out while Keylight runs, so that the only
-// keys lit are the ones it asks for, and come back when it stops. Sent again now and then: the
-// keyboard may have been switched off and on since. On a Mac the first seconds wait for the light
-// service to answer.
-const blankedPorts = new Map()   // port -> when it was last told
-const OWN_COLOURS_RESEND_MS = 10000
-function syncOwnColours(now = performance.now()) {
-  const settling = !(IS_WIN || IS_NATIVE_HOST) && now < 4000
-  const want = framesDrive() || settling ? [] : [midiOutput, midiOutput2].filter(Boolean)
-  for (const port of [...blankedPorts.keys()]) {
-    if (want.includes(port)) continue
-    blankedPorts.delete(port)
-    try { if (port.state !== 'disconnected') restoreOwnColours(port) } catch (_e) {}
-  }
-  for (const port of want) {
-    if (now - (blankedPorts.get(port) ?? -Infinity) < OWN_COLOURS_RESEND_MS) continue
-    const first = !blankedPorts.has(port)
-    blankedPorts.set(port, now)
-    try { blankOwnColours(port) } catch (_e) {}
-    if (first) console.log('LIGHTS own colours off on ' + port.name)
+/* ============================== Key lights on a PartyKeys-family keyboard ============================== */
+// <party-lights>
+// PartyKeys, PartyStudio / SAM5704 and PopuPiano light their keys by SysEx, never by Note On: the firmware echoes a Note On back as a key
+// press, which would be scored. renderer/party-lights.js is the controller; this block decides when one exists (syncPartyLights) and what it
+// is told (partyTarget). Every ROLI path (Note On lights, sweeps, BLOCKS SysEx, identify, exact colours) asks isPartyOut(port) first.
+const isPartyPort = (port) => !!port && partyProfileFor(port) !== null
+const isPartyOut = isPartyPort
+const partyKeysFromName = (label) => { const kind = partyProfileFor({ name: String(label || '') }); return kind === 'popu' ? 29 : kind ? 36 : 0 }
+const partyBound = () => isPartyOut(midiOutput)
+let partyLights = null          // the live controller; null when there is none (partyPlanNow says why)
+let partyPlanNow = null         // planParty() for the current output
+let partyStatus = { state: 'none', detail: '' }   // the controller's last status: starting, ready, sent, error
+let partyRange = null           // { low, high, units, octave } the controller found by asking the keyboard
+let partySig = ''               // the last target handed to the controller ('\0': send the current one again)
+let partyTestTimers = []
+let partyTestOn = false
+let partyTestDisabled = false   // Test lights is greyed out by us (not by a running test)
+const partyUsable = () => !!partyLights && (partyStatus.state === 'ready' || partyStatus.state === 'sent')   // not while starting: open() can take seconds
+const partyKeysLive = () => (partyBound() && partyLights && partyRange && partyRange.units > 0 && partyPlanNow?.profile !== 'popu' ? 36 * partyRange.units : 0)
+const partyColorMode = () => (['one', 'hands', 'rgb'].includes(settings.partyColor) ? settings.partyColor : 'rgb')
+
+function partyProblemText() {
+  if (!partyBound()) return ''
+  if (partyStatus.state === 'error') return 'Key lights stopped: ' + (partyStatus.detail || 'a send failed') + '. Try reconnecting the keyboard.'
+  if (partyPlanNow && !partyPlanNow.available) return partyPlanNow.message
+  return ''
+}
+const partyStateText = () => (!partyBound() ? '' : partyProblemText() || (!partyLights ? 'Key lights unavailable' : partyUsable() ? 'On: keys to play (beta)' : 'Starting key lights…'))
+
+// What the report and the Settings line say: what was detected and why the lights are or aren't on.
+function partyDiagnostics() {
+  const st = partyLights ? partyLights.status() : null
+  const plan = partyPlanNow
+  return {
+    profile: st?.profile || plan?.profile || 'none', mode: st?.mode || plan?.mode || 'one', state: partyStatus.state, detail: partyStatus.detail,
+    sysex: !!plan?.sysex, paired: !!plan?.inputIds?.length, reason: plan?.reason || '',
+    low: st?.range.low ?? null, high: st?.range.high ?? null, units: st?.range.units ?? 0, frames: st?.frames ?? 0
   }
 }
+function partyDetailText() {
+  const d = partyDiagnostics()
+  const keys = d.low == null ? '' : 'keys ' + noteName(d.low) + ' to ' + noteName(d.high) + (d.units > 1 ? ' (' + d.units + ' units)' : '')
+  return ['Detected: ' + (midiOutput?.name || 'keyboard'), 'lights ' + d.profile + (d.mode !== 'one' && d.profile !== 'none' ? ' / ' + d.mode : ''), keys,
+    'SysEx ' + (d.sysex ? 'on' : 'off'), 'input ' + (d.paired ? 'paired' : d.profile === 'popu' ? 'not needed' : 'not paired'), 'status ' + d.state].filter(Boolean).join(' · ')
+}
+
+function disposeParty() {
+  if (partyTestOn) {      // dispose sends the final clear itself: no second one from the test
+    cancelPartyTest(false)
+    lightTestActive = false
+    const btn = $('testLights')
+    if (btn) { btn.disabled = false; btn.textContent = 'Test lights' }
+  }
+  cancelPartyTest()
+  if (partyLights) { try { partyLights.dispose() } catch (_e) { /* a dying port */ } }
+  partyLights = null
+  partyStatus = { state: 'none', detail: '' }
+  partyRange = null
+  partySig = ''
+}
+
+// Builds, keeps or drops the controller. Idempotent: the signature is {output, paired inputs, profile, mode, SysEx, colours}, so the
+// port opening and its first send (both fire onstatechange) never restart a 120 ms init. Called on every port or membership change
+// (input or output), when Lights colour changes, and by Retry.
+function syncPartyLights(force = false) {
+  if (!midi || !isPartyOut(midiOutput)) { disposeParty(); partyPlanNow = null; syncPartySettings(); return }
+  const inputs = [midiInput, midiInput2, midiRowInput].filter(Boolean)    // only a bound input counts as the keyboard's own
+  const options = {
+    output: midiOutput, inputs, outputs: midi.outputs, sysexGranted: midiSysexGranted, access: midi,
+    mode: partyColorMode(),   // planParty decides: the speaker relay falls back to one colour, a direct PartyKeys and a PopuPiano keep it
+    colors: { right: hexToRgb(COLORS.hand.right), left: hexToRgb(COLORS.hand.left) }
+  }
+  const plan = planParty(options)
+  const current = partyLights ? partyLights.signature : partyPlanNow?.signature
+  if (!force && current === plan.signature && (partyLights || !plan.available)) { partyPlanNow = plan; syncPartySettings(); return }
+  disposeParty()
+  partyPlanNow = plan
+  partyStatus = { state: plan.available ? 'starting' : 'unavailable', detail: plan.available ? '' : plan.message }
+  console.log('PARTY lights ' + (plan.available ? plan.profile + ' mode=' + plan.mode : 'unavailable (' + plan.reason + ')') + ' on ' + (midiOutput.name || 'output'))
+  if (plan.available) {
+    partyLights = createPartyLights({ ...options, onStatus: partyStatusChanged, onRange: partyRangeChanged })
+    partySig = '\0'
+  }
+  syncPartySettings()
+}
+
+function refreshPartyUi() {
+  syncPartySettings()
+  updateKbChip()
+  renderSetup()
+  emitKeyboard()
+}
+function partyStatusChanged(state, detail) {
+  const next = { state, detail: detail || '' }
+  if (partyStatus.state === next.state && partyStatus.detail === next.detail) return
+  partyStatus = next
+  if (state === 'error') { console.log('PARTY lights error: ' + next.detail); recordDiagnosticFailure('MIDI', 'Key lights', new Error(next.detail || 'send failed'), true); if (partyTestOn) cancelLightTest() }   // a failed test must not report "done"
+  refreshPartyUi()
+}
+// The keyboard said where its keys are (units spliced together, octave button): the screen follows, like a ROLI keyboard's octave does.
+function partyRangeChanged(range) {
+  partyRange = range
+  if (range.units > 0 && !midiInput2) {
+    const zero = kbWindowZero()
+    if ((range.low - zero) % 12 === 0) {
+      const oct = (range.low - zero) / 12
+      if (oct !== kbOctave) {
+        kbOctave = oct
+        kbSetAt = performance.now()
+        rememberKeysAt()
+        if (player) player.setWindowStart(kbBase())
+        recheckHands()
+        syncOctaveUI()
+        console.log('PARTY keyboard octave base=' + kbBase())
+      }
+    }
+  }
+  applyKeyCount()
+  refreshPartyUi()
+}
+// The keyboard's own reports (route, octave): from the paired input only, and never scored.
+function partyTap(data, portId) {
+  if (partyLights && portId != null) partyLights.receive(Array.from(data), portId)
+}
+
+// What should be lit, as note -> { hand, dim, rgb }: the same sources the ROLI lights read, without LUMI velocities. A held key that
+// is not a target is left to the keyboard's own press light. Paused or idle is dark. A target with nothing in it is dark too.
+function partyTarget(snap) {
+  const out = partyTargetBase(snap)
+  // Firmware overlays its own press colour. Redraw the target on both key-down and key-up at the same brightness.
+  if (partyLights?.status().profile === 'rgb15') for (const pitch of held) {
+    const e = out.get(pitch)
+    if (e) e.held = true
+  }
+  return out
+}
+function partyTargetBase(snap) {
+  const out = new Map()
+  const put = (pitch, hand, dim, rgb) => { const prev = out.get(pitch); if (!prev || (prev.dim && !dim)) out.set(pitch, { hand: hand === 'left' || hand === 'right' ? hand : null, dim, rgb }) }
+  if (handGuideRun) {
+    const map = handGuideOverlay(0.5)
+    if (map) for (const [pitch, e] of map) put(pitch, e.hand, e.kind === 'placed' || !e.on, guideRgb(e))
+    return out
+  }
+  if (snap && screen === 'play' && player && song && !freeplay) {
+    if (!player.active && !player.armed) return out        // paused: dark, and Resume lights the current notes again
+    const rgb = partyColorMode() === 'rgb' ? (n) => hexToRgb(noteColor(n, settings.view)) : noteRgb
+    if (player.armed) {                                    // Wait mode waiting for the first key (also after leading silence)
+      for (const n of player.firstWaitNotes()) put(n.pitch, n.hand, false, rgb(n))
+      return out
+    }
+    for (const n of snap.activeNotes) put(n.pitch, n.hand, false, rgb(n))
+    for (const n of snap.upcomingNotes) put(n.pitch, n.hand, true, rgb(n))
+    if (snap.waiting) for (const n of snap.waitNotes || []) if (snap.needPitches.has(n.pitch)) put(n.pitch, n.hand, false, rgb(n))
+    return out
+  }
+  for (const pitch of quizHintPitches()) put(pitch, null, false, quizHintRgb())      // a hint is a key to press: always lit
+  for (const pitch of jamLitPitches()) put(pitch, null, false, userRgb())
+  return out
+}
+function partySignature(target) {
+  return [...target].sort((a, b) => a[0] - b[0]).map(([pitch, s]) => pitch + ':' + (s.hand || '') + (s.dim ? 'd' : '') + (s.held ? 'h' : '') + (s.rgb ? s.rgb.join('.') : '')).join(',')
+}
+// Called every frame. Only a changed target reaches the controller, so an empty target never repeats its clear frame.
+function updatePartyLights(snap) {
+  if (!partyLights || partyTestOn || partyStatus.state === 'error') return     // a running Test lights keeps the keys
+  const target = document.hidden ? new Map() : partyTarget(snap)
+  const sig = partySignature(target)
+  if (sig === partySig) return
+  partySig = sig
+  partyLights.set(target)
+}
+// Everything off now (page hidden, ports changing): the next target is sent again, whatever it is.
+function partyClear() {
+  if (!partyLights) return
+  if (partyTestOn) cancelLightTest()      // hidden or rebinding mid-test: its timers must not light keys later
+  partyLights.off()
+  partySig = '\0'
+}
+
+// Test lights and "Show the lights again": C, E, G, C one key at a time through the controller, then off and the song's lights come back.
+const PARTY_TEST_STEP_MS = 450
+function runPartyLightTest() {
+  if (!partyUsable()) { status(lightFallbackMessage() || partyStateText() || 'Key lights are unavailable'); return }
+  cancelPartyTest()
+  const { low, high } = partyLights.status().range
+  const demo = [60, 64, 67, 72]
+  const notes = demo.every((n) => n >= low && n <= high) ? demo : [0, 4, 7, 12].map((o) => low + o)
+  partyTestOn = true
+  lightTestActive = true
+  const btn = $('testLights')
+  if (btn) { btn.disabled = true; btn.textContent = 'Testing…' }
+  // Full colour: red, green, blue, white, so a person can tell at a glance whether the keyboard shows the colours it is sent
+  const probe = partyLights.status().profile === 'rgb15' ? [[255, 0, 0], [0, 255, 0], [0, 0, 255], [255, 255, 255]] : null
+  notes.forEach((pitch, i) => {
+    const rgb = probe ? probe[i] : noteRgb({ pitch, hand: 'right' })
+    partyTestTimers.push(setTimeout(() => partyLights?.set(new Map([[pitch, { hand: 'right', dim: false, rgb }]])), 150 + i * PARTY_TEST_STEP_MS))
+  })
+  partyTestTimers.push(setTimeout(() => {
+    partyTestOn = false
+    lightTestActive = false
+    partyTestTimers = []
+    partyLights?.off()
+    partySig = '\0'
+    if (btn) { btn.disabled = false; btn.textContent = 'Test lights' }
+    syncPartySettings()
+    status('Light test done: every key should have lit up, one after the other')
+  }, 150 + notes.length * PARTY_TEST_STEP_MS + 150))
+  status(probe ? 'Full colour test: you should see red, green, blue, then white' : 'Testing the lights: four keys light one after the other')
+}
+function cancelPartyTest(sendOff = true) {
+  for (const t of partyTestTimers) clearTimeout(t)
+  partyTestTimers = []
+  if (!partyTestOn) return
+  partyTestOn = false
+  if (!sendOff) return
+  partyLights?.off()
+  partySig = '\0'
+}
+
+// Settings > Lights: the colour option (only on a key-light keyboard), the detected line, and Test lights greyed out while there are no lights.
+// a PartyKeys showing the screen's colours ignores the ROLI light style, so the control is not offered
+function syncLightStyleRow() {
+  const partyScreenColours = partyBound() && partyColorMode() === 'rgb'
+  if ($('kbdModeRow')) $('kbdModeRow').classList.toggle('hidden', partyScreenColours)
+  if ($('userColorRow')) $('userColorRow').classList.toggle('hidden', partyScreenColours || settings.keyboardMode !== 'User')
+}
+function syncPartySettings() {
+  syncLightStyleRow()
+  const bound = partyBound()
+  const row = $('partyColorRow'), select = $('partyColor')
+  if (row) row.classList.toggle('hidden', !bound)
+  if (select) {
+    const rgbOk = bound && (partyPlanNow?.family === 'rgb15-capable' || partyPlanNow?.family === 'popu')   // exact colours: a direct PartyKeys or a PopuPiano, never the relay
+    const rgb = select.querySelector('option[value="rgb"]')
+    if (rgb) { rgb.hidden = !rgbOk; rgb.disabled = !rgbOk }
+    select.value = settings.partyColor === 'rgb' && !rgbOk ? 'one' : partyColorMode()
+  }
+  const detail = $('partyDetail')
+  if (detail) { detail.classList.toggle('hidden', !bound); if (bound) setText(detail, partyDetailText()) }
+  const test = $('testLights')
+  if (test && !lightTestActive) {
+    if (bound && !partyUsable()) { test.disabled = true; test.title = 'The key lights are not ready: see the line above'; partyTestDisabled = true }
+    else if (partyTestDisabled) { test.disabled = false; test.title = 'A light runs across every key and back, then any light left on goes off'; partyTestDisabled = false }
+  }
+}
+// </party-lights>
+
+// With no light service, the keyboard's own colours go out while Keylight runs, so that the only
+// keys lit are the ones it asks for, and come back when it stops. blocks.js does it: it reads and
+// saves them first (per block serial, in settings.kbOwnColours, so a crash can't lose them), and
+// also says how many blocks are joined and where their octave is. One link per keyboard output.
+// If the light service owns the keyboard, it has exclusive use of BLOCKS API mode.
+const blockLinks = new Map()     // physical output port -> { link, slot, port }; slot 2: the joined row's second port
+const ownColourStore = {
+  get: (serial) => (settings.kbOwnColours || {})[serial] || null,
+  set: (serial, entry) => {
+    const all = { ...(settings.kbOwnColours || {}) }
+    if (entry) all[serial] = entry
+    else delete all[serial]
+    settings.kbOwnColours = all
+    saveSettings()
+  }
+}
+function blocksLinkFor(slot) {
+  for (const v of blockLinks.values()) if (v.slot === slot) return v.link
+  return null
+}
+// The links behind an output (both of the row's for rowOutput)
+const linksFor = (port) => portsBehind(port).map((p) => blockLinks.get(p)?.link).filter(Boolean)
+const blockIndices = (port) => { const ls = linksFor(port); return ls.length ? [...new Set(ls.flatMap((l) => l.indices()))] : [0] }
+const apiPortOf = (port) => [...apiModePorts].find((p) => portsBehind(p).includes(port)) || null
+const daemonSettling = (now) => !(IS_WIN || IS_NATIVE_HOST) && !blockLinks.size &&
+  ((EXPECT_DAEMON && svcState !== 'failed' && (now < 4000 || (daemonState === 'checking' && now < 15000))) || daemon?.discovering)
+function syncBlockLinks(now) {
+  // one link per physical port: the row's first port behind rowOutput, a second keyboard's, the row's second port
+  const row = rowPorts.get(midiOutput)
+  const want = daemonOwnsKeyboard() || daemonSettling(now) || midi?.sysexEnabled === false ? []
+    : [[row ? row.a : midiOutput, 0], [midiOutput2, 1], [row?.b, 2]].filter(([p]) => p && !isPartyOut(p))   // BLOCKS SysEx never goes to a key-light keyboard
+  const stays = (p) => p.state !== 'disconnected' && want.some(([w]) => w === p)
+  // another link that stays reaches every block this one does (joined blocks on two links): it keeps them dark
+  const covered = (v) => !!v.link.info && [...blockLinks].some(([p, o]) => o !== v && stays(p) && o.link.info &&
+    v.link.info.blocks.every((b) => o.link.info.blocks.some((x) => x.serial && x.serial === b.serial)))
+  let changed = false
+  // links that go first, then the ones that only change slot (the other keyboard left, or it joined the row)
+  for (const [port, v] of [...blockLinks]) {
+    if (want.some(([p]) => p === port)) continue
+    changed = true
+    // out of exact-colour API mode first, on every block of this port
+    const apiPort = apiPortOf(port)
+    // a light service that just took the keyboard owns API mode now: no teardown packets onto its port
+    const handedOver = daemonOwnsKeyboard()
+    if (apiPort && port.state !== 'disconnected' && !handedOver) {
+      for (const dev of v.link.indices()) { try { turnOffAllKeys(port, dev); setLightingMode(port, LIGHTING_MODE.default, 1, dev) } catch (_e) {} }
+      v.link.setApi(false, 'lights')
+    }
+    if (apiPort && portsBehind(apiPort).length === 1) { apiModePorts.delete(apiPort); apiDevs.delete(apiPort) }
+    try { if (port.state !== 'disconnected' && !handedOver) { v.link.stopLights(); if (!covered(v)) v.link.release(true) } } catch (_e) {}
+    blockLinks.delete(port)
+    v.link.stop()
+    onBlocksChange(v.slot, null, 'gone')
+  }
+  // the input whose SysEx reaches a link (as blocksFeed routes it)
+  const feedOf = (slot) => (slot === 2 ? midiRowInput : [midiInput, midiInput2][midiInput2 && settings.kbLightsSwap ? 1 - slot : slot]) || null
+  for (const [port, v] of blockLinks) {
+    const slot = want.find(([p]) => p === port)[1]
+    // fed by another input now (the row folded, the swap changed): the blocks that answered it before aren't this port's
+    const feed = feedOf(slot)
+    if (feed !== v.feed) { v.feed = feed; v.link.resetOwnership() }
+    if (slot === v.slot) continue
+    v.slot = slot
+    changed = true
+    onBlocksChange(slot, v.link.info, 'promoted')
+  }
+  for (const [port, slot] of want) {
+    if (blockLinks.has(port)) continue
+    changed = true
+    const entry = { link: null, slot, port, feed: feedOf(slot) }
+    entry.link = new BlocksLink({
+      send: (bytes) => port.send(bytes),
+      store: ownColourStore,
+      log: (m) => console.log(m + ' (' + port.name + ')'),
+      onChange: (info, why) => onBlocksChange(entry.slot, info, why),
+      onButton: IS_NATIVE_HOST ? undefined : (button, serial) => {
+        // Octave presses are applied by the keyboard and reported by config polling.
+        if (!pageDrives() || ![0, 3, 4].includes(button.id)) return
+        if (pageLights.blocks.some((b) => b.serial === serial && b.link === entry.link)) handleKeyButton(button.id, button.action)
+      },
+      onLightsState: (state, blocks) => {
+        if (state === 'failed') console.log('LIGHTS in-app failed on ' + port.name + ': ' + blocks.filter((b) => b.state === 'failed').map((b) => b.serial.slice(-4) + ' ' + (b.reason || '?')).join(', '))
+        queuePageLights()
+      }
+    })
+    blockLinks.set(port, entry)
+    entry.link.start()
+    if (apiPortOf(port)) entry.link.setApi(true, 'lights')    // lit before the link existed: keep it alive
+  }
+  if (changed) queuePageLights()
+}
+// SysEx from a keyboard: the topology, config and ping replies go to its link (the link of the
+// output that belongs to that input: two keyboards' outputs can come the other way round). Slot 2:
+// the joined row's second input, which only its own port's link hears.
+function blocksFeed(data, slot) {
+  const link = blocksLinkFor(slot === 2 ? 2 : midiInput2 && settings.kbLightsSwap ? 1 - slot : slot)
+  return !!link && link.feed(data)
+}
+
+/* ----- the page's own key lights (blocks-leds.js), when there is no light service ----- */
+// Each LUMI block (firmware 1.3+) runs a small program the page uploads through that block's own link; the
+// app's frame (left to right across the row) goes 24 keys per block, in the row's order. If any block can't
+// take it, the whole keyboard goes back to its dark mode and note lights until the app is hidden and shown again.
+const pageLights = { ready: false, probing: false, pending: false, mixed: false, gaveUp: false, why: '', blocks: [], sig: '', waiting: [], gaveUpRow: '' }
+// a block no link gets ready (two joined blocks, only one's Bluetooth port connected) would keep the row waiting for good
+const rowWait = new RowLightsWait({ onExpire: () => syncPageLights() })
+const LUMI_SERIAL = /^LKB/i
+const lumiRow = (info) => !!info && info.blocks.length > 0 && info.blocks.every((b) => LUMI_SERIAL.test(b.serial || ''))
+// The row's blocks, left to right, in frame order (two keyboards on two cables: by their sides)
+function pageLightBlocks() {
+  if (!midiInput2) return (blocksLinkFor(0)?.info || blocksLinkFor(2)?.info)?.blocks || null
+  const order = []
+  for (const side of [0, 1]) {
+    const played = pair.side.indexOf(side)
+    if (played < 0) return null
+    const info = blocksLinkFor(settings.kbLightsSwap ? 1 - played : played)?.info
+    if (!info) return null
+    order.push(...info.blocks)
+  }
+  return order
+}
+let pageSyncQueued = false
+function queuePageLights() {
+  if (pageSyncQueued) return
+  pageSyncQueued = true
+  queueMicrotask(() => { if (!pageSyncQueued) return; pageSyncQueued = false; syncPageLights() })
+}
+// What the row is made of: the links (by slot), the blocks each one reaches, the frame order and the swap.
+// Another row (a link that came late, a block snapped on or off, a swap) gets its own try; the same row doesn't.
+function pageRowSig() {
+  const links = [...blockLinks.values()].map((v) => v.slot + ':' + (v.link.info ? v.link.info.blocks.map((b) => b.serial).join('+') : '-')).sort()
+  return [links.join(' '), (pageLightBlocks() || []).map((b) => b.serial).join(','), settings.kbLightsSwap ? 1 : 0].join('|')
+}
+function resetPageLightsTry() { pageLights.gaveUp = false; pageLights.why = ''; pageLights.gaveUpRow = ''; rowWait.reset() }
+function syncPageLights() {
+  const links = [...blockLinks.values()].map((v) => v.link)
+  const service = daemonOwnsKeyboard()
+  const rowSig = pageRowSig()
+  if (!links.length) resetPageLightsTry()     // the keyboard went: the next one gets its own try
+  else if (pageLights.gaveUp && rowSig !== pageLights.gaveUpRow) {
+    console.log('LIGHTS the row changed: trying in-app lights again')
+    resetPageLightsTry()
+  }
+  // a block that can't run the program, or one no link got ready in time: back to notes for the whole keyboard (each link lets go: its block's own lights return)
+  if (!pageLights.gaveUp && (links.some((l) => l.lightsState() === 'failed') || rowWait.expired)) {
+    pageLights.gaveUp = true
+    pageLights.gaveUpRow = rowSig
+    pageLights.why = links.flatMap((l) => l.lightsDetails()).filter((b) => b.state === 'failed').map((b) => b.serial.slice(-4) + ': ' + (b.reason || '?')).join(', ') ||
+      (rowWait.expired && pageLights.mixed ? 'the ports disagree on the row' : rowWait.expired && pageLights.waiting.length ? 'no link for ' + pageLights.waiting.map((s) => s.slice(-4)).join(', ') : 'no reply')
+    console.log('LIGHTS in-app lights unavailable (' + pageLights.why + '): the keys light from MIDI notes')
+    for (const l of links) l.stopLights()
+  }
+  // where it can run: LUMI blocks that make up the whole frame (24 or 48 keys), no light service, shown on screen
+  const blocks = pageLightBlocks()
+  const frameable = !service && !pageLights.gaveUp && !document.hidden && !!blocks && blocks.length > 0 &&
+    blocks.length * 24 === lightKeys() && lumiRow({ blocks })
+  for (const l of links) {
+    if (frameable && lumiRow(l.info)) { if (l.lightsState() === 'idle') l.startLights() } else l.stopLights()
+  }
+  const row = frameable ? routeRowLights(blocks, links) : null
+  const routed = row?.routed || null
+  const ready = !!row?.ready
+  pageLights.waiting = row ? row.waiting : []
+  // right after a split or a snap-on one link can still hold the old row for a few seconds: not known yet (the
+  // row's wait bounds it), so no dark-mode writes in between
+  pageLights.mixed = !service && !pageLights.gaveUp && !document.hidden && rowsDisagree(links.map((l) => l.info).filter(lumiRow))
+  rowWait.wait(frameable && !ready ? blocks.map((b) => b.serial).join(',') : pageLights.mixed ? 'mixed' : '')
+  pageLights.probing = links.some((l) => l.lightsState() === 'probing')
+  // still finding out (no topology yet, or the LUMI row not ready yet): don't darken the keyboard's flash in the meantime
+  pageLights.pending = !ready && !service && !pageLights.gaveUp && !document.hidden &&
+    (links.some((l) => !l.info && !l.noReply) || pageLights.mixed || (frameable && links.some((l) => lumiRow(l.info))))
+  const route = ready ? routed.map((b) => b.serial).join(',') : ''
+  if (route !== pageLights.blocks.map((b) => b.serial).join(',')) pageLights.sig = ''     // another split: send the picture again
+  pageLights.blocks = ready ? routed : []
+  if (ready === pageLights.ready) { updateKbChip(); renderSetup(); return }
+  pageLights.ready = ready
+  pageLights.sig = ''
+  console.log('LIGHTS ' + (ready ? 'full colour in app on ' + routed.map((b) => b.serial.slice(-4)).join(' + ') : 'in-app frames off'))
+  if (ready) clearNoteLights()       // no stale note lights under the frames
+  else if (modeHold) { clearTimeout(modeHold.timer); modeHold = null }
+  if (typeof applyKeyCount === 'function') applyKeyCount()    // the lights rows in Settings
+}
+// The program forces the keyboard's own brightness to full: Settings' brightness (30..255) scales the colours instead
+const pageBrightness = () => Math.max(0, Math.min(1, (Number(settings.brightness) || 255) / 255))
+function pageSend(frame) {
+  const b = pageBrightness()
+  pageLights.blocks.forEach(({ serial, link }, k) => {
+    const part = frame.slice(k * 24, k * 24 + 24)
+    while (part.length < 24) part.push([0, 0, 0])
+    link.setKeyFrame(serial, part, b)
+  })
+  pageLights.sig = frame.join('|')
+}
+// Where full-colour frames go: the light service when it runs, else the page's own program
+const lightSink = {
+  canSend: () => framesDrive(),
+  send(frame) {
+    if (daemonFrames()) daemon.send(frame)
+    else if (pageDrives()) pageSend(frame)
+  },
+  lastSig: () => (daemonFrames() ? daemon.lastSig : pageLights.sig),
+  resend() { if (daemon) daemon.lastSig = ''; pageLights.sig = '' }
+}
+function syncOwnColours(now = performance.now()) {
+  syncBlockLinks(now)
+  // a link that just came (or went) decides pending now, not in the microtask after the dark-mode write
+  if (pageSyncQueued) { pageSyncQueued = false; syncPageLights() }
+  // not while the page's program may take the keys (it needs no flash writes): only once it can't
+  const dark = !framesDrive() && !pageLights.pending && !pageLights.probing && !document.hidden
+  for (const { link } of blockLinks.values()) link.setDark(dark)
+}
+// Leaving or going to the background (iOS may stop the page soon after): the keyboard's own
+// settings and lights go back now, not on the next tick.
+function releaseOwnColours() {
+  for (const { link } of blockLinks.values()) { try { link.stopLights(); link.setDark(false); link.flush() } catch (_e) {} }
+}
 window.addEventListener('pagehide', () => {
+  lyricsEditor.pause()
+  disposeParty()      // the page may be gone: dispose clears the key-light keyboard once, and pageshow builds it again
   clearNoteLights()
   leaveApiMode()
-  for (const port of blankedPorts.keys()) { try { restoreOwnColours(port) } catch (_e) {} }
-  blankedPorts.clear()
+  releaseOwnColours()
 })
+window.addEventListener('pageshow', (e) => { if (e.persisted) syncPartyLights() })
+// clearNoteLights also leaves API mode, and forgets what was lit, so coming back relights it.
+// Back on screen: the page's program goes up again (hiding ended it) and gets the current picture.
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { lyricsEditor.pause(); clearNoteLights(); releaseOwnColours(); syncPageLights(); return }
+  resetPageLightsTry()
+  lightSink.resend()
+  syncPageLights()
+})
+
+// Blocks snapped on or off, an octave button, a keyboard that answered or didn't.
+let blocksKeysSeen = null      // the row's key count last time, to say when it changes
+let twiceRow = null            // a second port that only repeats the first one's row (joined blocks, both on Bluetooth)
+const snapMessage = (from, to, n) => (to > from
+  ? (n === 2 ? 'Second keyboard attached: ' : 'Another keyboard attached: ') + to + ' keys'
+  : (n === 1 ? 'Second keyboard removed: ' : 'A keyboard was removed: ') + to + ' keys')
+// Joined blocks pulled apart while both stay on (each has its own Bluetooth link): two keyboards side by side, until one
+// is switched off (then the one left is a single keyboard). Said after the "removed" line the first link's topology gave.
+// Said only once the ports have settled (a block switched off drops its Bluetooth link a moment after the row splits)
+// and both keyboards are still there.
+let pairUnknown = false
+function rowSeparated() {
+  if (midi) bindMidiPorts()
+  setTimeout(() => {
+    if (!midiInput2 || twiceRow) return
+    status('Keyboards separated: still playing on both. Switch one off to play on just one.' +
+      (pairUnknown ? ' Tell Keylight which one is on the left in Settings > Your keyboard.' : ''))
+  }, 3000)
+}
+function onBlocksChange(slot, info, why) {
+  if (why === 'battery') { showKeyboardInfo(); return }
+  const link = blocksLinkFor(slot)
+  if (why === 'connect' && link) link.repairLeftovers()
+  if (slot === 0) {
+    if (info && info.keys && why === 'topology' && blocksKeysSeen && blocksKeysSeen !== info.keys) status(snapMessage(blocksKeysSeen, info.keys, info.blocks.length))
+    if (info && info.keys) blocksKeysSeen = info.keys
+    else if (why === 'gone') blocksKeysSeen = null
+    // the row came apart: the second port is its own keyboard again
+    if (twiceRow && info && !info.joined) { twiceRow = null; rowSeparated() }
+  }
+  const shared = (p, q) => p.blocks.some((x) => q.blocks.some((y) => y.serial && y.serial === x.serial))
+  // the row's second link (slot 2) can be the first to hear that the blocks came apart: it then reaches no block
+  // the first link does, and the two ports are two keyboards again
+  const first = blocksLinkFor(0)?.info, row = blocksLinkFor(2)?.info
+  if (twiceRow && (why === 'topology' || why === 'connect') && first && row && (!row.joined || !shared(first, row))) { twiceRow = null; rowSeparated() }
+  // both links have to report the joined row: right after a split one of them can still hold the old topology
+  const a = blocksLinkFor(0)?.info, b = blocksLinkFor(1)?.info
+  if (a && b && midiInput2 && a.joined && b.joined && shared(a, b)) {
+    console.log('BLOCKS both ports reach the same keyboards: listening to one')
+    twiceRow = midiInput2.id
+    if (midi) bindMidiPorts()
+  }
+  // a joined block came or went: the API set-up of the ones that left is forgotten (exact colours)
+  if (link && info && why === 'topology') for (const [port, devs] of apiDevs) if (linksFor(port).includes(link)) for (const dev of [...devs]) if (!info.indices.includes(dev)) devs.delete(dev)
+  if ((slot === 0 || (slot === 2 && !blocksLinkFor(0))) &&
+      (why === 'octave' || why === 'topology' || why === 'promoted' || ((why === 'connect' || why === 'config') && !player))) followBlocksOctave()
+  applyKeyCount()
+  if (why === 'connect' || why === 'topology' || why === 'gone' || why === 'promoted') showKeyboardInfo()
+  queuePageLights()     // a topology, firmware or reply that decides the page's own lights
+}
+// The keyboard says where its octave is: the screen follows (the buttons are yours, Keylight
+// doesn't fight them). LUMI Keys / Piano M only: the ROLI Piano's octave isn't charted.
+function followBlocksOctave() {
+  const link = blocksLinkFor(0) || blocksLinkFor(2), low = link?.lowestNote()
+  if (low == null || midiInput2 || canMoveOctave() || !link.info.models.length || !link.info.models.every((m) => m === 'keys24')) return
+  const zero = kbWindowZero()
+  if ((low - zero) % 12) return
+  const oct = (low - zero) / 12
+  if (oct === kbOctave) return
+  kbOctave = oct
+  kbSetAt = performance.now()
+  rememberKeysAt()
+  if (player) player.setWindowStart(kbBase())
+  recheckHands()
+  syncOctaveUI()
+  console.log('KEYBOARD following the keyboard\'s octave base=' + kbBase())
+}
+const blocksKeys = () => blocksLinkFor(0)?.info?.keys || blocksLinkFor(2)?.info?.keys || 0
+// What is connected, for the setup and Settings (CONTRACT: keyboardInfo / 'keylight:keyboard').
+function keyboardInfo() {
+  const link = blocksLinkFor(0) || blocksLinkFor(2), info = link?.info || null, info2 = blocksLinkFor(1)?.info || null
+  const label = midiInput ? portLabel(midiInput) : ''
+  const two = !!midiInput2, service = !!(daemon && daemon.ready)
+  const party = !!midiInput && !info && isPartyPort(midiInput)
+  const roli = !!midiInput && !party && (!!info || KB_PORT.test(label) || KB_MAKER.test(label) || service)
+  const guess = (n) => Array.from({ length: n }, () => (!two && keysFromName(label) === 49 ? 'piano49' : 'keys24'))
+  // two cables: each keyboard counts, with or without its own topology yet
+  const blocks = !midiInput ? 0 : two ? (info?.blocks.length || 1) + (info2?.blocks.length || 1) : info ? info.blocks.length : service ? Math.max(1, daemon.count) : 1
+  const models = !roli ? [] : two ? [...(info ? info.models : guess(1)), ...(info2 ? info2.models : guess(1))] : info ? [...info.models] : guess(blocks)
+  return {
+    connected: !!midiInput,
+    family: midiInput ? (roli ? 'roli' : party ? 'partykeys' : 'midi') : null,
+    name: midiInput ? (midiInput.name || 'Keyboard') + (two ? ' + ' + (midiInput2.name || 'Keyboard') : '') : '',
+    keys: midiInput ? kbKeys() : 0,
+    blocks,
+    joined: !two && blocks >= 2,
+    lights: partyBound() ? partyUsable() : !!(midiOutput || midiOutput2 || framesDrive()),
+    models,
+    octave: link && link.octave != null ? link.octave : canMoveOctave() ? kbOctave : null
+  }
+}
+let keyboardSig = ''
+function emitKeyboard() {
+  const detail = keyboardInfo(), sig = JSON.stringify(detail)
+  if (sig === keyboardSig) return
+  keyboardSig = sig
+  window.dispatchEvent(new CustomEvent('keylight:keyboard', { detail }))
+}
+// "Which one is this?": that keyboard lights every key for 2 s (each joined block lights the keys
+// it has, wherever its octave is), then the song's lights come back. which: 0/1 or a port id.
+const identifyTimers = new Map()     // output port -> its turn-off timer (also tells updateNoteLights to keep off that port)
+function identifyKeyboard(which = 0) {
+  const ids = (p) => (p ? [p.id, p.name] : [])
+  // which: an input slot (0/1) or a port id. The two outputs can come the other way round (settings.kbLightsSwap).
+  const swapped = (slot) => (midiInput2 && settings.kbLightsSwap ? 1 - slot : slot)
+  const slot = which === 0 || which === 1 ? swapped(which)
+    : ids(midiOutput).includes(which) ? 0
+      : midiOutput2 && ids(midiOutput2).includes(which) ? 1
+        : ids(midiInput).includes(which) ? swapped(0)
+          : midiInput2 && ids(midiInput2).includes(which) ? swapped(1) : -1
+  const port = slot === 1 ? midiOutput2 : slot === 0 ? midiOutput : null
+  if (!port || isPartyOut(port)) return false     // a key-light keyboard has no Note On flash
+  clearTimeout(identifyTimers.get(port))
+  identifyTimers.delete(port)      // otherwise a stale entry keeps updateNoteLights off this port
+  const exact = exactWanted()       // exact colours: the keys take light commands, not note velocities
+  try {
+    if (exact) for (const dev of prepareApi(port)) setAllKeysToColor(port, 0xffffffff, dev)
+    else for (const bytes of noteBursts(0x90, 127)) port.send(bytes)     // a few buffers, not 128 sends (iOS queue limit)
+  } catch (_e) { return false }
+  identifyTimers.set(port, setTimeout(() => {
+    identifyTimers.delete(port)
+    try {
+      if (exact && apiModePorts.has(port)) for (const dev of blockIndices(port)) turnOffAllKeys(port, dev)
+      else { for (const bytes of noteBursts(0x80, 0)) port.send(bytes); port.send([0xb0, 123, 0]) }
+    } catch (_e) {}
+    // the frame loop lights this port's song keys again
+    for (const [pitch, route] of [...litRoutes]) if (route[0] === port) { litRoutes.delete(pitch); litNotes.delete(pitch) }
+  }, 2000))
+  return true
+}
 // Exact colours: instead of a note velocity (which the keyboard maps to its own palette), the
 // value carries the colour itself, top bit 1. Only with plain MIDI notes (no light service).
 const EXACT_FLAG = 1 << 24
-const noteLightColour = (rgb) => settings.exactColors && noteLightsOnly()
+const noteLightColour = (rgb) => exactWanted()
   ? EXACT_FLAG | (rgb[0] << 16) | (rgb[1] << 8) | rgb[2]
   : velocityForColour(rgb)
 const asNext = (v) => (v & EXACT_FLAG ? v : v | NOTE_DIM)   // exact next-notes are already coloured
 const apiModePorts = new Set()   // ports in API lighting mode (exact colours)
-const exactWanted = () => !!(settings.exactColors && noteLightsOnly() && !framesDrive())
+const apiDevs = new Map()        // port -> the block indices set up for it
+const exactWanted = () => !!(settings.exactColors && midi?.sysexEnabled !== false && !daemonOwnsKeyboard() && noteLightsOnly() && !daemonSettling(performance.now()) && !isPartyOut(midiOutput) && !isPartyOut(midiOutput2))
 function guardApiMode() { if (apiModePorts.size && !exactWanted()) { leaveApiMode(); clearNoteLights() } }
 function leaveApiMode() {
   for (const port of apiModePorts) {
-    try { turnOffAllKeys(port); setLightingMode(port, LIGHTING_MODE.default, 1); endApiMode(port) } catch (_e) {}
+    const links = linksFor(port)
+    for (const dev of blockIndices(port)) {
+      try { turnOffAllKeys(port, dev); setLightingMode(port, LIGHTING_MODE.default, 1, dev); if (!links.length) endApiMode(port, dev) } catch (_e) {}
+    }
+    for (const l of links) l.setApi(false, 'lights')     // ends API mode on each block unless a read still needs it
   }
   apiModePorts.clear()
+  apiDevs.clear()
 }
 // Blue rather than a dimmer white: Piano's next key has to read as different even on a keyboard
 // that doesn't dim single keys.
@@ -3246,6 +6005,13 @@ function addHeldNoteLights(desired) {
   for (const pitch of held) if (!desired.has(pitch)) desired.set(pitch, noteLightColour(pressRgb(pitch, pitch - base)))
 }
 function clearNoteLights() {
+  partyClear()     // a key-light keyboard: its own clear frame, and the next target is sent again
+  // an Identify flash cut short: its own turn-off never runs, so plain note-lit keys are switched off here (API ports go dark below)
+  for (const [port, t] of identifyTimers) {
+    clearTimeout(t)
+    if (!apiModePorts.has(port)) { try { for (const b of noteBursts(0x80, 0)) port.send(b); port.send([0xb0, 123, 0]) } catch (_e) {} }
+  }
+  identifyTimers.clear()
   leaveApiMode()
   for (const route of litRoutes.values()) { try { route[0].send([0x80, route[1], 0]) } catch (_e) {} }
   litNotes.clear()
@@ -3259,7 +6025,8 @@ function clearNoteLights() {
 const MIDI_SWEEP_MS = 1485
 let midiSweepTimers = []
 const midiSweepLit = new Map()   // pitch -> [port, note] it was lit on
-function midiLightSweep(port = midiOutput) {
+function midiLightSweep(port = hasNoteLightPort() ? midiOutput || midiOutput2 : null) {
+  if (isPartyOut(port)) port = null     // never a Note On sweep on a key-light keyboard
   for (const t of midiSweepTimers) clearTimeout(t)
   midiSweepTimers = []
   const send = (to, msg) => { try { to.send(msg) } catch (_e) {} }
@@ -3270,7 +6037,7 @@ function midiLightSweep(port = midiOutput) {
   for (let i = 0; i < keys; i++) {
     const pitch = base + i
     if (pitch < 0 || pitch > 127) continue
-    const route = port === midiOutput ? noteRoute(pitch) : [port, pitch]
+    const route = port === midiOutput || port === midiOutput2 ? noteRoute(pitch) : [port, pitch]
     if (!route) continue
     midiSweepTimers.push(setTimeout(() => { send(route[0], [0x90, route[1], 127]); midiSweepLit.set(pitch, route) }, i * step))
     midiSweepTimers.push(setTimeout(() => { send(route[0], [0x80, route[1], 0]); midiSweepLit.delete(pitch) }, (i + 3) * step))
@@ -3287,18 +6054,21 @@ function cancelLightTest() {
   lightTestTimers = []
   cancelCeremony()
   midiLightSweep(null)
-  for (const out of [midiOutput, midiOutput2]) if (out) clearLights(out)
+  for (const out of [midiOutput, midiOutput2]) if (out && !isPartyOut(out)) clearLights(out)
+  cancelPartyTest()
   litNotes.clear(); litRoutes.clear()
-  if (daemon) daemon.lastSig = ''
+  lightSink.resend()
   const btn = $('testLights')
   if (btn) { btn.disabled = false; btn.textContent = 'Test lights' }
+  syncPartySettings()      // a key-light keyboard whose lights are off keeps Test lights greyed out
   return true
 }
 function runMidiLightTest() {
-  if (!midiOutput) { if (!midiInput) { status('No keyboard found: plug it in over USB and switch it on. ' + noKeyboardNextStep(), keyboardSettingsAction()); return }
-    status(canChooseLights() ? 'Choose your keyboard by name in Settings to light its keys' : 'Keylight doesn’t recognise this keyboard, so its keys stay unlit', canChooseLights() ? undefined : supportDeviceAction()); return }
-  clearLights(midiOutput)
-  if (midiOutput2) clearLights(midiOutput2)
+  if (partyBound()) { runPartyLightTest(); return }
+  if (!hasNoteLightPort()) { if (!midiInput) { status('No keyboard found: ' + (IS_IOS ? 'connect it with a USB adapter or over Bluetooth' : 'plug it in over USB') + ' and switch it on. ' + noKeyboardNextStep(), keyboardSettingsAction()); return }
+    status(lightFallbackMessage() || (canChooseLights() ? 'Choose your keyboard by name in Settings to light its keys' : 'Keylight doesn’t recognise this keyboard, so its keys stay unlit'), canChooseLights() ? undefined : supportDeviceAction()); return }
+  if (midiOutput && !isPartyOut(midiOutput)) clearLights(midiOutput)
+  if (midiOutput2 && !isPartyOut(midiOutput2)) clearLights(midiOutput2)
   litNotes.clear()
   litRoutes.clear()
   const ms = midiLightSweep()
@@ -3308,8 +6078,8 @@ function runMidiLightTest() {
   lightTestActive = true
   lightTestTimers.push(setTimeout(() => {
     lightTestActive = false
-    if (midiOutput) { clearLights(midiOutput); litNotes.clear(); litRoutes.clear() }
-    if (midiOutput2) clearLights(midiOutput2)
+    if (midiOutput && !isPartyOut(midiOutput)) { clearLights(midiOutput); litNotes.clear(); litRoutes.clear() }
+    if (midiOutput2 && !isPartyOut(midiOutput2)) clearLights(midiOutput2)
     btn.disabled = false
     btn.textContent = 'Test lights'
     status('Light test done: every key should have lit up, and stuck lights are cleared')
@@ -3328,18 +6098,65 @@ function syncBacking() {
 function togglePlay() {
   if (!player) { if (song) return startSong(); return }
   initAudio()
+  // Play during "Place your hands" skips it and plays; a fresh start may show it first (then plays)
+  if (!player.active && handGuideRun && handGuideRun.kind === 'song') endHandGuide('skip', false)
+  else if (!player.active && maybeGuideHands(() => togglePlay())) { syncHudButtons(); return }
   if (player.active) { player.pause(); stopBacking() }
   else { cancelLightTest(); cancelCeremony(); player.play(); syncBacking() }
   pumpAudio()
   syncHudButtons()
 }
 
-function setMode(mode) {
+// After a restart: Wait mode stays armed (the first key starts it), every other mode counts in and plays.
+function playFresh({ guide = true } = {}) {
+  if (!player) return
+  if (guide && settings.experience === 'new' && maybeGuideHands(player.armed ? null : () => playFresh({ guide: false }))) return
+  if (!player.active && !player.armed) { initAudio(); cancelLightTest(); player.play(); syncBacking(); pumpAudio() }
+  syncHudButtons()
+}
+function restartSong(autoPlay = false) {
+  if (!player) return
+  cancelSongGuide()
+  cancelCeremony()
+  handGuideStartPlayer = null
+  if (autoPlay) {
+    player.restart(false)
+    playFresh()
+    if (settings.experience !== 'new' && player.armed) maybeGuideHands()
+  } else if (settings.experience === 'new') {
+    player.restart(false)
+    if (player.armed) maybeGuideHands()
+    else if (player.countIn > 0) playFresh()
+  } else player.restart()
+}
+// Wait mode is stopped at the start and a key press may start it: only on the player itself, with nothing on top of it.
+// where the canvas may draw at its top: below the player's top bar, which floats over the notes when no sheet sits between
+// (iPhone on its side, iPad with notation off). In canvas pixels; 0 when the bar is not there.
+// The bar's content bottom (without its 22 px fade padding), so a wrapped second row (TV remote) is cleared too. Measured at
+// most every 250 ms: this runs every frame of a Wait pause.
+const pillTop = { at: -1e9, v: 0 }
+function waitPillTop() {
+  const t = performance.now()
+  if (t - pillTop.at < 250) return pillTop.v
+  pillTop.at = t
+  const bar = $('topbar')
+  if (!bar || bar.offsetParent === null || getComputedStyle(bar).display === 'none') return (pillTop.v = 0)
+  const pad = parseFloat(getComputedStyle(bar).paddingBottom) || 0
+  return (pillTop.v = Math.max(0, bar.getBoundingClientRect().bottom - pad - canvas.getBoundingClientRect().top + 8))
+}
+function waitArmed() {
+  return !!(player && song && !freeplay && screen === 'play' && player.armed && $('results').classList.contains('hidden') && !$('app').inert && !tourIsOpen() && !setup.open && !handGuideRun && !document.querySelector('dialog[open]'))
+}
+
+function setMode(mode, { guide = true } = {}) {
   if (!player) return
   player.setMode(mode)
   stopBacking()
   if (mode === 'PRACTISE') player.setAdvancement(settings.waitMode || 'pauseAndSnap')
-  status(mode === 'WATCH' ? 'Watch — sit back and listen, the keys show you how' : mode === 'PRACTISE' ? 'Wait mode — the song waits for you on every note' : 'Play — keep up with the song, every note is scored')
+  status(mode === 'WATCH' ? 'Watch. Listen and follow the keys.' : mode === 'PRACTISE' ? 'Wait mode. The song waits for you on every note.' : 'Play. Keep up with the song. Every note is scored.')
+  if (mode === 'WATCH' && handGuideRun && handGuideRun.kind === 'song') endHandGuide('cancel')
+  else if (mode === 'PRACTISE' && handGuideRun && handGuideRun.kind === 'song') handGuideRun.then = null   // Wait stays armed after it
+  else if (guide && mode === 'PRACTISE' && player.armed) maybeGuideHands()   // armed Wait mode: the first key would start it
   syncHudButtons()
 }
 // Speed track: Wait (practise, waits for you) · 0.5x · 0.75x · Full speed.
@@ -3378,6 +6195,7 @@ function cycleLabels() {
 const noHandPart = (hand) => (song && keysStayAt() != null && song.notes.some((n) => n.hand === hand)
   ? `The ${hand}-hand part is off your keys: use the octave buttons on your keyboard` : `This song has no ${hand}-hand part`)
 function cycleHands() {
+  reguideAfterChange()
   const order = ['both', 'left', 'right']
   const counts = player && player.song ? player.handCounts() : null
   let hand = player ? player.handFilter : settings.hands
@@ -3423,10 +6241,15 @@ function syncViewMenu() {
 function placeViewMenu() {
   const menu = $('viewMenu')
   const r = $('btnView').getBoundingClientRect()
+  if (!r.width && !r.height) { closeViewMenu(); return }   // the button left a narrow bar for More (player-hud.js fitBar)
   const w = menu.offsetWidth || 300
   const left = Math.max(12, Math.min(window.innerWidth - w - 12, r.left + r.width / 2 - w / 2))
   menu.style.left = left + 'px'
-  menu.style.top = Math.round(r.bottom + 10) + 'px'
+  // under the button; above it when that would leave the screen (the button is in the More sheet at the bottom)
+  const h = menu.offsetHeight || 290
+  const above = r.bottom + 10 + h > window.innerHeight - 12 && r.top - 10 - h >= 12
+  menu.classList.toggle('above', above)
+  menu.style.top = Math.round(above ? r.top - 10 - h : Math.max(12, Math.min(r.bottom + 10, window.innerHeight - h - 12))) + 'px'
   menu.style.setProperty('--nub', Math.round(r.left + r.width / 2 - left) + 'px')
 }
 function openViewMenu() {
@@ -3479,12 +6302,91 @@ function toggleLoop() {
   syncHudButtons()
 }
 
+// A chip in the player when a remembered setting hides part of the song: one hand only, or Sheet only (no keys). One tap puts it back.
+// ---- hand legend + "play the lit key" pill ----
+// The legend names the hand colours (small, in the top bar; big and centred at the start of a song, fading after
+// ~4 s of playing). The pill shows while Wait mode is armed.
+const HAND_INTRO_MS = 4000
+let handCue = { player: null, ms: 0, last: 0, key: '', armText: '' }
+const handsOf = (sg) => {
+  if (!sg) return { left: false, right: false }
+  if (!sg._handsUsed) sg._handsUsed = { left: sg.notes.some((n) => n.hand === 'left'), right: sg.notes.some((n) => n.hand !== 'left') }
+  return sg._handsUsed
+}
+function syncStartCues() {
+  const legend = $('handLegend'), intro = $('handIntro'), pill = $('armPill')
+  if (!legend || !intro || !pill) return
+  const t = performance.now()
+  const dt = Math.min(100, t - handCue.last); handCue.last = t
+  const real = !!(player && song && !freeplay && screen === 'play')
+  // ---- legend
+  const used = real ? handsOf(player.song) : { left: false, right: false }
+  const show = real && (used.left || used.right)
+  const filter = real ? player.handFilter : 'both'
+  const key = [show, used.left, used.right, filter].join()
+  if (key !== handCue.key) {
+    handCue.key = key
+    legend.classList.toggle('is-off', !show)
+    for (const [side, el] of [['left', 'hlLeft'], ['right', 'hlRight']]) {
+      const e1 = $(el), e2 = $(side === 'left' ? 'hiLeft' : 'hiRight')
+      for (const e of [e1, e2]) {
+        e.style.setProperty('--hand-c', COLORS.hand[side])
+        e.classList.toggle('is-gone', !used[side])
+        e.classList.toggle('is-dim', filter !== 'both' && filter !== side)
+      }
+    }
+  }
+  // ---- big intro: counts only while playing; a stopped song at its start shows it again
+  if (handCue.player !== player) { handCue.player = player; handCue.ms = 0 }
+  if (real && player.active) handCue.ms += dt
+  else if (real && !player.finished && player.position <= (player.sectionStart || 0) + 1e-3) handCue.ms = 0
+  // not behind the "Place your hands" card: it would show through as a faint outline above it
+  const introOn = show && handCue.ms < HAND_INTRO_MS && !(handGuideRun && handGuideRun.kind === 'song')
+  intro.classList.toggle('show', introOn)
+  legend.classList.toggle('is-quiet', introOn)   // upright phone: the small one waits for the big one to fade
+  // ---- armed Wait mode
+  const armed = waitArmed()
+  pill.classList.toggle('hidden', !armed)
+  if (armed) {
+    const notes = player.firstWaitNotes()
+    const chord = new Set(notes.map((n) => n.pitch)).size > 1
+    // keys light up two seconds ahead: only then is "the lit key" true
+    const lit = notes.length && notes[0].start - player.position <= 2
+    const text = player.finished || !notes.length ? 'Play a key to start again' : lit ? (chord ? 'Play the lit keys to start' : 'Play the lit key to start') : (chord ? 'Play the first notes to start' : 'Play the first note to start')
+    if (text !== handCue.armText) { handCue.armText = text; $('armPillText').textContent = text }
+    const r = canvas.getBoundingClientRect()
+    const kbH = keyboardGeometry && keyboardGeometry.kbH ? keyboardGeometry.kbH : 110
+    const scale = r.height && canvas.height ? r.height / (canvas.height / stageDpr) : 1
+    pill.style.bottom = Math.round(kbH * scale + 14) + 'px'
+  }
+}
+function syncPlayHint() {
+  const el = $('playHint')
+  if (!el) return
+  const real = !!(song && player && screen === 'play' && !freeplay && !lessonMeta && !gameMeta && !exerciseMeta && !courseRun)
+  const hands = player ? player.handFilter : settings.hands
+  const sheetOnly = real && settings.view === 'SHEET' && $('screen-play').classList.contains('sheet-only')
+  const parts = []
+  if (real && hands !== 'both') parts.push(hands === 'left' ? 'Left hand only' : 'Right hand only')
+  if (sheetOnly) parts.push('Sheet only, no keys')
+  const key = parts.join(' + ')
+  const show = !!key && key !== playHintDismissed && !(player && player.active)
+  el.classList.toggle('hidden', !show)
+  if (show) $('playHintText').textContent = key
+}
+function resetPlayHint() {
+  if (player && player.handFilter !== 'both') { settings.hands = 'both'; player.setHandFilter('both'); saveSettings() }
+  if (settings.view === 'SHEET') chooseView('CASCADE')
+  playHintDismissed = ''
+  syncHudButtons()
+}
 function syncHudButtons() {
   const setLbl = (id, v) => { const el = $(id); if (el) el.textContent = v }
   // toggle buttons carry their on/off state to assistive tech as aria-pressed
   const setToggle = (id, on) => { const el = $(id); if (!el) return; el.classList.toggle('on', on); el.setAttribute('aria-pressed', String(!!on)) }
   if (instrumentControls) instrumentControls.sync()
   if ($('voiceCount')) $('voiceCount').textContent = String(activeVoiceCount())
+  syncLyricEditorButton()
   setToggle('btnMetro', settings.metronome)
   setToggle('btnSheet', settings.sheet || settings.view === 'SHEET')
   setLbl('lblLabels', settings.labels === 'names' ? 'Names' : settings.labels === 'fingers' ? 'Fingers' : 'Labels')
@@ -3493,6 +6395,7 @@ function syncHudButtons() {
   const hands = player ? player.handFilter : settings.hands
   setLbl('lblHands', hands === 'both' ? 'Both' : hands === 'left' ? 'Left' : 'Right')
   setToggle('btnHands', hands !== 'both')
+  syncPlayHint()
   setLbl('lblView', (VIEW_INFO[settings.view] || VIEW_INFO.CASCADE).name)
   syncViewMenu()
   setToggle('btnLoop', !!(player && player.loop.on))
@@ -3506,6 +6409,7 @@ function syncHudButtons() {
     b.classList.toggle('on', on)
     if (on) onBtn = b
   }
+  $('speedTrack').dataset.rate = speedChipLabel(sel === 'wait' ? 1 : (player ? player.rate : settings.rate))   // the compact chip shows this when no button is selected (a custom rate)
   const thumb = $('speedThumb')
   if (thumb) thumb.hidden = !onBtn
   $('customSpeed').hidden = !!onBtn
@@ -3519,10 +6423,17 @@ function syncHudButtons() {
   if ($('backingState') && backingName) $('backingState').textContent = backingName
   if ($('fullState') && fullName) $('fullState').textContent = fullName
   if ($('kbdMode')) $('kbdMode').value = settings.keyboardMode
+  if ($('waitStyle')) $('waitStyle').value = settings.waitStyle || 'breathe'
+  if ($('nextStyle')) $('nextStyle').value = settings.nextStyle || 'glow'
+  for (const id of ['waitStyleRow', 'nextStyleRow', 'lightStyleHint']) if ($(id)) $(id).classList.toggle('hidden', !framesDrive())
   if ($('exprToggle')) $('exprToggle').checked = !!settings.expression
+  if ($('glideToggle')) $('glideToggle').checked = !!settings.glide
   if ($('userColorRow')) $('userColorRow').classList.toggle('hidden', settings.keyboardMode !== 'User')
   if ($('exactColors')) $('exactColors').checked = !!settings.exactColors
-  for (const id of ['exactRow', 'exactHint']) if ($(id)) $(id).classList.toggle('hidden', !noteLightsOnly())
+  if ($('partyColor')) { $('partyColor').value = partyColorMode(); if (partyBound()) syncPartyLights() }   // idempotent: only a changed colour setting rebuilds
+  for (const id of ['exactRow', 'exactHint']) if ($(id)) $(id).classList.toggle('hidden', !noteLightsOnly() || daemonOwnsKeyboard() || partyBound())
+  // a PartyKeys showing the screen's colours ignores the ROLI light style, so the control is not offered
+  syncLightStyleRow()
 }
 let playIconState = null
 function setPlayIcon(playing) {
@@ -3570,6 +6481,10 @@ function takeMeta(trigger) {
 }
 
 function beginTake(trigger) {
+  if (document.body.classList.contains('stage-follows') && document.body.classList.contains('hud-idle')) {
+    document.body.classList.remove('hud-idle')
+    resize()
+  }
   const onStop = (r) => { if (r.saved && r.sidecar.stopReason === 'time limit') status('Takes stop after 15 minutes: this one is saved in ' + TAKES_FOLDER) }
   const run = freeplay ? 'playground' : player
   const stem = startTake({ canvas, meta: takeMeta(trigger), save: takeSave, onStop })
@@ -3599,7 +6514,7 @@ window.keylightSaveTake = async () => {
 // A take still being saved holds a new one back (endTake starts it once that is done;
 // starting it now would only fail, and say so).
 function maybeStartTake() {
-  if (!settings.recordTakes || takeBusy() || screen !== 'play') return
+  if (!settings.recordTakes || takeBusy() || screen !== 'play' || lyricsEditor.isOpen()) return
   if (!$('results').classList.contains('hidden')) return
   if (freeplay) { if (takeDeclined !== 'playground') beginTake('switch'); return }
   if (player && song && player.active && takeDeclined !== player) beginTake('switch')
@@ -3607,6 +6522,7 @@ function maybeStartTake() {
 
 function syncRecPill() {
   const on = isRecording()
+  document.body.classList.toggle('stage-follows', !on && typeof ResizeObserver === 'function')
   $('recPill').classList.toggle('hidden', !on)
   clearInterval(recPillTimer)
   recPillTimer = 0
@@ -3616,11 +6532,320 @@ function syncRecPill() {
   recPillTimer = setInterval(tick, 1000)
 }
 
+/* ============================== TV mode (iPhone and iPad) ==============================
+   While an Apple TV shows a second screen through AirPlay, this phone sends the TV page what it needs
+   (tv-link.js, tv-calibrate.js) and becomes a remote. Nothing here runs on other platforms: the link is
+   enabled only in the iPhone/iPad app, and it stays silent until the native side reports a connected TV. */
+function tvSongMeta() {
+  if (!song) return null
+  return { id: String(song.importedId || song.file || song.title || ''), title: song.title || '', artist: song.artist || '', keyCount: player?.windowKeys ?? kbKeys() }
+}
+// What the TV shows now: the calibrate screen during a sync, the results after a song, else the player or the idle screen.
+function tvScreenInfo() {
+  let info = { name: playingSong() ? 'play' : 'idle' }   // the Playground has no song: the TV shows idle
+  if ((tvCal && !tvCal.finished) || tvPreviewing) info = { name: 'calibrate' }
+  else if (lastSummary && !$('results').classList.contains('hidden')) {
+    const s = lastSummary
+    info = { name: 'results', results: { stars: s.starRating, accuracy: s.overallAccuracy, longestStreak: s.longestStreak, hits: s.totalNotesHit, misses: s.missed, best: !!s.newBest } }
+  }
+  if (song) info.song = { title: song.title || '', artist: song.artist || '' }
+  return info
+}
+function tvSendScreen() { if (tvOn()) tvLink.sendScreen() }
+function tvPlayerChanged() { if (tvOn()) { tvLink.sendState(); tvSyncLayout() } }
+function tvJudged() { if (tvOn()) { tvLink.sendScore(); tvKeys(); tvSyncLive() } }
+function tvKeys() { if (tvOn()) tvLink.sendKeys(held, feedback) }
+function tvTick() { if (tvOn()) tvLink.tick() }
+async function tvNativeLog() {
+  const native = await androidRequest('diagnosticsLog', {}, 2000).catch(() => [])
+  return [...(Array.isArray(native) ? native : []), ...Object.values(tvDiagnostics)]
+}
+function tvApplyMute() {
+  setOutputMuted(tvOn() && settings.tvSound === 'muted')
+}
+function tvOnEvent(ev) {
+  if (['connected', 'ready', 'notReady', 'disconnected', 'failed', 'songFailed', 'songRecovered', 'accessChanged'].includes(ev.event)) tvPageChanged()
+  if (['connected', 'disconnected', 'failed', 'accessChanged'].includes(ev.event)) tvApplyMute()
+  if (ev.event === 'scene') tvDiagnostics.scene = {
+    message: 'TV scene: ' + ev.role + ', ' + ev.width + '×' + ev.height + ' pt, ' + ev.delegate + (ev.accessory ? ', accessory' : '')
+  }
+  if (ev.event === 'accessory') tvDiagnostics.accessory = { message: 'TV accessory: ' + (ev.available ? 'display available' : 'no display') }
+  if (ev.event === 'sound' && tvOn()) tvDiagnostics.audio = {
+    message: 'TV audio: ' + settings.tvSound + ', ' + (ev.portTypes?.join(', ') || 'no output') + ', ' + ev.latencyMs + ' ms'
+  }
+  if (ev.event === 'failed' || ev.event === 'songFailed') {
+    tvDiagnostics.failure = { message: 'TV: ' + (ev.reason || 'song transfer failed'), code: ev.code }
+    status(ev.event === 'failed' ? 'The TV view could not open. You can keep playing on this device.' : 'The song could not load on the TV. You can keep playing on this device.')
+  }
+  if (ev.event === 'ready' && tvLink.isReady() && !settings.tvCalibOffered && tvSetup() === 'airplay') tvOfferCalibration()
+  tvRefreshSettings()
+}
+function tvPageChanged() {
+  if (!tvLink.isReady()) {
+    tvStopPreview()
+    if (tvCal) tvCalClose()
+  }
+  // the player is held in landscape, but the remote layout may turn to portrait (ios-orientation.js)
+  const remote = tvLayoutOn()
+  if (remote) lyricsEditor.close()
+  syncLyricEditorButton()
+  if (remote !== document.body.classList.contains('tv-on') && screen === 'play') {
+    if (remote) leavePlayer(); else enterPlayer()
+  }
+  tvSyncLayout()
+}
+// The remote layout (the player's controls on the phone, the notes on the TV) only while the TV page is ready and a song
+// plays on the player screen. The Playground and every other screen keep the phone's own layout.
+function tvSyncLayout() {
+  const remote = tvLayoutOn()
+  if (remote && typeof cancelSongGuide === 'function') cancelSongGuide()   // typeof: scripts/test-tv-contract.js runs this slice on its own
+  document.body.classList.toggle('tv-on', remote)
+  document.body.classList.toggle('tv-notes', remote && !!settings.tvPhoneNotes)
+  $('tvChip').classList.toggle('hidden', !remote)
+  $('tvUnlock').classList.toggle('hidden', tvAllowed() || !tvLink.isConnected())
+  tvShowStage()
+  tvSyncRemote()
+}
+function tvShowStage() { $('tvStage').classList.toggle('hidden', !(tvLayoutOn() && !settings.tvPhoneNotes)) }
+// the phone draws the notes only when its setting asks; with the remote layout the TV shows them
+function tvHidesNotes() { return document.body.classList.contains('tv-on') && !settings.tvPhoneNotes }
+// The remote's controls: the playing state, hands, wait and loop follow the player's own buttons.
+function tvSyncRemote() {
+  if (!document.body.classList.contains('tv-on')) return
+  const pressed = (el) => (el && el.getAttribute('aria-pressed') === 'true' ? 'true' : 'false')
+  const wait = document.querySelector('#speedTrack [data-speed="wait"]')
+  $('tvHands').textContent = 'Hands: ' + $('lblHands').textContent
+  $('tvHands').setAttribute('aria-pressed', pressed($('btnHands')))
+  $('tvLoop').setAttribute('aria-pressed', pressed($('btnLoop')))
+  $('tvWait').setAttribute('aria-pressed', wait && wait.classList.contains('on') ? 'true' : 'false')
+  $('tvStageSong').textContent = song ? song.title || '' : ''
+  tvSyncLive()
+}
+function tvSyncLive() {
+  const el = $('tvStageLive')
+  if (!el || !player || !player.score) return
+  const s = summarize(player.score, player.mode)
+  const judged = s.perfect + s.good + s.early + s.late + s.missed + s.cold + s.hinted
+  el.textContent = judged ? 'Accuracy ' + Math.round(s.overallAccuracy * 100) + '%, streak ' + player.score.streak : 'Your score starts when you play'
+}
+function tvDeviceName() {
+  const ua = navigator.userAgent
+  return (/iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) ? 'iPad' : 'iPhone'
+}
+function tvSetup() { return settings.tvSetup === 'cable' ? 'cable' : 'airplay' }
+function tvDelay() {
+  const setup = tvSetup()
+  const airplayDefault = Number.isFinite(settings.tvDelayMs) ? settings.tvDelayMs : DEFAULT_DELAY_MS
+  const saved = settings.tvDelayBySetup?.[setup]
+  const delay = Number.isFinite(saved) ? saved : setup === 'cable' ? 0 : airplayDefault
+  return Math.max(0, Math.min(MAX_DELAY_MS, Math.round(delay)))
+}
+function tvAudioPortName(port) {
+  if (port === 'Speaker' || port === 'Receiver') return tvDeviceName()
+  if (/AirPlay|HDMI/i.test(port)) return 'TV'
+  if (/Bluetooth/i.test(port)) return 'Wireless audio'
+  if (/Headphones/i.test(port)) return 'Headphones'
+  if (/USB/i.test(port)) return 'USB audio'
+  if (/LineOut/i.test(port)) return 'Audio output'
+  return 'External audio'
+}
+// Settings > TV: the delay, the sync button, the sound route and what the TV reports.
+function tvRefreshSettings() {
+  const allowed = tvAllowed()
+  $('tvPremiumNotice').classList.toggle('hidden', allowed)
+  $('tvSettingsControls').classList.toggle('hidden', !allowed)
+  const ready = tvLink.isReady()
+  $('tvSetup').value = tvSetup()
+  $('tvDelayValue').textContent = $('tvRemoteDelay').textContent = $('tvSyncPillMs').textContent = tvDelay() + ' ms'
+  $('tvSync').disabled = !ready
+  $('tvSyncHint').classList.toggle('hidden', ready)
+  for (const b of document.querySelectorAll('[data-tv-sound]')) {
+    const on = b.dataset.tvSound === settings.tvSound
+    b.classList.toggle('on', on)
+    b.setAttribute('aria-pressed', String(on))
+  }
+  $('tvPhoneNotes').checked = !!settings.tvPhoneNotes
+  const snd = tvLink.sound()
+  const ports = snd?.portTypes || []
+  let text = ''
+  if (settings.tvSound === 'muted') text = 'Use the keyboard’s own sound while a TV is connected.'
+  else if (tvOn() && ports.length) {
+    text = 'Playing on: ' + [...new Set(ports.map(tvAudioPortName))].join(', ')
+    if (settings.tvSound === 'phone' && ports.some((type) => /AirPlay|HDMI/i.test(type))) text += '. Sound still goes to the TV.'
+  }
+  $('tvSoundStatus').textContent = text
+}
+function tvSaveDelay(ms) {
+  settings.tvDelayBySetup = { ...settings.tvDelayBySetup, [tvSetup()]: Math.max(0, Math.min(MAX_DELAY_MS, Math.round(ms))) }
+  saveSettings()
+  tvRefreshSettings()
+  tvLink.sendState()
+}
+function tvSetDelay(ms) {
+  tvSaveDelay(ms)
+  tvPreview()
+}
+// Live preview for the -/+ buttons: the TV flashes at a time with no delay compensation, the phone flashes at that
+// time plus the delay. When the two flashes land together, the delay is right.
+// Cancels a running preview (its phone flash and its end), so nothing fires after a TV has gone or a newer preview began.
+function tvStopPreview() {
+  for (const t of tvPreviewTimers) clearTimeout(t)
+  tvPreviewTimers = []
+  tvPreviewing = false
+}
+function tvPreview() {
+  if (!tvLink.isReady() || tvCal) return
+  tvStopPreview()
+  const token = ++tvPreviewToken
+  const startAt = tvNow() + 800
+  tvPreviewing = true
+  tvLink.sendScreen()
+  tvLink.sendCalib({ startAt, periodMs: CALIB.periodMs, count: 1 })
+  tvPreviewTimers.push(setTimeout(() => { if (token === tvPreviewToken && tvOn()) tvFlashPhone() }, startAt + tvDelay() - tvNow()))
+  tvPreviewTimers.push(setTimeout(() => { if (token === tvPreviewToken) { tvStopPreview(); tvLink.sendScreen() } }, startAt + 1200 - tvNow()))
+}
+function tvFlashPhone() {
+  const el = $('tvPulse')
+  el.classList.add('on')
+  setTimeout(() => el.classList.remove('on'), 80)
+}
+// The first time a TV connects, offer the sync once (Later is the cancel button of the confirm dialog).
+function tvOfferCalibration() {
+  settings.tvCalibOffered = true; saveSettings()
+  const cancel = $('confirmCancel'), was = cancel.textContent
+  cancel.textContent = 'Later'
+  askConfirm('Sync with your TV?', 'Tap the screen each time a dot on the TV reaches a line, so the picture and the sound line up. It takes about 20 seconds.', 'Sync with TV', false)
+    .then((yes) => { cancel.textContent = was; if (yes) tvCalStart() })
+}
+function tvCalStart() {
+  if (!tvLink.isReady()) { status('Connect a TV first'); return }
+  tvStopPreview()
+  const schedule = makeSchedule(tvNow())
+  const dots = Array.from({ length: schedule.count }, () => { const d = document.createElement('span'); d.className = 'tv-dot'; return d })
+  $('tvCalibDots').replaceChildren(...dots)
+  $('tvCalibResult').textContent = ''
+  $('tvCalibDone').classList.add('hidden')
+  const last = schedule.startAt + (schedule.count - 1) * schedule.periodMs
+  tvCal = { schedule, taps: [], finished: false, timer: 0 }
+  tvCal.timer = setTimeout(tvCalFinish, last + 1200 - tvNow())
+  $('tvCalib').classList.remove('hidden')
+  tvLink.sendScreen()
+  tvLink.sendCalib(schedule)
+  tvRefreshSettings()
+}
+// A tap counts when it falls in the flashes' window (half a period either side of each end).
+function tvCalTap() {
+  if (!tvCal || tvCal.finished) return
+  const t = tvNow(), s = tvCal.schedule, margin = s.periodMs / 2
+  if (t < s.startAt - margin || t > s.startAt + (s.count - 1) * s.periodMs + margin) return
+  tvCal.taps.push(t)
+  const dot = $('tvCalibDots').children[tvCal.taps.length - 1]
+  if (dot) dot.classList.add('on')
+}
+function tvCalFinish() {
+  if (!tvCal || tvCal.finished) return
+  tvCal.finished = true
+  clearTimeout(tvCal.timer)
+  const res = resultFromTaps(tvCal.schedule, tvCal.taps)
+  if (res.ok) {
+    tvSaveDelay(res.delayMs)
+    $('tvCalibResult').textContent = 'Your TV shows the picture ' + res.delayMs + ' ms late. Saved.'
+  } else {
+    const retry = {
+      'too-few': 'Not enough taps. Tap each time the dot reaches the line, then try again.',
+      duplicate: 'Tap once each time the dot reaches the line, then try again.',
+      'out-of-range': 'The delay was outside the supported range. Try again or adjust it by hand.',
+      uneven: 'The taps were uneven. Try again.'
+    }
+    $('tvCalibResult').textContent = retry[res.reason]
+  }
+  $('tvCalibDone').classList.remove('hidden')
+  tvLink.sendScreen()   // the TV goes back to its previous screen
+  tvRefreshSettings()
+}
+function tvCalClose() {
+  if (tvCal && !tvCal.finished) { tvCal.finished = true; clearTimeout(tvCal.timer); tvLink.sendScreen() }
+  tvCal = null
+  $('tvCalib').classList.add('hidden')
+  tvRefreshSettings()
+}
+// iPhone and iPad only: show the TV group in Settings, listen to the native side and wire the controls.
+function tvInitIOS() {
+  $('setTV').classList.remove('hidden')
+  $('tvUnlock').onclick = $('tvSettingsUnlock').onclick = () => { void openPaywall() }
+  onEntitlementChange(() => {
+    tvLink.setAllowed(tvAllowed())
+    // after every other listener (the Premium card in paywall.js registers later and must update first)
+    setTimeout(() => {
+      const search = $('settingsSearch')
+      if (search.value) search.dispatchEvent(new Event('input'))
+    }, 0)
+  })
+  if (tvDeviceName() === 'iPad') $('tvSoundPhone').textContent = 'This iPad'
+  androidEvents((ev) => tvLink.onNative(ev))
+  for (const b of document.querySelectorAll('[data-tv-sound]')) {
+    b.onclick = () => {
+      settings.tvSound = b.dataset.tvSound
+      saveSettings()
+      tvApplyMute()
+      tvLink.setSoundRoute(settings.tvSound)
+      tvRefreshSettings()
+    }
+  }
+  $('tvSetup').onchange = (e) => {
+    settings.tvSetup = e.target.value
+    saveSettings()
+    if (tvPreviewing) { tvStopPreview(); tvSendScreen() }
+    tvRefreshSettings()
+    tvLink.sendState()
+  }
+  $('tvDelayDown').onclick = () => tvSetDelay(tvDelay() - 10)
+  $('tvDelayUp').onclick = () => tvSetDelay(tvDelay() + 10)
+  // the Sync pill on the remote opens its -10 / +10 steps in place, and closes them again
+  $('tvSyncPill').onclick = () => { const open = $('tvSyncPanel').hidden; $('tvSyncPanel').hidden = !open; $('tvSyncPill').setAttribute('aria-expanded', String(open)) }
+  $('tvRemoteDelayDown').onclick = () => tvSaveDelay(tvDelay() - 10)
+  $('tvRemoteDelayUp').onclick = () => tvSaveDelay(tvDelay() + 10)
+  $('tvSync').onclick = () => tvCalStart()
+  $('tvPhoneNotes').onchange = (e) => {
+    settings.tvPhoneNotes = e.target.checked; saveSettings()
+    tvSyncLayout()
+  }
+  $('tvCalibTap').addEventListener('pointerdown', (event) => { if (event.isPrimary && event.button === 0) tvCalTap() })
+  $('tvCalibTap').addEventListener('click', (event) => { if (event.detail === 0) tvCalTap() })
+  $('tvCalibClose').onclick = () => tvCalClose()
+  $('tvCalibDone').onclick = () => tvCalClose()
+  // the remote presses the player's own buttons, so their handlers do the work
+  $('tvRestart').onclick = () => $('btnRestart').click()
+  $('tvBack5').onclick = () => { if (player) player.seek(player.currentPosition() - 5) }
+  $('tvHands').onclick = () => $('btnHands').click()
+  $('tvWait').onclick = () => setSpeed('wait')   // called directly: a synthetic click would meet the compact speed menu
+  $('tvLoop').onclick = () => $('btnLoop').click()
+  tvLink.setSoundRoute(settings.tvSound)
+  tvRefreshSettings()
+}
+
 /* ============================== player callbacks ============================== */
+function announcePlayer(message) {
+  if (!playerLive) return
+  lastPlayerAnnouncement = performance.now()
+  playerLive.replaceChildren(document.createTextNode(message))
+}
+
+function announceWaitNotes(snap) {
+  if (!snap.waiting) { announcedWaitNotes = null; return }
+  if (snap.waitNotes === announcedWaitNotes || performance.now() - lastPlayerAnnouncement < PLAYER_ANNOUNCE_MS) return
+  const message = formatWaitNotes(snap.waitNotes.filter((note) => snap.needPitches.has(note.pitch)))
+  if (!message) return
+  announcedWaitNotes = snap.waitNotes
+  announcePlayer(message)
+}
+
 function onPlayerState(ev) {
+  if (!player?.waiting) announcedWaitNotes = null
   if (player && player.active && ceremonyTimers.length) cancelCeremony()
   if (player && player.active) maybeStartTake()
   syncHudButtons()
+  tvPlayerChanged()
 }
 
 function onJudgement(res) {
@@ -3631,10 +6856,23 @@ function onJudgement(res) {
   } else if (res.kind === 'perfect' || res.kind === 'good' || res.kind === 'early' || res.kind === 'late') {
     feedback.set(0, { kind: res.kind, until: performance.now() + 260 })
   }
+  tvJudged()
 }
 
 function onFinish(summary) {
+  handGuideStartPlayer = null
   stopBacking()
+  if (lyricsEditor.isOpen()) { lyricsEditor.end(); return }
+  if (summary.mode === 'PRACTISE' && player && player.advancement !== 'continuous') {
+    const finishedPlayer = player
+    const delay = Math.max(0, PLAYER_ANNOUNCE_MS - (performance.now() - lastPlayerAnnouncement))
+    setTimeout(() => {
+      if (screen === 'play' && player === finishedPlayer && player.finished) {
+        const stars = summary.starRating
+        announcePlayer(`Song finished, ${stars} ${stars === 1 ? 'star' : 'stars'}`)
+      }
+    }, Math.ceil(delay))
+  }
   if (guided.onFinish(summary)) { endTake('guided step finished'); syncHudButtons(); return }
   // the mode the run was scored in (a mode change part way through carries the score over)
   const mode = summary.mode || (player ? player.mode : 'PLAY')
@@ -3657,8 +6895,8 @@ function onFinish(summary) {
     syncHudButtons()
     return
   }
-  // Practise (the song waits for you) shows how much you got right first time, but
-  // only a run played in time keeps stars: a best, a Challenge, an exercise, a level
+  noteHandGuideRun(summary)
+  // Wait mode rates notes right first time. Lessons, exercises and games keep stars for timed runs.
   const practise = mode === 'PRACTISE'
   if (exerciseMeta) {
     if (!practise) {
@@ -3682,6 +6920,7 @@ function onFinish(summary) {
     const slow = !!player && player.rate < (gameMeta.rate || 1) - 1e-3
     const passed = !slow && summary.overallAccuracy >= gameMeta.threshold
     if (!passed) summary.starRating = 0
+    summary.firstThree = starsShown(summary.starRating) >= 3 && starsShown(gameBest(gameMeta.id)) < 3
     store.set('lumi.game.' + gameMeta.id, Math.max(gameBest(gameMeta.id), summary.starRating))
     summary.game = { ...gameMeta, passed, slow }
     renderGames()
@@ -3700,11 +6939,28 @@ function onFinish(summary) {
       markCalm(r.passed)
     }
   }
-  const file = song && song.file
+  const file = song?.file && !player?.arrangementChangedMidRun ? coverScoreFile(song.file, song.coverRaw ? song.coverArrangement : null) : ''
+  const best = file ? store.get('lumi.best.' + file, 0) : 0
   const stars = summary.starRating
-  if (file && !practise && !gameMeta && !lessonMeta && !exerciseMeta && stars > (bestFor(file) || 0)) store.set('lumi.best.' + file, stars)
+  if (file && !gameMeta && !lessonMeta && !exerciseMeta && stars > best) {
+    summary.firstThree = starsShown(stars) >= 3 && starsShown(best) < 3
+    store.set('lumi.best.' + file, stars)
+  }
   if (!practise && !gameMeta && !lessonMeta && !exerciseMeta && stars > 0) markCalm(true)
+  if (file && !practise && !summary.watched && !gameMeta && !lessonMeta && !exerciseMeta && summary.totalNotes) {   // personal best accuracy, shown on the results
+    const key = 'lumi.bestacc.' + file, prev = store.get(key, 0), now = Math.round(summary.overallAccuracy * 100)
+    summary.bestBefore = prev
+    summary.newBest = prev > 0 && now > prev
+    if (now > prev) store.set(key, now)
+  }
   showResults(summary)
+  // results: a tap for finishing (three stars: success, then two light taps; a new best adds a heavy one)
+  if (summary.totalNotes && !summary.watched) {
+    const taps = [['success', 0]]
+    if (stars >= 3) taps.push(['light', 120], ['light', 120])
+    if (summary.newBest) taps.push(['heavy', 150])
+    if (!IS_IOS) hapticSequence(taps)   // the app has one success tap, when the last earned star lands (results-motion.js)
+  }
   // gold stars, or the fail flash; a Practise run without stars gets neither
   if (summary.totalNotes && !(practise && !stars)) celebrate(stars)
   renderLibrary(); renderRecent(); updateHome()
@@ -3739,6 +6995,7 @@ function recordPractice(seconds) {
 let goalFresh = false
 function goalReached() {
   goalFresh = true
+  haptic('success')
   status('Daily goal reached: ' + settings.goalMin + ' minutes today. Nicely done.')
 }
 function updateGoal() {
@@ -3749,7 +7006,10 @@ function updateGoal() {
   $('goalTotal').textContent = g.goal
   $('goalNote').textContent = g.done ? 'Goal reached' : g.mins ? g.left + ' min to go' : 'today’s goal'
   ring.classList.toggle('done', g.done)
-  ring.setAttribute('aria-label', 'Daily goal: ' + g.mins + ' of ' + g.goal + ' minutes' + (g.done ? ', reached' : '') + '. Change it in Settings.')
+  // iOS Home hides the streak tile and shows the streak only in the ring's line, so the ring's name carries it
+  const streakN = Number($('streakChip')?.textContent) || 0
+  const streakWords = document.documentElement.classList.contains('ios') ? (streakN >= 1 ? streakN + (streakN === 1 ? ' day' : ' days') + ' in a row. ' : 'Start a streak. ') : ''
+  ring.setAttribute('aria-label', streakWords + 'Daily goal: ' + g.mins + ' of ' + g.goal + ' minutes' + (g.done ? ', reached' : '') + '. Change it in Settings.')
   const arc = $('goalArc')
   const target = (g.frac * 100).toFixed(1) + ' 100'
   const calm = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -3804,7 +7064,7 @@ function refreshProgressUI() {
   const days = store.get('lumi.days', {})
   const secs = days[todayKey()] || 0
   const el = $('playedToday')
-  if (el) el.textContent = Math.round(secs / 60) + ' min · streak ' + store.get('lumi.streak.count', 0) + 'd'
+  if (el) el.textContent = Math.round(secs / 60) + ' min' + dot() + 'streak ' + store.get('lumi.streak.count', 0) + 'd'
 }
 
 /* ============================== results ============================== */
@@ -3815,9 +7075,21 @@ let resultsPrimary = null
 let resultsReturnFocus = null
 function openResults(primary) {
   resultsPrimary = primary
-  for (const b of [$('resAgain'), $('resNext')]) { b.classList.toggle('primary', b === primary); b.classList.toggle('ghost', b !== primary) }
+  for (const b of [$('resAgain'), $('resNext'), $('resPractice')]) { b.classList.toggle('primary', b === primary); b.classList.toggle('ghost', b !== primary) }
+  if (IS_IOS) {
+    // one ivory primary and at most two quiet buttons in one row beside it: Practice and Watch first, then Play again or Next song.
+    // In a course item the way back to the lesson or exam (resNext) stays, ahead of Watch.
+    let quiet = 0
+    const order = courseRun ? [$('resNext'), $('resPractice'), $('resWatch'), $('resAgain')] : [$('resPractice'), $('resWatch'), $('resAgain'), $('resNext')]
+    for (const b of order) {
+      b.classList.remove('res-spare')
+      if (b === primary || b.classList.contains('hidden')) continue
+      if (++quiet > 2) b.classList.add('res-spare')
+    }
+  }
   if ($('results').classList.contains('hidden')) resultsReturnFocus = document.activeElement
   $('results').classList.remove('hidden')
+  $('status')?.classList.remove('show'); clearTimeout(toastTimer)
   $('app').inert = true
   primary.focus({ preventScroll: true })
 }
@@ -3842,7 +7114,7 @@ function resultsNext(s) {
     return s.game && s.game.passed && GAMES[i + 1] ? { label: 'Next level', go: () => startGame(GAMES[i + 1]), primary: true } : null
   }
   const idx = song && !exerciseMeta ? LIBRARY.findIndex((l) => l.file === song.file) : -1
-  return idx >= 0 && idx < LIBRARY.length - 1 ? { label: 'Next song', go: () => openLibrary(LIBRARY[idx + 1].file) } : null
+  return idx >= 0 && idx < LIBRARY.length - 1 ? { label: 'Next song', go: () => openLibrary(LIBRARY[idx + 1].file), primary: IS_IOS && !s.watched && starsShown(s.starRating) >= 2 } : null
 }
 
 function showResults(s) {
@@ -3860,53 +7132,63 @@ function showResults(s) {
   const primary = next && next.primary && !nextBtn.classList.contains('hidden') ? nextBtn : $('resAgain')
   // in a lesson, Next step is the step the Practise button would open
   practiceBtn.classList.toggle('hidden', !!lessonMeta && lastMode !== 'PLAY')
+  resultsRun?.cancel(); resultsRun = null     // a run still playing is dropped silently: no late haptic, no stale announcement
+  $('resLive').textContent = ''
+  for (const c of ['playing', 'played', 'skipped', 'tone-warm']) $('results').classList.remove(c)
   $('results').classList.toggle('watched', !!s.watched)
   if (s.watched) {
-    $('resKicker').textContent = 'WATCHED'
+    $('resKicker').textContent = IS_IOS ? 'Watched' : 'WATCHED'
     $('resHead').textContent = 'Now try it yourself'
-    practiceBtn.textContent = 'Practice it'
+    practiceBtn.textContent = courseRun?.item.params.watchFirst ? 'Play it in Wait mode' : 'Practice it'
     $('resAgain').textContent = 'Watch again'
     watchBtn.classList.add('hidden')
-    $('resAcc').textContent = 'Practice waits for you on every note. Play keeps time and scores you.'
+    $('resAcc').textContent = 'Wait mode waits for you on every note. The other speeds keep time and score you.'
+    $('resLead').textContent = ''
     $('celebrate').replaceChildren()
-    openResults(primary)
+    openResults(courseRun?.item.params.watchFirst ? practiceBtn : primary)
     return
   }
-  $('resAgain').textContent = 'Try again'
+  $('resAgain').textContent = IS_IOS ? 'Play again' : 'Try again'
   const practise = lastMode === 'PRACTISE'
   const acc = Math.round(s.overallAccuracy * 100)
   const game = s.game
-  $('resKicker').textContent = game ? (game.passed ? 'LEVEL COMPLETE' : 'GAME OVER') : lastMode === 'WATCH' ? 'WATCH COMPLETE' : practise ? 'PRACTICE COMPLETE' : 'SONG COMPLETE'
+  const kick = (t) => (IS_IOS ? t[0] + t.slice(1).toLowerCase() : t)   // the app sets labels in sentence case
+  $('resKicker').textContent = kick(game ? (game.passed ? 'LEVEL COMPLETE' : 'GAME OVER') : lastMode === 'WATCH' ? 'WATCH COMPLETE' : practise ? 'PRACTICE COMPLETE' : 'SONG COMPLETE')
   $('resHead').textContent = game
-    ? (game.passed ? 'Level passed!' : game.slow ? 'Pass it at ' + speedName(game.rate || 1) : 'So close — try again')
+    ? (game.passed ? 'Level passed!' : game.slow ? 'Pass it at ' + speedName(game.rate || 1) : IS_IOS ? 'So close, try again' : 'So close. Try again.')
     : s.starRating >= 4 ? 'Beautiful!' : s.starRating >= 2 ? 'Nicely done' : 'Keep going'
-  $('resStars').innerHTML = Array.from({ length: 5 }, (_, i) =>
-    `<span class="rstar ${i < s.starRating ? 'on' : ''}" style="animation-delay:${(0.25 + i * 0.14).toFixed(2)}s"><svg><use href="#i-star"/></svg></span>`).join('')
-  // accuracy ring fills and the number counts up
+  const earnedStars = starsShown(s.starRating)
+  $('resStars').innerHTML = Array.from({ length: STAR_SLOTS }, (_, i) => IS_IOS
+    ? `<span class="rstar ${i < earnedStars ? 'on' : ''}" style="--d:${i * 120}ms"><svg><use href="#i-star"/></svg></span>`
+    : `<span class="rstar ${i < earnedStars ? 'on' : ''}" style="animation-delay:${(0.25 + i * 0.14).toFixed(2)}s"><svg><use href="#i-star"/></svg></span>`).join('')
+  // accuracy ring fills and the number counts up (iPhone/iPad: results-motion.js runs both, once the screen is open)
   const ring = $('resRing')
   ring.style.transition = 'none'; ring.style.strokeDashoffset = '326.7'
   void ring.getBoundingClientRect()
   ring.style.transition = ''
-  requestAnimationFrame(() => { ring.style.strokeDashoffset = String(326.7 * (1 - s.overallAccuracy)) })
-  const t0 = performance.now()
-  const still = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches
-  const countUp = (t) => {
-    const k = still ? 1 : Math.min(1, (t - t0 - 150) / 600)
-    $('resBig').textContent = Math.round(acc * (k <= 0 ? 0 : 1 - Math.pow(1 - k, 3))) + '%'
-    if (k < 1) requestAnimationFrame(countUp)
+  if (IS_IOS) $('resBig').textContent = '0%'
+  else {
+    requestAnimationFrame(() => { ring.style.strokeDashoffset = String(326.7 * (1 - s.overallAccuracy)) })
+    const t0 = performance.now()
+    const still = prefersReducedMotion()
+    const countUp = (t) => {
+      const k = still ? 1 : Math.min(1, (t - t0 - 150) / 600)
+      $('resBig').textContent = Math.round(acc * (k <= 0 ? 0 : 1 - Math.pow(1 - k, 3))) + '%'
+      if (k < 1) requestAnimationFrame(countUp)
+    }
+    requestAnimationFrame(countUp)
   }
-  requestAnimationFrame(countUp)
   // Practise is rated by the share right first time: in time, or found with no wrong
   // key and no long wait
   const firstTime = s.firstTimeHits ?? s.totalNotesHit
-  $('resSub').textContent = practise ? 'right first time' : `${s.totalNotesHit} of ${s.totalNotes} notes`
+  $('resSub').textContent = practise ? (IS_IOS ? `${firstTime} of ${s.totalNotes} notes` : 'right first time') : `${s.totalNotesHit} of ${s.totalNotes} notes`
   $('resAcc').textContent = game
-    ? `pass mark ${Math.round(game.threshold * 100)}%${game.slow ? ' at ' + speedName(game.rate || 1) : ''} · your accuracy ${acc}%`
+    ? `pass mark ${Math.round(game.threshold * 100)}%${game.slow ? ' at ' + speedName(game.rate || 1) : ''}${dot()}your accuracy ${acc}%`
     : practise
-      ? `${firstTime} of ${s.totalNotes} notes right first time · the Challenge keeps your stars`
-      : `note accuracy ${Math.round(s.noteAccuracy * 100)}% · rhythm accuracy ${Math.round(s.rhythmAccuracy * 100)}%`
-  if (courseRun && courseRun.filtered) $('resAcc').textContent += ' · not counted for the course: switch Hands to Both for this task'
-  else if (courseRun) $('resAcc').textContent += ` · ${courseRun.passed ? 'course item passed' : 'aim for ' + passText(courseRun.item) + ' to pass it'}${courseRun.lessonDone ? ' · lesson complete' : ''}`
+      ? `${firstTime} of ${s.totalNotes} notes right first time` + (lessonMeta || exerciseMeta || game || courseRun ? dot() + 'the Challenge keeps your stars' : '')
+      : `note accuracy ${Math.round(s.noteAccuracy * 100)}%${dot()}rhythm accuracy ${Math.round(s.rhythmAccuracy * 100)}%`
+  if (courseRun && courseRun.filtered) $('resAcc').textContent += dot() + 'not counted for the course: switch Hands to Both for this task'
+  else if (courseRun) $('resAcc').textContent += `${dot()}${courseRun.passed ? 'course item passed' : 'aim for ' + passText(courseRun.item) + ' to pass it'}${courseRun.lessonDone ? dot() + 'lesson complete' : ''}`
   // Practise has no timing to judge: its cards count notes right first time, notes
   // found after a hint and wrong keys instead of the five timings
   const cards = practise
@@ -3920,24 +7202,78 @@ function showResults(s) {
     shown++
     card.querySelector('span').textContent = v[0]
     card.querySelector('b').textContent = v[1] || 0
+    card.classList.toggle('is-zero', !v[1])
   }
   const grid = document.querySelector('#results .results-cards')
   if (grid) grid.style.gridTemplateColumns = practise ? `repeat(${shown}, 1fr)` : ''
   const hands = player ? player.score.hands : { left: { hit: 0, miss: 0 }, right: { hit: 0, miss: 0 } }
   const hAcc = (h) => { const n = h.hit + h.miss; return n ? Math.round((100 * h.hit) / n) : 0 }
-  $('resHands').innerHTML = `<span class="lh">Left hand</span> ${hands.left.hit + hands.left.miss ? hAcc(hands.left) + '%' : '—'} &nbsp;·&nbsp; <span class="rh">Right hand</span> ${hands.right.hit + hands.right.miss ? hAcc(hands.right) + '%' : '—'}`
+  $('resHands').innerHTML = `<span class="lh">Left hand</span> ${hands.left.hit + hands.left.miss ? hAcc(hands.left) + '%' : 'N/A'}${dot().trim() === ',' ? ', ' : ' &nbsp;·&nbsp; '}<span class="rh">Right hand</span> ${hands.right.hit + hands.right.miss ? hAcc(hands.right) + '%' : 'N/A'}`
   // mode-specific next steps
   watchBtn.classList.toggle('hidden', lastMode === 'WATCH')
-  watchBtn.onclick = () => { hideResults(); setMode('WATCH'); if (player) player.restart(false) }
+  watchBtn.textContent = IS_IOS ? 'Watch' : 'Watch again'
+  watchBtn.onclick = () => { hideResults(); setMode('WATCH'); if (player) { player.restart(false); playFresh() } }
   practiceBtn.textContent = lastMode === 'WATCH' ? 'Try yourself' : practise ? 'Challenge' : 'Practice'
-  burstStars(s.starRating)
+  const best = $('resBest')
+  best.classList.toggle('hidden', !(s.newBest || s.bestBefore))
+  best.classList.toggle('is-new', !!s.newBest)
+  $('results').classList.toggle('is-best', !!s.newBest)
+  best.textContent = s.newBest ? 'New best' + dot() + 'was ' + s.bestBefore + '%' : s.bestBefore ? 'Your best ' + s.bestBefore + '%' : ''
+  // the one serif line under the ring on iPhone/iPad: "86% accurate, up from 71%", or the first-time line
+  const lead = game ? `${acc}% accurate, pass mark ${Math.round(game.threshold * 100)}%`
+    : practise ? `${firstTime} of ${s.totalNotes} right first time`
+    : s.newBest ? `${acc}% accurate, up from ${s.bestBefore}%`
+    : s.bestBefore ? `${acc}% accurate, your best is ${s.bestBefore}%`
+    : `${acc}% accurate, first time through`
+  // iPhone/iPad: the ring carries the score, so the serif line under it is the caption only ("Up from 71%"); the live region keeps the full line
+  const caption = game ? `Pass mark ${Math.round(game.threshold * 100)}%`
+    : practise ? 'Right first time'
+    : s.newBest ? `Up from ${s.bestBefore}%`
+    : s.bestBefore ? `Your best is ${s.bestBefore}%`
+    : 'First time through'
+  $('resLead').textContent = IS_IOS ? caption : lead
+  // the stats the iPhone shows by default are Perfect, Missed and Best streak; the rest sits behind Details. N/A hands are left out.
+  if (IS_IOS) {
+    const hs = [['Left hand', hands.left], ['Right hand', hands.right]].filter(([, h]) => h.hit + h.miss)
+    $('resHands').innerHTML = hs.map(([n, h]) => `<span class="${n[0] === 'L' ? 'lh' : 'rh'}">${n}</span> ${hAcc(h)}%`).join(', ')
+    $('resHands').classList.toggle('hidden', !hs.length)
+  } else $('resHands').classList.remove('hidden')
+  $('results').classList.remove('show-details'); $('resDetails').setAttribute('aria-expanded', 'false')
+  burstStars(s)
   openResults(primary)
+  if (IS_IOS) {
+    // one choreography, 1.0s at most: stars, ring, count-up and (on a new best or the first three stars) a keyboard sweep, run together
+    $('results').classList.toggle('tone-warm', earnedStars >= 2)   // the field warms to amber (600ms) once the stars land
+    mountResultsRail($('results'))
+    const lastNote = song && Array.isArray(song.notes) ? song.notes.reduce((a, n) => (!a || n.start + n.dur >= a.start + a.dur ? n : a), null) : null
+    resultsRun = playResults({
+      host: $('results'), earned: earnedStars, celebrate: !!s.newBest || !!s.firstThree, target: acc, bigEl: $('resBig'),
+      lastPc: lastNote && Number.isFinite(lastNote.pitch) ? ((lastNote.pitch % 12) + 12) % 12 : null,
+      setBig: (t) => { $('resBig').textContent = t }, ring, offset: 326.7 * (1 - s.overallAccuracy),
+      // one announcement, once the numbers have landed: the lead line and the stars (never the count-up)
+      announce: () => { $('resLive').textContent = lead + (earnedStars ? ', ' + starsOffer(s.starRating) : '') }
+    })
+  }
+  tvSendScreen()
 }
-function burstStars(stars) {
+let resultsRun = null
+// a tap anywhere that is not a button skips the choreography to its end
+$('results').addEventListener('pointerdown', (e) => { if (resultsRun && !(e.target.closest && e.target.closest('button, a'))) resultsRun.skip() })
+// Space or Enter while the choreography plays skips it instead of pressing the focused button; the "Skip animation" button is the VoiceOver way
+let resultsKeySkipped = false
+$('results').addEventListener('keydown', (e) => {
+  if ((e.key !== ' ' && e.key !== 'Enter') || !resultsRun || resultsRun.finished) return
+  e.preventDefault(); e.stopPropagation(); resultsKeySkipped = true
+  resultsRun.skip()
+}, true)
+$('results').addEventListener('keyup', (e) => { if (resultsKeySkipped && (e.key === ' ' || e.key === 'Enter')) { resultsKeySkipped = false; e.preventDefault(); e.stopPropagation() } }, true)
+$('resSkipBtn').onclick = () => resultsRun?.skip()
+$('resDetails').onclick = () => { const on = $('results').classList.toggle('show-details'); $('resDetails').setAttribute('aria-expanded', String(on)) }
+function burstStars({ starRating, newBest }) {
   const wrap = $('celebrate')
   if (!wrap) return
   wrap.replaceChildren()
-  if (stars < 3) return
+  if (IS_IOS || !newBest || starRating < 4 || prefersReducedMotion()) return   // the app celebrates with the keyboard sweep, not confetti
   const colours = ['#f5be27', '#3d8bff', '#a3ffeb', '#00a482', '#ff5c8a', '#ffffff']
   for (let i = 0; i < 70; i++) {
     const c = document.createElement('i')
@@ -3956,7 +7292,10 @@ function burstStars(stars) {
 function hideResults() {
   const el = $('results')
   if (el.classList.contains('hidden')) return
+  resultsRun?.cancel(); resultsRun = null
+  $('resLive').textContent = ''
   el.classList.add('hidden')
+  tvSendScreen()
   $('app').inert = false
   // focus goes back where it was (the Play button, say), if that is still on screen
   const back = resultsReturnFocus
@@ -3966,7 +7305,7 @@ function hideResults() {
 
 // Keyboard light ceremony: star groups then a streak flash.
 function celebrate(stars) {
-  console.log('CEREMONY stars=' + stars + ' daemon=' + (daemon && daemon.ready ? 'ready' : 'absent'))
+  console.log('CEREMONY stars=' + stars + ' daemon=' + (daemonFrames() ? 'frames' : 'no frames') + (pageDrives() ? ' lights=in-app' : ''))
   if (!framesDrive()) return
   const n = lightKeys()
   const off = () => Array.from({ length: n }, () => [0, 0, 0])
@@ -3974,8 +7313,8 @@ function celebrate(stars) {
   if (stars === 0) {
     // fail: red flash, three times
     for (let i = 0; i < 3; i++) {
-      seq.push(() => daemon.send(Array.from({ length: n }, () => [225, 110, 115])))
-      seq.push(() => daemon.send(off()))
+      seq.push(() => lightSink.send(Array.from({ length: n }, () => [225, 110, 115])))
+      seq.push(() => lightSink.send(off()))
     }
   } else {
     // star rating: gold groups fill in, one per star (~3 s)
@@ -3985,7 +7324,7 @@ function celebrate(stars) {
       seq.push(() => {
         const frame = off()
         if (g < stars) for (let k = 0; k < keysPerGroup; k++) frame[g * keysPerGroup + k] = [245, 190, 39]
-        daemon.send(frame)
+        lightSink.send(frame)
       })
     }
     // streak complete: teal sweep (2.25 s)
@@ -3993,11 +7332,11 @@ function celebrate(stars) {
       seq.push(() => {
         const frame = off()
         for (let k = 0; k < n; k++) if ((k + i) % 4 === 0) frame[k] = [0, 165, 130]
-        daemon.send(frame)
+        lightSink.send(frame)
       })
     }
   }
-  seq.push(() => daemon.send(off()))
+  seq.push(() => lightSink.send(off()))
   cancelCeremony()
   ledOverrideUntil = performance.now() + seq.length * 380 + 100
   ceremonyTimers = seq.map((fn, i) => setTimeout(fn, i * 380))
@@ -4025,11 +7364,47 @@ function logRaw(data) {
 const mpeStates = [createMpeState(), createMpeState()]
 const mpeFor = (channelBase) => mpeStates[channelBase >= 16 ? 1 : 0]
 
+// Diagnostics: a live view of what the keyboard sends, whatever the expression setting. Values are kept on every message;
+// the rows are drawn at most once a frame and only while Settings shows with the fold open (pressure streams are fast).
+const diagIn = { count: 0, note: '', ctl: '', expr: '', raf: 0 }
+const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+function diagFeed(status, d1, d2, channelBase) {
+  diagIn.count++
+  const type = status & 0xf0
+  const ch = 'channel ' + ((status & 0x0f) + 1) + (channelBase >= 16 ? ' (keyboard 2)' : '')
+  if (type === 0x90 && d2 > 0) diagIn.note = `${NOTE_NAMES[d1 % 12]}${Math.floor(d1 / 12) - 1} (note ${d1}) · velocity ${d2} · ${ch}`
+  else if (type === 0xB0) diagIn.ctl = `Control ${d1} = ${d2} · ${ch}`
+  else if (type === 0xE0 || type === 0xD0 || type === 0xA0) {
+    const what = type === 0xE0 ? 'Pitch bend' : 'Pressure'
+    diagIn.ctl = `${what} · ${ch}`
+    const on = type === 0xE0 ? settings.glide : settings.expression
+    diagIn.expr = on ? '' : what + ' received, but ' + what + ' is off in Settings'
+  }
+  if (!diagIn.raf && screen === 'settings' && $('setDiagnostics')?.open) diagIn.raf = requestAnimationFrame(diagDraw)
+}
+function diagDraw() {
+  diagIn.raf = 0
+  $('diagCount').textContent = String(diagIn.count)
+  if (diagIn.note) $('diagNote').textContent = diagIn.note
+  if (diagIn.ctl) $('diagCtl').textContent = diagIn.ctl
+  if (diagIn.expr) $('mpeState').textContent = diagIn.expr
+}
+document.getElementById('setDiagnostics')?.addEventListener('toggle', (e) => { if (e.target.open) diagDraw() })   // opening shows what came in meanwhile
+function diagPortText() {
+  const el = $('diagPort'); if (!el) return
+  const names = [midiInput, midiInput2].filter(Boolean).map((p) => p.name || 'Keyboard')
+  el.textContent = names.length ? names.join(' + ') : 'Nothing connected'
+}
+
 function handleMidiMessage(data, channelBase = 0, fed = false, portId = null) {
-  if (!fed && typeof deviceSupport !== 'undefined' && deviceSupport) deviceSupport.feed(data, portId)   // fed: pairMessage already did   // statistics for the device report, only while it is capturing
   const status = data[0]
+  // Keylight's own BLOCKS replies (topology, config, acks) are not the keyboard's traffic: not for the device report, not logged
+  if (status === 0xf0 && typeof blocksFeed === 'function' && blocksFeed(data, channelBase >= 16 ? 1 : 0)) return   // typeof: tests run this function on its own
+  if (!fed && typeof deviceSupport !== 'undefined' && deviceSupport) deviceSupport.feed(data, portId)   // fed: pairMessage already did   // statistics for the device report, only while it is capturing
   if (status == null || status < 0x80) return
-  if (status === 0xf0) {   // device SysEx (config replies etc.) — don't spam the log
+  if (!fed && status < 0xf0 && typeof diagFeed === 'function') diagFeed(status, data[1] || 0, data[2] || 0, channelBase)   // fed: pairMessage already counted it; typeof: tests run this function on its own
+  if (status === 0xf0) {   // skip logs for device SysEx (config replies etc.)
+    if (typeof partyTap === 'function') partyTap(data, portId)   // a key-light keyboard's reports (routes, octave): never scored
     if (rawLogged < 2) logRaw(data)
     return
   }
@@ -4043,7 +7418,8 @@ function handleMidiMessage(data, channelBase = 0, fed = false, portId = null) {
   if (type === 0x80 || (type === 0x90 && d2 === 0)) { handleNoteOff(d1, ch, type === 0x80 ? d2 : 0); return }
   if (type === 0xB0 && d1 === 64) { logMidi('cc', 64, d2, ch); setSustain(d2 >= 64); return }          // sustain pedal
   if (type === 0xB0 && (d1 === 120 || d1 === 123)) { stopAll(); return }    // all sound / notes off
-  if (!settings.expression) return   // expression off: keys play like a piano
+  // keys play like a piano unless asked: rocking a key bends only with Pitch bend on, pressing in only with Pressure on
+  if (type === 0xE0 ? !settings.glide : !settings.expression) return
   const jam = routeToJam() ? jamUi : null   // while Jam shows, its tracks take the gestures instead of the synth
   if (type === 0xE0) {
     const raw = (d2 << 7) | d1
@@ -4066,19 +7442,36 @@ function handleMidiMessage(data, channelBase = 0, fed = false, portId = null) {
 }
 
 function handleNoteOn(pitch, vel, channel = 0) {
-  if (screen === 'exercise') lastActAt = performance.now()
+  if (songRecording?.capturing) return
+  const dialogOpen = !!document.querySelector('dialog[open]')
+  if (!dialogOpen && screen === 'exercise') lastActAt = performance.now()
   initAudio()
   lastKeyAt = performance.now()
-  if (routeToJam()) { held.add(pitch); jamUi.noteOn(pitch, vel, channel); return }   // Jam plays it on the selected track: no second sound
+  homeLight?.noteOn(pitch)     // the Home rail lights the same key (only while Home is on screen)
+  if (!dialogOpen && routeToJam()) { held.add(pitch); jamUi.noteOn(pitch, vel, channel); return }   // Jam plays it on the selected track: no second sound
   noteOn(pitch, vel, channel)
   logMidi('on', pitch, vel, channel)
   held.add(pitch)
+  noteVel.set(pitch, vel)
+  tvKeys()
+  if (dialogOpen) return
   learnLengthFromNotes(pitch)
   calibrateFromNote(pitch)
+  // under the tour's coach marks or the setup screen a key only sounds and lights: it never plays, scores or starts the song
+  if (tourIsOpen() || setup.open) return
+  // a hand placement guide takes every key: it never starts or scores a song
+  if (handGuideRun) { handGuidePress(pitch); return }
   airSource?.onNoteOn(pitch)
   quizPress(pitch)
   if (exercise && screen === 'exercise') exercise.input(pitch, performance.now())
   if (!player || player.mode === 'WATCH') return
+  // Armed Wait mode: the first key starts it, with no count-in. A right key counts as played; a wrong one only sounds.
+  if (waitArmed()) {
+    if (settings.experience === 'new' && maybeGuideHands()) return
+    cancelLightTest(); cancelCeremony()
+    if (player.startArmed()) { syncBacking(); pumpAudio(); syncHudButtons() }
+    if (!player.needPitches.has(pitch)) { tvKeys(); return }
+  }
   const need = player.waiting ? new Set(player.needPitches) : null
   const pendingForPitch = settings.fingerCoaching ? player.score.expected.filter((entry) => entry.pitch === pitch && entry.state === 'pending') : []
   const res = player.noteOn(pitch)
@@ -4092,11 +7485,14 @@ function handleNoteOn(pitch, vel, channel = 0) {
       : new Set([...player.activeNotes(), ...player.upcomingNotes()].map((n) => n.pitch).filter((p) => player.keyIndexFor(p) >= 0)))
   }
   if (res && res.kind && ['perfect', 'good', 'early', 'late'].includes(res.kind)) feedback.set(pitch, { kind: res.kind, until: performance.now() + 220 })
+  tvKeys()
 }
 // release: the key's release velocity (0..127) when the keyboard sent one, 0 when it did not
 function handleNoteOff(pitch, channel = 0, release = 0) {
-  if (routeToJam()) { held.delete(pitch); letGoAt.set(pitch, performance.now()); jamUi.noteOff(pitch, release > 0 ? release : 64, channel); return }
+  homeLight?.noteOff(pitch)
+  if (routeToJam()) { noteOff(pitch, channel); held.delete(pitch); letGoAt.set(pitch, performance.now()); jamUi.noteOff(pitch, release > 0 ? release : 64, channel); return }   // noteOff: a key pressed while setup covered Jam sounded on the main synth
   noteOff(pitch, channel); logMidi('off', pitch, 0, channel); held.delete(pitch); letGoAt.set(pitch, performance.now())
+  tvKeys()
 }
 
 // Two keyboards on two cables play as one row of 48 keys. Each sends notes wherever its own octave
@@ -4111,6 +7507,7 @@ function loadPair() {
   pair.low = known ? [a.low, b.low] : [settings.kbZero, settings.kbZero]
   pair.down = [new Map(), new Map()]
   pair.pedal = [false, false]
+  queuePageLights()
   console.log('PAIR two keyboards on ' + midiInput.name + ' and ' + midiInput2.name + (known ? ' as set up: sides ' + pair.side + ' from ' + pair.low : ', not set up yet') +
     ' outputs=' + (midiOutput ? 'yes' : 'no') + ',' + (midiOutput2 ? 'yes' : 'no'))
   return known
@@ -4137,9 +7534,11 @@ function pairPitch(slot, raw) {
   return pitch >= 0 && pitch <= 127 ? pitch : null
 }
 function pairMessage(slot, data) {
-  if (typeof deviceSupport !== 'undefined' && deviceSupport) deviceSupport.feed(data, (slot ? midiInput2 : midiInput)?.id)   // the device report sees every paired message once
   const status = data[0]
+  if (status === 0xf0 && typeof blocksFeed === 'function' && blocksFeed(data, slot)) return   // Keylight's own reply: not the keyboard's traffic
+  if (typeof deviceSupport !== 'undefined' && deviceSupport) deviceSupport.feed(data, (slot ? midiInput2 : midiInput)?.id)   // the device report sees every paired message once
   if (status == null || status < 0x80) return
+  if (status < 0xf0 && typeof diagFeed === 'function') diagFeed(status, data[1] || 0, data[2] || 0, 16 * slot)
   const type = status & 0xf0, d1 = data[1] || 0, d2 = data[2] || 0
   const ch = (status & 0x0f) + 16 * slot
   const key = (status & 0x0f) * 128 + d1
@@ -4180,24 +7579,29 @@ function pairMessage(slot, data) {
       performanceControls?.send([status, pitch, d2])
       if (settings.expression) { if (routeToJam()) jamUi.press(ch, d2 / 127); else setPolyPressure(pitch, ch, d2 / 127) }
     }
-  } else handleMidiMessage(data, 16 * slot, true)
+  } else handleMidiMessage(data, 16 * slot, true, (slot ? midiInput2 : midiInput)?.id)
 }
 // With a light service, each keyboard is held at octave 0 and the row moves in the app, so the two
 // can't drift apart when an octave button is pressed.
 function holdPairOctave() {
-  if (!midiInput2 || !daemon || !daemon.ready) return
+  if (!midiInput2 || !daemonFrames()) return
   daemon.setConfig(5, 0)
   daemon.setConfig(4, 0)
 }
 // Lights land by which keyboard is which, and neither the light service nor the ports say so.
-const canSwapLights = () => (framesDrive() ? daemon.count >= 2 : !!(midiInput2 && midiOutput && midiOutput2))
+const canSwapLights = () => (daemonFrames() ? daemon.count >= 2 : !!(midiInput2 && midiOutput && midiOutput2))
 function swapLights() {
-  if (framesDrive() && daemon.count >= 2) {
+  if (daemonFrames() && daemon.count >= 2) {
     settings.kbLightsLeft = daemon.boards[1].serial
     daemon.setLeft(settings.kbLightsLeft)
   } else {
     clearNoteLights()
     settings.kbLightsSwap = !settings.kbLightsSwap
+    resetPageLightsTry()    // another pairing: its own try (the links' inputs change with it, syncBlockLinks re-finds their blocks)
+    // now, as a frame would: the links re-find their blocks for the new inputs (resetOwnership) before the
+    // in-app frames split by the same pairing, so no renderer starts on stale owners
+    queuePageLights()
+    syncOwnColours()
   }
   saveSettings()
   console.log('PAIR lights swapped')
@@ -4214,15 +7618,20 @@ function swapLights() {
 const KB_PORT = /lumi|\bpiano m\b/i, KB_MAKER = /roli/i, KB_UNNAMED = /usbmidi2/i
 const TWO_KEYBOARDS = '__two__'     // settings.kbPort: the two likeliest inputs, as one keyboard
 const SOFT_PORT = /\biac\b|\bbus\b|network|session|virtual|\bloop|yoke|through|\bthru\b|rtp|\bsim\b/i
-function pickPorts(ins, outs, choice = '') {
+// prefer: the keyboard card picked in the setup or Settings ('partykeys', 'roli', ...). With a PartyKeys picked, a connected PartyKeys
+// outranks a LUMI that is also switched on (Bluetooth reconnects known keyboards by itself), so the keyboard you chose gets the lights.
+function pickPorts(ins, outs, choice = '', prefer = '') {
   const label = (p) => (p.name || '') + ' ' + (p.manufacturer || '')
-  const rank = (p) => (KB_PORT.test(label(p)) ? 3 : KB_MAKER.test(label(p)) ? 2 : SOFT_PORT.test(label(p)) ? 0 : 1)
+  ins = [...ins]; outs = [...outs]   // the callers pass one-shot iterators (midi.outputs.values()): read them once, here
+  const preferParty = prefer === 'partykeys' && ins.some((p) => p && p.state !== 'disconnected' && isPartyPort(p))
+  // a key-light keyboard ranks 2: named for the keyboard (never a software bus), but below the 24-key ROLI/LUMI rank 3 that pairs two
+  // keyboards, so a second PartyKeys or a PartyKeys beside a LUMI can never become a 24 + 24 row
+  const rank = (p) => (isPartyPort(p) ? (preferParty ? 4 : 2) : KB_PORT.test(label(p)) ? 3 : KB_MAKER.test(label(p)) ? 2 : SOFT_PORT.test(label(p)) ? 0 : 1)
   const best = (list, min) => {
     let pick = null
     for (const p of list) if (p && p.state !== 'disconnected' && rank(p) >= min && (!pick || rank(p) > rank(pick))) pick = p
     return pick
   }
-  ins = [...ins]; outs = [...outs]
   const named = (list, name) => list.find((p) => p && p.name === name && p.state !== 'disconnected') || null
   // The input you chose stays chosen: unplugged, it waits instead of another port taking over.
   // Two keyboards: Automatic takes two inputs named for the 24-key keyboards. Identical keyboards
@@ -4232,10 +7641,15 @@ function pickPorts(ins, outs, choice = '') {
   // can show up twice, over USB and Bluetooth). Chosen by hand: anything that could be one of them.
   const named24 = (p) => rank(p) === 3 && !SOFT_PORT.test(label(p))
   const serviceSaysOne = !!(daemon && daemon.ready && daemon.count < 2)
-  const likely = choice === TWO_KEYBOARDS ? live.filter((p) => !SOFT_PORT.test(label(p)) && (rank(p) >= 2 || KB_UNNAMED.test(label(p)))).sort((a, b) => rank(b) - rank(a))
-    : !choice && !serviceSaysOne ? live.filter(named24) : []
-  const namesakes = (list, p) => list.filter((q) => q && q.name === p.name && q.state !== 'disconnected')
-  const ownOf = (p) => { const mine = namesakes(outs, p); return mine[Math.max(0, namesakes(ins, p).indexOf(p))] || mine[0] || null }
+  const likely = choice === TWO_KEYBOARDS ? live.filter((p) => !SOFT_PORT.test(label(p)) && !isPartyPort(p) && (rank(p) >= 2 || KB_UNNAMED.test(label(p)))).sort((a, b) => rank(b) - rank(a))
+    : !choice && !serviceSaysOne && !preferParty ? live.filter(named24) : []
+  // Windows can give the two directions different MIDI endpoint names. Keep any
+  // endpoint number so two keyboards can still be paired with their own outputs.
+  const endpointName = (p) => (p.name || '').trim().toLowerCase()
+    .replace(/^midi(?:in|out)(\d+)(?=\s|$)/, 'midi$1')
+    .replace(/\s*\(?\bmidi\s+(?:in(?:put)?|out(?:put)?)\)?$/, '').trim()
+  const namesakes = (list, p) => list.filter((q) => q && q.state !== 'disconnected' && endpointName(q) === endpointName(p))
+  const ownOf = (p) => namesakes(outs, p)[namesakes(ins, p).indexOf(p)] || null
   const canLight = (p) => p && (rank(p) >= 2 || (KB_UNNAMED.test(label(p)) && !!choice))
   if (likely.length >= 2) {
     const a = ownOf(likely[0]), b = ownOf(likely[1])
@@ -4246,7 +7660,27 @@ function pickPorts(ins, outs, choice = '') {
   const input = choice === TWO_KEYBOARDS ? likely[0] || null : choice ? named(ins, choice) : best(ins, 1)
   if (choice && !input) return { input: null, output: null }
   const own = input && ownOf(input)
-  return { input, output: canLight(own) ? own : best(outs, 2) }
+  if (canLight(own)) return { input, output: own }
+  // Windows can name the two directions differently ("LUMI Keys BLOCK" in, "MIDIOUT2 (LUMI Keys
+  // BLOCK)" out): a lightable output no other input owns takes the lights, never another keyboard's.
+  // A light keyboard's own output must be the same device: same name inside any MIDIOUT wrapper and
+  // the same Windows instance ("2- LUMI Keys BLOCK" is the second keyboard, never the first one's).
+  // A controller without lights can still be accompanied by a separate light keyboard.
+  // the "N- " instance prefix can sit outside or inside the MIDIOUTn (...) wrapper: "MIDIOUT2 (2- LUMI Keys BLOCK)"
+  const unwrap = (p) => endpointName(p).replace(/^\d+-\s+/, '').replace(/^midi(?:in|out)?\d*\s*\((.*)\)$/, '$1').trim()
+  const instance = (p) => (/^\s*(\d+)-\s+/.exec(p.name || '') || /^(\d+)-\s+/.exec(unwrap(p)) || [, '1'])[1]
+  const core = (p) => unwrap(p).replace(/^\d+-\s+/, '').trim()
+  // A lone PartyKeys-family keyboard names its two directions differently ("PartyKeys In", "SAM5704" / "SAM5704 APP"): one input and one output of
+  // the same kind are one device, as upstream pairs them
+  const kindOf = (p) => partyProfileFor(p)
+  const aloneOfKind = (list, kind) => list.filter((p) => p && p.state !== 'disconnected' && kindOf(p) === kind).length === 1
+  const partyLone = (q) => !!input && isPartyPort(input) && isPartyPort(q) && kindOf(q) === kindOf(input) && aloneOfKind(ins, kindOf(input)) && aloneOfKind(outs, kindOf(input))
+  const sameDevice = (q) => !input || !canLight(input) || partyLone(q) || (instance(q) === instance(input) && core(q) === core(input))
+  const unclaimed = !own && outs.find((q) => q && q.state !== 'disconnected' && canLight(q) && sameDevice(q) &&
+    !ins.some((p) => p !== input && ownOf(p) === q))
+  if (unclaimed) return { input, output: unclaimed }
+  // If the selected ROLI output is busy or missing, never redirect its lights to another board.
+  return { input, output: input && canLight(input) ? null : best(outs, 2) }
 }
 
 // A keyboard that plays but gets no light notes: choosing it by name helps only on that nameless port.
@@ -4273,36 +7707,147 @@ function fillKbPorts() {
   renderSetup()
 }
 
+let midiSysexGranted = false     // the { sysex: true } request succeeded (always on the native hosts)
 let midiState = null    // what the last 'keylight:midi' event said
 let kbAsk = false       // Automatic found several inputs and needs you to choose one
+let midiOpening = null
+let midiOpenFailure = null
+let midiOutputFailure = null
+let midiAccessFailed = false
+
+function midiConnectionStatus() {
+  if (midiOpening) return 'Connecting...'
+  if (midiOpenFailure) return 'Could not connect to ' + (midiOpenFailure.port.name || 'your keyboard') + '. ' +
+    (IS_WIN ? 'Close other apps using the keyboard, then retry.' : 'Try again.')
+  if (midiAccessFailed) return 'MIDI is unavailable. Reconnect your keyboard and try again.'
+  if (midiInput2) return 'Two keyboards connected'
+  if (midiInput) return 'Keyboard connected'
+  if (kbAsk) return 'Several MIDI inputs found. Choose your keyboard.'
+  return IS_IOS ? 'No keyboard found. Connect your keyboard.' : 'No keyboard found. Plug in your keyboard.'
+}
+
+function retryMidiOpen() {
+  if (midiOpening) return
+  midiOpenFailure = null
+  midiOutputFailure = null
+  if (midi) bindMidiPorts()
+  else initMidi()
+  if (partyBound() && !midiOpening && partyStatus.state === 'error') { syncPartyLights(true); refreshPartyUi() }     // a failed key-light controller starts again, after the ports are bound
+}
+
+async function openMidiPort(port) {
+  if (IS_NATIVE_HOST) return port.open()   // the native bridge already times out
+  let timeout
+  try {
+    await Promise.race([
+      port.open(),
+      new Promise((_, reject) => { timeout = setTimeout(() => reject(new Error('MIDI port did not open in time')), 2500) })
+    ])
+    if (port.state === 'disconnected' || port.connection === 'pending') throw new Error('MIDI port is unavailable')
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
 // Called at boot and whenever a port comes or goes (opening one counts too), so a
 // keyboard switched on or woken from sleep after launch plays, waits and lights like
 // one found at boot. The onboarding listens for 'keylight:midi'.
 function bindMidiPorts() {
   if (!midi) return
-  const wasTwo = !!midiInput2
   const keyboardInputs = [...midi.inputs.values()].filter((port) => !/airwave/i.test(portLabel(port)) && port.id !== performanceControls?.gestureInputId())
-  const { input, output, input2 = null, output2 = null, ask = false } = pickPorts(keyboardInputs, midi.outputs.values(), settings.kbPort)
+  const ports = pickPorts(keyboardInputs, midi.outputs.values(), settings.kbPort, normalizeChoice(settings.kbChoice))
+  // joined blocks reached over two links: one keyboard, read from both inputs, lit through both outputs (see midiRowInput)
+  ports.rowInput = null
+  if (ports.input2 && twiceRow && ports.input2.id === twiceRow) {
+    const { input2, output2 } = ports
+    Object.assign(ports, { input2: null, output2: null, rowInput: input2 })
+    if (output2 && output2 !== ports.output) ports.output = rowOutput(ports.output, output2)
+  }
+  const { input, input2 = null, ask = false } = ports
   if (ask && !kbAsk) status('Several MIDI inputs found: choose your keyboard in Settings')
   kbAsk = ask
+  const inputs = [input, input2, ports.rowInput]
+  const outputs = [...portsBehind(ports.output), ports.output2].filter(Boolean)
+  const sameSelection = (attempt) => attempt && attempt.input === input && attempt.input2 === input2 &&
+    attempt.rowInput === ports.rowInput && attempt.output === ports.output && attempt.output2 === ports.output2
+  // A desktop port that opens after the 2.5 s timeout closed on it: the failure is stale, so
+  // the same selection is bound and lit instead of waiting for Retry.
+  if (midiOpenFailure && [midiOpenFailure.input, midiOpenFailure.input2, midiOpenFailure.rowInput,
+    midiOpenFailure.output, midiOpenFailure.output2].filter(Boolean).every((port) => port.connection === 'open')) midiOpenFailure = null
+  if (sameSelection(midiOpening) || sameSelection(midiOpenFailure)) return
+  midiOpening = null
+  midiOpenFailure = null
+  if (!sameSelection(midiOutputFailure)) midiOutputFailure = null
+  const usablePorts = () => {
+    const failed = midiOutputFailure?.failed || []
+    const row = rowPorts.get(ports.output)
+    const first = row ? row.a : ports.output
+    const a = failed.includes(first) ? null : first
+    const b = failed.includes(row?.b) ? null : row?.b
+    return { ...ports, output: b ? rowOutput(a, b) : a,
+      output2: failed.includes(ports.output2) ? null : ports.output2 }
+  }
+  const toOpen = [...inputs, ...(!IS_NATIVE_HOST ? outputs : [])].filter((port) =>
+    port?.open && port.connection !== 'open' && !midiOutputFailure?.failed.includes(port))
+  if (!toOpen.length) {
+    applyMidiPorts(usablePorts())
+    return
+  }
+  const attempt = midiOpening = { input, input2, rowInput: ports.rowInput, output: ports.output, output2: ports.output2 }
+  applyMidiPorts({ input: null, output: null })
+  Promise.allSettled(toOpen.map(openMidiPort)).then((results) => {
+    if (midiOpening !== attempt) return
+    midiOpening = null
+    const failed = toOpen.filter((port, i) => {
+      if (results[i].status !== 'rejected') return false
+      recordDiagnosticFailure('MIDI', 'Open ' + (port.name || 'keyboard'), results[i].reason, true)
+      return true
+    })
+    const failedOutputs = [...(midiOutputFailure?.failed || []), ...failed.filter((p) => outputs.includes(p))]
+    if (failedOutputs.length) midiOutputFailure = { ...attempt, failed: failedOutputs }
+    const failedInput = failed.find((p) => inputs.includes(p))
+    if (failedInput) {
+      midiOpenFailure = { ...attempt, port: failedInput }
+      const usable = usablePorts()
+      if (failed.includes(input)) {
+        const other = input2 || ports.rowInput
+        const otherOutput = input2 ? usable.output2 : rowPorts.get(usable.output)?.b
+        applyMidiPorts({ input: failed.includes(other) ? null : other, output: otherOutput || null })
+      } else {
+        // Keep the primary keyboard playable if its partner's input is busy.
+        applyMidiPorts({ input, output: usable.output })
+      }
+      status(midiConnectionStatus(), { label: 'Retry', run: retryMidiOpen })
+    } else {
+      applyMidiPorts(usablePorts())
+    }
+  })
+}
+
+function applyMidiPorts({ input, output, input2 = null, output2 = null, rowInput = null }) {
+  const wasTwo = !!midiInput2
   if (input !== midiInput || input2 !== midiInput2) {
     performanceControls?.panic()
     for (const m of mpeStates) m.reset()
     if (midiInput) midiInput.onmidimessage = null
     if (midiInput2) midiInput2.onmidimessage = null
     // the old port's note-offs and pedal-up will never come
-    if (held.size || sustainDown()) { stopAll(); setSustain(false); held.clear(); letGoAt.clear() }
+    if (held.size || sustainDown()) { stopAll(); setSustain(false); held.clear(); letGoAt.clear(); tvKeys() }
+    homeLight?.releaseAll()     // the old keyboard's note-offs will never come: the Home rail lets go too
     midiInput = input
     midiInput2 = input2
+    diagPortText()
     lastFarAt = -Infinity
     if (midiInput2) {
       midiInput2.onmidimessage = (ev) => pairMessage(1, ev.data)   // the port is read from midiInput/midiInput2 for the device report
-      if (!loadPair()) status('Two keyboards found: they now play as one. Run setup again in Settings so Keylight knows which is on the left')
+      pairUnknown = !loadPair()
+      if (pairUnknown) status('Two keyboards found. Tell Keylight which one is on the left in Settings > Your keyboard.')
       holdPairOctave()
     }
     if (midiInput) {
       midiInput.onmidimessage = (ev) => (midiInput2 ? pairMessage(0, ev.data) : handleMidiMessage(ev.data, 0, false, input.id))
       settings.kbLast = portLabel(midiInput)
+      settings.kbMidiSeen = true   // hides the "Need a keyboard?" row in the setup picker for good
       // a count chosen with no keyboard plugged in was meant for this one
       if (settings.kbKeysFor[''] && !settings.kbKeysFor[kbLabel()]) settings.kbKeysFor[kbLabel()] = settings.kbKeysFor['']
       delete settings.kbKeysFor['']
@@ -4310,18 +7855,33 @@ function bindMidiPorts() {
       if (!player) restoreKeysAt()
     }
   }
-  if (output !== midiOutput || output2 !== midiOutput2) { leaveApiMode(); clearNoteLights(); midiOutput = output; midiOutput2 = output2 }
+  // after the ports above: the row's port may be the one just let go as the second keyboard (its handler was cleared there)
+  if (rowInput !== midiRowInput || (rowInput && !rowInput.onmidimessage)) {
+    // not if it is now a keyboard of its own (the row came apart, or the first port went): it just got its handler above
+    if (midiRowInput && midiRowInput !== rowInput && midiRowInput !== midiInput && midiRowInput !== midiInput2) midiRowInput.onmidimessage = null
+    midiRowInput = rowInput
+    // the other block's keys: the same handling as the first link's (slot 0). Its BLOCKS replies go to its own port's link (slot 2) only.
+    if (midiRowInput) midiRowInput.onmidimessage = (ev) => {
+      rowSeen++
+      const data = ev.data
+      if (data[0] === 0xf0 && (blocksFeed(data, 2) || isBlocksPacket(data) || parseIdentity(data))) return
+      if (midiInput) handleMidiMessage(data, 0, false, midiInput.id)
+    }
+  }
+  if (output !== midiOutput || output2 !== midiOutput2) { leaveApiMode(); clearNoteLights(); midiOutput = output; midiOutput2 = output2; syncOwnColours(performance.now()) }
+  syncPartyLights()      // after the ports above; idempotent, so an open or a first send (both fire onstatechange) rebuilds nothing
+  syncKeyboardChoice()
   performanceControls?.updateMidi(midi, [midiInput, midiInput2], [midiOutput, midiOutput2])
   applyKeyCount()
   // back to one keyboard: its octave goes back to meaning what the screen says
   if (wasTwo && !midiInput2) setKeyboardWindow(kbBase())
   fillKbPorts()
   updateKbChip()
-  const detail = { connected: !!midiInput, name: midiInput ? midiInput.name + (midiInput2 ? ' + ' + midiInput2.name : '') : null, ask: kbAsk }
-  if (midiState && midiState.connected === detail.connected && midiState.name === detail.name && midiState.ask === detail.ask) return
+  const detail = { connected: !!midiInput, name: midiInput ? midiInput.name + (midiInput2 ? ' + ' + midiInput2.name : '') : null, ask: kbAsk, status: midiConnectionStatus() }
+  if (midiState && midiState.status === detail.status && midiState.name === detail.name) return
   midiState = detail
   const obd = $('obDevice')
-  if (obd) obd.textContent = midiInput2 ? 'Two keyboards connected' : midiInput ? 'Keyboard connected' : kbAsk ? 'Several MIDI inputs found — choose your keyboard' : 'No keyboard found — plug in your keyboard'
+  if (obd) obd.textContent = detail.status
   console.log('MIDI keyboard ' + (midiInput ? 'in=' + midiInput.name + ' out=' + (midiOutput ? midiOutput.name : 'none') + (midiInput2 ? ' in2=' + midiInput2.name + ' out2=' + (midiOutput2 ? midiOutput2.name : 'none') : '') : 'none') +
     ' (inputs=' + [...midi.inputs.values()].map((p) => p.name + (p.state === 'disconnected' ? ' (gone)' : '')).join('|') + ')')
   window.dispatchEvent(new CustomEvent('keylight:midi', { detail }))
@@ -4329,42 +7889,173 @@ function bindMidiPorts() {
 
 async function initMidi() {
   try {
-    midi = await (IS_NATIVE_HOST ? requestAndroidMIDIAccess({ sysex: true }) : navigator.requestMIDIAccess({ sysex: true }))
+    midiSysexGranted = false
+    if (IS_NATIVE_HOST) { midi = await requestAndroidMIDIAccess({ sysex: true }); midiSysexGranted = true }
+    else {
+      try {
+        midi = await navigator.requestMIDIAccess({ sysex: true })
+        midiSysexGranted = true
+      } catch (error) {
+        recordDiagnosticFailure('MIDI', 'Enable SysEx', error, true)
+        midi = await navigator.requestMIDIAccess()
+      }
+    }
+    midiAccessFailed = false
     console.log('MIDI ready: inputs=' + [...midi.inputs.values()].map((p) => p.name).join('|') + ' outputs=' + [...midi.outputs.values()].map((p) => p.name).join('|'))
     midi.onstatechange = () => bindMidiPorts()
+    // A key-light controller hears its own failed sends directly (party-lights.js, which also reports them to the diagnostics); a native error that is
+    // anyone else's (the support wizard's identity request, another port, an input) never fails it
+    if (IS_NATIVE_HOST) midi.onerror = (error) => recordDiagnosticFailure('MIDI', 'Native MIDI', error, true)
     bindMidiPorts()
-  } catch (e) { console.log('MIDI failed: ' + e.message) }
+  } catch (e) {
+    midiAccessFailed = true
+    recordDiagnosticFailure('MIDI', 'List MIDI ports', e, true)
+    console.log('MIDI failed: ' + e.message)
+    updateKbChip()
+    renderSetup()
+  }
 }
 
 function updateKbChip() {
   const chip = $('kbStatus')
   if (!chip) return
   const connected = !!midiInput
+  if (IS_IOS && connected && !kbWasOn) homeLight?.sweep()
+  kbWasOn = connected
   chip.classList.toggle('on', connected)
-  const lit = framesDrive() || (noteLightsOnly() && !!midiOutput)
-  const name = midiInput2 ? 'Two keyboards' : 'Keyboard'
   const help = $('kbHelp')
   if (help) {
-    const none = !connected && !kbAsk && !!midi
+    const none = !connected && !kbAsk && !midiOpening && !midiOpenFailure && !!midi
     help.classList.toggle('hidden', !none)
-    help.textContent = none ? 'No keyboard found. Check it is plugged in over USB and switched on. ' + noKeyboardNextStep() : ''
+    help.textContent = none ? (IS_IOS ? 'No keyboard found. Connect one with a USB adapter or over Bluetooth, and switch it on. ' : 'No keyboard found. Check it is plugged in over USB and switched on. ') + noKeyboardNextStep() : ''
   }
   const helpSupport = $('kbHelpSupportRow')
-  if (helpSupport) helpSupport.classList.toggle('hidden', connected || kbAsk || !midi)
-  $('kbStatusText').textContent = connected ? (lit ? name + ' connected' : name + ' · lights off') : kbAsk ? 'Choose a keyboard' : 'No keyboard'
-  if (noteLightsOnly()) showWindowsLights()
+  if (helpSupport) helpSupport.classList.toggle('hidden', connected || kbAsk || !!midiOpening || !!midiOpenFailure || !midi)
+  // "Connection failed" is only for a keyboard or light service you set up: with none configured, a MIDI access error is just "No keyboard" (P10)
+  const configured = !!(settings.kbPort || settings.kbLast || midiOpenFailure || midiInput || midiOutput || midiInput2 || midiOutput2)
+  const failed = (midiOpenFailure || midiAccessFailed) && configured
+  chip.dataset.state = failed ? 'failed' : ''
+  const partyFailed = partyBound() && partyStatus.state === 'error'
+  $('kbRetryRow').classList.toggle('hidden', !(failed || (midiOutputFailure && !framesDrive()) || partyFailed))
+  $('kbRetryMessage').textContent = failed ? midiConnectionStatus() : midiOutputFailure || partyFailed ? lightFallbackMessage() : ''
+  $('kbStatusText').textContent = failed ? 'Connection failed' : midiOpening || connected ? midiConnectionStatus() : kbAsk ? 'Choose a keyboard' : 'No keyboard'
+  chip.setAttribute('aria-label', failed ? midiConnectionStatus() : $('kbStatusText').textContent)
+  if (!(IS_WIN || IS_NATIVE_HOST)) showDaemonState()
+  else showLightState()
 }
 
-// Windows and the 49-key keyboard: Settings says how the keys light (there is no light service
-// to report on), and the brightness works only with a blocksd someone runs themselves.
-function showWindowsLights() {
+function lightFallbackMessage() {
+  if (framesDrive()) return ''
+  const partyProblem = partyProblemText()
+  if (partyProblem) return partyProblem
+  if (midiOutputFailure) return (midiOutput || midiOutput2 ? 'Some key lights are unavailable.' : 'Key lights are unavailable.') +
+    (IS_WIN ? ' Close other apps using the keyboard, then retry.' : ' Try reconnecting the keyboard.')
+  const missing = [[midiInput, midiOutput], [midiInput2, midiOutput2]].some(([input, output]) =>
+    input && !output && (KB_PORT.test(portLabel(input)) || KB_MAKER.test(portLabel(input)) || isPartyPort(input) ||
+      (settings.kbPort && KB_UNNAMED.test(portLabel(input)))))
+  if (missing) {
+    return (midiOutput || midiOutput2 ? 'Some key lights are unavailable.' : 'The keyboard plays, but its light port is unavailable.') +
+      (IS_WIN ? ' Close other apps using the keyboard, then reconnect it.' : '')
+  }
+  if (!hasNoteLightPort()) return ''
+  if (midi?.sysexEnabled === false) return 'Full-colour lights need MIDI SysEx access. Using MIDI note lights.'
+  const noReply = [...blockLinks.values()].some(({ link, port }) => link.noReply && KB_PORT.test(portLabel(port)))
+  return pageLights.gaveUp || noReply ? 'Full-colour lights did not start. Using MIDI note lights.' : ''
+}
+
+// Settings light status for in-app frames and MIDI-note fallback.
+function showLightState() {
   const ready = framesDrive()
   const el = $('daemonState')
-  if (el) el.textContent = ready ? 'Full colour (blocksd)' : midiOutput ? 'On: only the keys to play' : midiInput ? (canChooseLights() ? 'Off: choose your keyboard below' : 'Off for this keyboard') : midi ? (kbAsk ? 'Choose your keyboard below' : 'No keyboard found') : 'checking…'
+  if (el) el.textContent = daemonIssue() || lightFallbackMessage() || (partyBound() ? partyStateText() : '') || (ready ? (pageDrives() ? 'Full colour (in app)' : 'Full colour (blocksd)') : midiOutput ? 'On: only the keys to play' : midiInput ? (canChooseLights() ? 'Off: choose your keyboard below' : 'Off for this keyboard') : midi ? (kbAsk ? 'Choose your keyboard below' : 'No keyboard found') : 'checking…')
   const b = $('brightness')
   if (b) {
     b.disabled = !ready
     b.title = ready ? '' : 'The keyboard sets its own brightness'
+  }
+  // these two styles only exist on full-colour frames, so they are hidden without them
+  for (const id of ['waitStyleRow', 'nextStyleRow', 'lightStyleHint']) if ($(id)) $(id).classList.toggle('hidden', !ready)
+  syncPartySettings()
+}
+
+// The iPhone/iPad app is a paid App Store app with no camera, no light service and no desktop tools: take those parts out of the page,
+// and say what is left in words that fit a touch screen (a keyboard comes over USB with an adapter, or Bluetooth).
+// Called once from boot(), before wireUI(): code that wires an element removed here must cope with its absence.
+function applyIOSPage() {
+  const byId = (id) => document.getElementById(id)
+  const say = (id, text) => { const el = byId(id); if (el) el.textContent = text }
+  const hide = (el) => { if (el) { el.classList.add('hidden'); el.setAttribute('aria-hidden', 'true') } }
+  // hidden, not removed: the camera, Airwave and recording code still looks these up (and is never started on iOS).
+  // "Support my device" stays: it works without USB here (renderer/device-support.js, the ios option)
+  for (const el of document.querySelectorAll('#btnCamera, #setCamera, #obInstall, #airCard, #setExperimental, #settingsJump [data-jump="setCamera"], #settingsJump [data-jump="setExperimental"], #airwaveNote, #gestureRow, #gestureStatus, #recordTakesRow, #backingRow, #fullMixRow')) hide(el)
+  const fingerSource = byId('fingerSource')
+  if (fingerSource) hide(fingerSource.closest('label'))
+  // gone for good: app.js toggles some of these; the install steps name Homebrew and Terminal; the support dialog holds the Ko-fi link
+  for (const el of document.querySelectorAll('#obInstall, #supportDialog, #obSupportHint')) el.remove()
+  settings.recordTakes = false   // recording a take saves a video and a file per run: not offered here
+  const mission = document.querySelector('.about-mission')
+  if (mission) mission.textContent = mission.textContent.replace(/^Free, open-source piano/, 'Piano')
+  say('aboutLine', 'Piano lessons with falling notes, sheet music and glowing keys.')
+  // Help card (iPhone/iPad only): the help page and the problem report, out of Advanced so testers and buyers find them
+  const helpRows = byId('setHelpRows')
+  if (helpRows) {
+    for (const id of ['openDiagnostics', 'betaReportHint']) { const el = byId(id); if (el) { if (id === 'betaReportHint') helpRows.after(el); else helpRows.append(el) } }
+    byId('setHelp').classList.remove('hidden')
+  }
+  say('aboutAck', 'Thanks to the open-source music community, whose tools, research and recordings made this app possible.')
+  say('aboutNotices', 'Keylight includes open-source software and recordings: Basic Pitch and TensorFlow.js (Apache 2.0), music-metadata (MIT), OpenSheetMusicDisplay (BSD 3-Clause), the Outfit font (SIL OFL 1.1) and the Salamander Grand Piano recordings (CC BY 3.0). Their full licence texts are under Licences and acknowledgements, below.')
+  // Keyboard shortcuts are for a hardware keyboard: no row for them on a touch device
+  for (const el of document.querySelectorAll('#openShortcuts, #aboutShortcuts')) hide(el)
+  // The picker: "Choose File" only. Photo and video types make iOS offer Photo Library and Take Video (the camera, which this app does not use);
+  // extensions only, and no audio/* (WebKit treats audio/* like a camera type too; tested in the simulator: extension-only lists open the Files picker directly).
+  // A video reaches the app through the share sheet.
+  const importFile = byId('importFile')
+  if (importFile) importFile.setAttribute('accept', '.mp3,.m4a,.aac,.wav,.flac,.ogg,.aif,.aiff,.caf,.mid,.midi,.kar,.xml,.musicxml,.mxl')
+  say('importPrivacy', 'Keylight works out the notes on this device. Keylight does not upload the file. MIDI and MusicXML play note for note.')
+  // Add a song rows (Illuminated Studio copy)
+  for (const [sel, text] of [['#impRecord .imp-source-detail', 'Record a song or a tune'], ['#impShare .imp-source-detail', 'Send audio or video from Voice Memos or Files']]) {
+    const el = document.querySelector(sel)
+    if (el) el.textContent = text
+  }
+  say('impShareText', 'Open a recording in Voice Memos or Files, tap Share, then choose Keylight. For a video in Photos, choose Save to Files first, then share it from Files.')
+  say('impWait', 'Keep Keylight open while this finishes.')
+  say('advancedSummary', 'Pitch bend and MIDI output')
+  if (IS_IOS_BETA) say('betaReportHint', 'Send it to support@keylightpiano.app, or attach it to your beta feedback in TestFlight.')
+  byId('betaReportHint')?.classList.remove('hidden')
+  const hapticsRow = byId('hapticsRow')
+  if (hapticsRow) hapticsRow.classList.remove('hidden')    // vibration feedback is an iPhone/iPad setting
+  say('kbAutoHint', 'Automatic reads the size from the keyboard you connect.')
+  say('fxHint', 'Lite keeps the colours and drops the background blur, soft shadows and slow drift, so older iPhones and iPads stay smooth.')
+  // No keyboard? The setup's connect step has the Bluetooth list, Apple's list and the on-screen keys; the "No keyboard" chip opens it
+  const chip = byId('kbStatus')
+  if (chip) {
+    chip.setAttribute('role', 'button')
+    chip.setAttribute('tabindex', '0')
+    chip.setAttribute('aria-label', 'Keyboard connection')
+    chip.style.cursor = 'pointer'
+    const open = () => {
+      if (midiOpenFailure || midiAccessFailed) retryMidiOpen()
+      else if (!midiOpening) {
+        if (midiInput || kbAsk) jumpSettings('setKeyboard', true)
+        else openConnect()
+      }
+    }
+    chip.onclick = open
+    chip.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open() } }
+  }
+}
+
+// The system's Bluetooth MIDI pairing sheet (ios-ble.js): a paired keyboard then shows up as an ordinary MIDI port
+function iosPairBluetooth() {
+  return import('./ios-ble.js').then(({ requestPairing }) => requestPairing({ request: androidRequest }, (m) => status(m)))
+    .catch((e) => status('Could not open Bluetooth pairing: ' + (e && e.message ? e.message : 'unavailable')))
+}
+
+// "Salamander Piano (sampled)" is cut off on a phone: the iPhone/iPad lists drop the bracketed part
+function applyIOSInstrumentNames() {
+  for (const id of ['instrument', 'btnInst']) {
+    const select = document.getElementById(id)
+    if (select) for (const option of select.options) option.textContent = option.textContent.replace(/\s*\([^)]*\)\s*$/, '')
   }
 }
 
@@ -4374,9 +8065,8 @@ function applyWindowsPage() {
   const set = (id, text) => { const el = $(id); if (el) el.textContent = text }
   set('lightsLabel', 'Key lights')
   set('recordTakesNote', 'Saves each run in the player as a video with Keylight’s sound to ' + TAKES_FOLDER + ', for making videos.')
-  set('importPrivacy', 'A recording becomes notes on ' + THIS_COMPUTER + ', and the file is never uploaded. MIDI and MusicXML files are read as written. Only add music you have the right to use. With the lookup on, cover art comes from iTunes and lyrics from LRCLIB.')
   set('camHelp', 'Point a camera down at the keyboard. Keylight then shows which finger is over which key, before you press it.')
-  showWindowsLights()
+  showLightState()
 }
 
 /* ============================== keyboard octave ============================== */
@@ -4387,7 +8077,7 @@ function applyWindowsPage() {
 let kbOctave = 0
 let kbSetAt = 0
 let octaveMiss = { offset: 0, pitches: [] }
-const kbBase = () => settings.kbZero + 12 * kbOctave
+const kbBase = () => kbWindowZero() + 12 * kbOctave
 
 // How many keys: 24 (Piano M, LUMI Keys), 49 (ROLI Piano) or 48 (two 24-key keyboards). Two on two
 // cables are always 48; two joined together share one port, and the light service counts them.
@@ -4399,32 +8089,53 @@ const KB_SIZES = [24, 49]
 const KB_JOINED_SIZES = [24, 48]     // a port named for the 24-key keyboards can only be one or two of them
 const portLabel = (p) => ((p.manufacturer || '') + ' ' + (p.name || '')).trim()
 const kbLabel = () => (midiInput ? portLabel(midiInput) : settings.kbLast)
-const keysFromName = (label) => (/\broli piano\b(?!\s*m\b)/i.test(label) ? 49 : 24)
+const keysFromName = (label) => (/\broli piano\b(?!\s*m\b)/i.test(label) ? 49 : partyKeysFromName(label) || 24)
 let serviceCountsTwo = false     // kept while the light service restarts, so the screen doesn't jump
 const keysAuto = () => (!settings.kbPort && serviceCountsTwo ? 48 : keysFromName(kbLabel()))
-const kbKeys = () => (midiInput2 ? 48 : settings.kbKeysFor[kbLabel()] || keysAuto())
+// A ROLI keyboard that answers says it itself (blocks.js topology: 24 per LUMI Keys / Piano M block,
+// 49 for the ROLI Piano), live as blocks are snapped on and off; the name is the fallback.
+const kbKeys = () => (midiInput2 ? 48 : blocksKeys() || settings.kbKeysFor[kbLabel()] || partyKeysLive() || keysAuto())
+const usesScreenKeys = () => !midiInput && (settings.kbChoice === 'screen' || TOUCH)
+function playerRange() {
+  const keys = kbKeys()
+  const wide = usesScreenKeys() && courseRun?.screenWindow
+  if (wide && wide.keys > keys) return wide
+  return { keys, start: wide ? null : keysStayAt() }
+}
 const lightKeys = () => (kbKeys() === 48 ? 48 : 24)     // how many keys a frame for the light service has
-// blocksd only drives the 24-key keyboards, so a longer one lights from MIDI notes, as on Windows;
-// two 24-key keyboards it drives one frame each
-const noteLightsOnly = () => IS_WIN || IS_NATIVE_HOST || (kbKeys() > 24 && !(kbKeys() === 48 && framesDrive()))
-// Whether the light service does the lighting: on a 48-key row, only if it reaches both keyboards
-const framesDrive = () => !!(daemon && daemon.ready) && (kbKeys() !== 48 || daemon.count >= 2)
+const noteLightsOnly = () => !framesDrive()
+const daemonOwnsKeyboard = () => !!daemon?.ready
+const daemonIssue = () => daemonOwnsKeyboard() && !daemon.frameCapable
+  ? (daemon.unsupportedFrames || daemon.device?.keyCount == null ? OLD_DAEMON_MESSAGE : 'The light service holds this keyboard. Quit it to use in-app lights.')
+  : ''
+// The service sends 24-key frames and needs to reach both keyboards on a 48-key row.
+function daemonFrames() {
+  if (!daemon?.frameCapable) return false
+  const keys = kbKeys()
+  return keys === 24 || (keys === 48 && daemon.count >= 2)
+}
+const pageDrives = () => pageLights.ready && !daemonOwnsKeyboard()
+// Whether full-colour frames light the keys (sendKeys), from the light service or the page. Called many times a frame: cached state only.
+const framesDrive = () => daemonFrames() || pageDrives()
 // Whether the app can move the keys' octave itself, through the light service. Not on two
 // keyboards: on two cables the row moves in the app, and nobody knows what two joined ones do.
-const canMoveOctave = () => !!(daemon && daemon.ready) && !midiInput2 && kbKeys() !== 48
+const canMoveOctave = () => daemonFrames() && settings.kbChoice !== 'midi' && !midiInput2 && kbKeys() === 24
 
 // A long keyboard, which the app can't move or ask: the screen always shows where its keys are,
 // as last seen for that keyboard. (24 keys off the light service fit each song instead: a note
 // off so few keys soon shows where they really are.)
 const keysAt = () => settings.kbBaseFor[kbLabel()] ?? settings.kbZero
-const keysStayAt = () => (kbKeys() > 24 && !midiInput2 && !canMoveOctave() ? keysAt() : null)
+const genericRange = () => settings.kbChoice === 'midi' && !midiInput2 && !!settings.kbKeysFor[kbLabel()]
+// Use the measured pitch class with the existing octave controls.
+const kbWindowZero = () => genericRange() ? settings.kbZero + ((keysAt() - settings.kbZero) % 12 + 12) % 12 : settings.kbZero
+const keysStayAt = () => ((kbKeys() > 24 || genericRange()) && !midiInput2 && !canMoveOctave() ? keysAt() : null)
 function rememberKeysAt() {
   if (keysStayAt() == null) return
   settings.kbBaseFor[kbLabel()] = kbBase()
   saveSettings()
 }
 function restoreKeysAt() {
-  if (keysStayAt() != null) kbOctave = Math.round((keysAt() - settings.kbZero) / 12)
+  if (keysStayAt() != null) kbOctave = Math.round((keysAt() - kbWindowZero()) / 12)
 }
 // The notes a long keyboard can't reach from where it is, said once the song's own message
 // has had its moment.
@@ -4470,7 +8181,7 @@ function learnLengthFromNotes(pitch) {
   const now = performance.now()
   const far = [...pressedAt].filter(([p, at]) => now - at < NOTES_TOGETHER_MS && Math.abs(p - pitch) > 24).map(([p]) => p)
   pressedAt.set(pitch, now)
-  if (!far.length || !midiInput || midiInput2 || (daemon && daemon.ready) || settings.kbKeysFor[kbLabel()] || kbKeys() > 24 || KB_PORT.test(kbLabel())) return
+  if (!far.length || !midiInput || midiInput2 || (daemon && daemon.ready) || settings.kbKeysFor[kbLabel()] || kbKeys() > 24 || KB_PORT.test(kbLabel()) || isPartyPort(midiInput)) return
   const gap = now - lastFarAt
   if (gap < NOTES_TOGETHER_MS) return     // still the same moment
   lastFarAt = now
@@ -4487,9 +8198,12 @@ function learnLengthFromNotes(pitch) {
 // song's window and the wording.
 function applyKeyCount() {
   const keys = kbKeys()
-  setKeyCount(keys)
-  if (player && player.windowKeys !== keys) {
-    player.setWindowKeys(keys, keysStayAt())
+  const range = playerRange()
+  setKeyCount(player && !freeplay ? range.keys : keys)
+  // A playing cover is re-arranged for the new keys first: the window and the hands then change once, against the new notes.
+  refreshPlayingCover()
+  if (player && player.windowKeys !== range.keys) {
+    player.setWindowKeys(range.keys, range.start)
     if (song) {
       song.fitStart = player.windowStart
       setKeyboardWindow(song.fitStart)
@@ -4499,34 +8213,52 @@ function applyKeyCount() {
     }
   }
   const box = $('obKeys')
-  const whites = keys === 49 ? 29 : keys === 48 ? 28 : 14
+  const whites = countWhiteKeys(kbBase(), keys)
   if (box.children.length !== whites || !box.style.length) {
     box.replaceChildren(...Array.from({ length: whites }, (_, i) => { const k = document.createElement('i'); k.style.setProperty('--i', i); return k }))
     box.style.setProperty('--white-keys', whites)
     box.classList.toggle('long', keys > 24)
     setup.glow = new Array(whites).fill(0)
+    if (box.dataset.mark) markSetupKeys()
   }
-  $('kbKeys').value = String(midiInput2 ? 48 : settings.kbKeysFor[kbLabel()] || 0)
-  $('kbKeys').disabled = !!midiInput2
-  $('kbKeys').options[0].textContent = 'Automatic (' + keysAuto() + ' keys)'
+  const keySelect = $('kbKeys')
+  const keyValue = String(midiInput2 ? 48 : settings.kbKeysFor[kbLabel()] || 0)
+  const measured = keySelect.querySelector('option[data-measured]')
+  if (measured && measured.value !== keyValue) measured.remove()
+  if (![...keySelect.options].some((option) => option.value === keyValue)) {
+    const option = document.createElement('option')
+    option.dataset.measured = ''
+    option.value = keyValue
+    option.textContent = keyValue + ' keys'
+    keySelect.append(option)
+  }
+  keySelect.value = keyValue
+  keySelect.disabled = !!midiInput2
+  keySelect.options[0].textContent = 'Automatic (' + keysAuto() + ' keys)'
   $('swapRow').classList.toggle('hidden', !canSwapLights())
-  for (const id of ['exactRow', 'exactHint']) if ($(id)) $(id).classList.toggle('hidden', !noteLightsOnly())
-  if (!(IS_WIN || IS_NATIVE_HOST)) {
-    if (!noteLightsOnly()) { $('brightness').disabled = false; $('brightness').title = ''; showDaemonState() }
-  }
+  for (const id of ['exactRow', 'exactHint']) if ($(id)) $(id).classList.toggle('hidden', !noteLightsOnly() || daemonOwnsKeyboard() || partyBound())
   syncOctaveUI()
   updateKbChip()      // also the lights row, while it follows the keyboard
   renderSetup()
+  emitKeyboard()
 }
 
 function setKeyboardWindow(start) {
-  kbOctave = Math.max(-4, Math.min(5, Math.round((start - settings.kbZero) / 12)))
+  const zero = kbWindowZero()
+  const min = genericRange() ? Math.ceil(-zero / 12) : -4
+  const max = genericRange() ? Math.floor((128 - kbKeys() - zero) / 12) : 5
+  kbOctave = Math.max(min, Math.min(max, Math.round((start - zero) / 12)))
   kbSetAt = performance.now()
   if (canMoveOctave()) {
     daemon.setConfig(5, 0)          // transpose off: keys play plain octaves
     daemon.setConfig(4, kbOctave)
   }
-  if (player) player.setWindowStart(kbBase())
+  if (player) {
+    player.setWindowStart(playerWindowStart({
+      keys: kbKeys(), calibrated: settings.kbBaseFor[kbLabel()] != null, start, base: kbBase(),
+      wide: usesScreenKeys() && courseRun?.screenWindow?.keys > kbKeys()
+    }))
+  }
   console.log('KEYBOARD octave=' + kbOctave + ' base=' + kbBase())
   syncOctaveUI()
 }
@@ -4534,6 +8266,11 @@ function setKeyboardWindow(start) {
 // The octave − / + (HUD, Settings, Z / X and the keyboard's own buttons). The keys get a
 // sweep that travels the way they moved.
 function shiftOctave(delta) {
+  reguideAfterChange()
+  if (screen === 'play' && player && player.windowKeys > kbKeys() && usesScreenKeys()) {
+    status('The on-screen keys already cover this piece')
+    return
+  }
   // two keyboards on two cables: the row moves here, and an octave button that also moved a
   // keyboard is put back
   if (midiInput2) {
@@ -4550,7 +8287,7 @@ function shiftOctave(delta) {
   // without the light service the app can't move the keyboard's octave, only follow it
   if (!canMoveOctave()) {
     // a long keyboard seldom plays a note off the screen, so this is how to line the screen up with it
-    if (kbKeys() > 24) {
+    if (kbKeys() > 24 || genericRange()) {
       const to = kbBase() + 12 * delta
       if (to < 0 || to + kbKeys() - 1 > 127) { status('The screen is already at its ' + (delta < 0 ? 'lowest' : 'highest') + ' octave'); return }
       const hand = player && player.handFilter
@@ -4560,8 +8297,7 @@ function shiftOctave(delta) {
       if (!player || player.handFilter === hand) status('The screen now shows ' + keysRange() + '. To move the keys themselves, use the octave buttons on your keyboard')
       return
     }
-    status(noteLightsOnly() ? 'Use the octave buttons on your keyboard to move the keys: Keylight follows them'
-      : 'Moving the keys from here needs the light service: use the octave buttons on your keyboard')
+    status('Use the octave buttons on your keyboard to move the keys: Keylight follows them')
     return
   }
   const from = kbBase()
@@ -4578,8 +8314,11 @@ function syncOctaveUI() {
   setText($('lblOctave'), keysRange())
   syncKbRange()
   // the device octave runs from -4 to 5 (setKeyboardWindow)
-  for (const id of ['btnOctDown', 'setOctDown']) if ($(id)) $(id).disabled = kbOctave <= -4
-  for (const id of ['btnOctUp', 'setOctUp']) if ($(id)) $(id).disabled = kbOctave >= 5 || (!!midiInput2 && kbBase() + 12 + kbKeys() - 1 > 127)
+  const upOutOfRange = kbBase() + 12 + kbKeys() > 128
+  const downAtLimit = genericRange() ? kbBase() < 12 : kbOctave <= -4
+  const upAtLimit = genericRange() ? upOutOfRange : kbOctave >= 5 || (!!midiInput2 && upOutOfRange)
+  for (const id of ['btnOctDown', 'setOctDown']) if ($(id)) $(id).disabled = downAtLimit
+  for (const id of ['btnOctUp', 'setOctUp']) if ($(id)) $(id).disabled = upAtLimit
 }
 
 // Our idea of the keys' range was off by `shift` semitones: fix the calibration
@@ -4588,7 +8327,7 @@ function recalibrate(shift, reason) {
   if (!canMoveOctave()) {
     // We can't move the keyboard's octave right now, so we don't know it either:
     // follow the keys without saving a calibration.
-    if (kbBase() + shift < 0) return
+    if (kbBase() + shift < 0 || (genericRange() && kbBase() + shift + kbKeys() > 128)) return
     kbOctave += shift / 12
     rememberKeysAt()
     if (player) player.setWindowStart(kbBase())
@@ -4638,11 +8377,16 @@ function checkOctaveMismatch(pitch, need) {
 
 /* ============================== LED daemon ============================== */
 function showDaemonState() {
+  showLightState()
+  const retry = $('daemonRetry')
+  if (!EXPECT_DAEMON || daemonOwnsKeyboard() || pageDrives() || lightFallbackMessage() || partyBound()) {
+    retry?.classList.add('hidden')
+    return
+  }
   const el = $('daemonState'), state = daemonState
   // a refused frame still means the service is there
   if (el) el.textContent = state === 'connected' || state === 'rejected' ? 'Connected' : state === 'no-device' ? 'Running, no keyboard found'
     : state === 'unavailable' || state === 'disconnected' ? 'Not running: the light service did not answer' : state === 'checking' ? 'checking…' : state
-  const retry = $('daemonRetry')
   if (retry) retry.classList.toggle('hidden', IS_WIN || IS_NATIVE_HOST || !['unavailable', 'disconnected', 'no-device'].includes(state))
 }
 function retryDaemon() {
@@ -4650,7 +8394,7 @@ function retryDaemon() {
   daemonState = 'checking'
   showDaemonState()
   const api = window.keylightNative && window.keylightNative.daemon
-  if (api && BUNDLED_DAEMON) api.retry().then((st) => { if (st && st.port) daemon.setPort(st.port) }).catch(() => {})
+  if (api && EXPECT_DAEMON) api.retry().then((st) => { if (st && st.port) daemon.setPort(st.port) }).catch(() => {})
   daemon.retry()
 }
 // The light service sees a different number of keyboards. Its order changes with replugging, so
@@ -4663,38 +8407,38 @@ function serviceBoardsChanged() {
     saveSettings()
     daemon.setLeft(settings.kbLightsLeft)
   }
-  const changed = two !== serviceCountsTwo
   serviceCountsTwo = two
   if (midi) bindMidiPorts()      // two inputs may now be, or stop being, two keyboards
   holdPairOctave()
-  if (changed) applyKeyCount()
 }
 function initDaemon() {
   if (IS_NATIVE_HOST) return
-  daemon = new LedDaemon((state, info, device) => {
-    if (state === 'info') { showKeyboardInfo(info); return }   // a battery update from the same keyboard
-    // a second keyboard came or went, the first still being driven
-    if (state === 'boards') {
-      console.log('LED daemon keyboards=' + daemon.count)
-      serviceBoardsChanged()
-      daemon.brightness(settings.brightness)
-      applyDeviceMode()
-      return
-    }
+  daemon = new LedDaemon((state) => {
+    if (state === 'info') { showKeyboardInfo(); return }
     const was = daemonState
-    daemonState = state
-    showDaemonState()
-    updateKbChip()
-    if (state !== 'rejected') showKeyboardInfo(state === 'connected' ? device : null)
-    if (state === 'no-device' && serviceCountsTwo) { serviceCountsTwo = false; if (midi) bindMidiPorts(); applyKeyCount() }
-    if (state === 'connected') {
-      console.log('LED daemon ready device=' + (info || '?'))
-      daemon.brightness(settings.brightness)
+    daemonState = state === 'boards' ? 'connected' : state
+    if (state === 'connected' || state === 'boards') {
       serviceBoardsChanged()
-      applyDeviceMode()
-      setKeyboardWindow(player && song ? (song.fitStart ?? player.windowStart) : kbBase())
-    } else if (state !== was) console.log('LED daemon: ' + state)   // it retries every 2 s
-  }, handleKeyButton, onDeviceConfig)
+      if (daemonFrames()) {
+        clearNoteLights()
+        daemon.brightness(settings.brightness)
+        applyDeviceMode()
+        if (state === 'connected' && canMoveOctave()) setKeyboardWindow(player && song ? (song.fitStart ?? player.windowStart) : kbBase())
+      }
+    } else if (!daemonOwnsKeyboard() && serviceCountsTwo) {
+      serviceCountsTwo = false
+      if (midi) bindMidiPorts()
+    } else if (state === was) return
+    syncOwnColours()
+    syncKeyboardChoice()
+    applyKeyCount()
+    showDaemonState()
+    showKeyboardInfo()
+    if (state !== was) console.log('LED daemon: ' + (daemonIssue() || state))
+  }, (id, action) => {
+    if ((id === 1 || id === 2) && !daemonFrames()) return
+    handleKeyButton(id, action)
+  }, onDeviceConfig)
   daemon.setLeft(settings.kbLightsLeft)
   daemon.connect()
   watchDaemonService()
@@ -4705,7 +8449,7 @@ function initDaemon() {
 // setup and Settings; a new port reconnects there; Try again also asks the app to look again.
 function watchDaemonService() {
   const api = window.keylightNative && window.keylightNative.daemon
-  if (!api) return
+  if (!api || !EXPECT_DAEMON) return
   const apply = (st) => {
     if (!st || st.state === 'none') return
     svcState = st.state; svcReason = st.reason || ''
@@ -4717,15 +8461,26 @@ function watchDaemonService() {
   api.status().then(apply).catch(() => {})
 }
 
-// Battery from the light service: a row under Light service in Settings, and the keyboard
-// chip's tooltip; once a session, a word when it runs low off the charger.
+// Battery in Settings and the keyboard chip, from the daemon or from BLOCKS topology.
 let lowBatteryWarned = false
-function showKeyboardInfo(dev) {
-  const all = daemon && daemon.devices && daemon.devices.length ? daemon.devices : (dev ? [dev] : [])
+function showKeyboardInfo() {
+  let all = daemon?.devices || []
+  if (!all.length) {
+    const blocks = new Map((pageLightBlocks() || []).map((b) => [b.serial, b]))
+    for (const { link: { info } } of blockLinks.values()) {
+      for (const b of info?.blocks || []) {
+        if (!blocks.has(b.serial) || b.index === info.master) blocks.set(b.serial, b)
+      }
+    }
+    all = [...blocks.values()].filter((b) => b.model).map((b) => ({
+      battery: b.battery == null ? null : Math.round(b.battery / 31 * 100),
+      charging: b.charging
+    }))
+  }
   const text = all
-    .map((d, i) => d && d.battery != null ? (all.length > 1 ? 'Keyboard ' + (i + 1) + ': ' : '') + d.battery + '%' + (d.charging ? ' · charging' : '') : '')
+    .map((d, i) => d && d.battery != null ? (all.length > 1 ? 'Keyboard ' + (i + 1) + ': ' : '') + d.battery + '%' + (d.charging ? dot() + 'charging' : '') : '')
     .filter(Boolean)
-    .join('  ·  ')
+    .join(IS_IOS ? '; ' : '  ·  ')
   const row = $('batteryRow')
   if (row) { row.classList.toggle('hidden', !text); $('kbBattery').textContent = text }
   const chip = $('kbStatus')
@@ -4742,9 +8497,8 @@ function showKeyboardInfo(dev) {
 }
 
 // The keyboard's buttons, numbered like its Littlefoot handleButtonDown: 0 mode, 1 minus,
-// 2 plus, 3 left arrow, 4 right arrow; blocksd reports press and release. − / + always move
-// the octave (the app owns it, so the lit keys and the keys' notes move together); the
-// arrows and the mode button do what fits where you are.
+// 2 plus, 3 left arrow, 4 right arrow. In-app lights follow the keyboard's own octave.
+// The arrows and mode button do what fits where you are.
 const MODE_HOLD_MS = 600
 let modeHold = null             // the mode button while it is down in the player
 let buttonIdWarned = false
@@ -4752,8 +8506,9 @@ let buttonIdWarned = false
 function keyButtonAction(id, at) {
   if (id === 1) return 'octave-down'
   if (id === 2) return 'octave-up'
+  if (at.overlay) return null
   if (id === 0) return at.player ? 'mode-hold' : 'light-style'
-  if ((id !== 3 && id !== 4) || at.overlay) return null    // nothing behind the welcome or import sheet
+  if (id !== 3 && id !== 4) return null
   const right = id === 4
   if (at.results) return right ? 'results-next' : 'results-close'
   if (at.freeplay) return right ? 'scale-next' : 'scale-prev'
@@ -4766,7 +8521,7 @@ function keyButtonContext() {
   const results = shown('results')
   const play = screen === 'play' && !results
   return {
-    screen, results, overlay: shown('onboarding') || shown('importSheet'),
+    screen, results, overlay: !!handGuideRun || shown('onboarding') || shown('importSheet') || !!document.querySelector('dialog[open]'),
     freeplay: play && freeplay, player: play && !freeplay && !!player && !!song, loopSections: play && !freeplay && !!loopSections()
   }
 }
@@ -4808,7 +8563,7 @@ function handleKeyButton(id, action, at = null) {
     status('Scale: ' + freeScaleLabel())
   } else if (what === 'loop-later' || what === 'loop-earlier') walkLoop(what === 'loop-later' ? 1 : -1)
   else if (what === 'play-pause') togglePlay()
-  else if (what === 'restart') { cancelCeremony(); player.restart() }
+  else if (what === 'restart') restartSong()
   else if (what === 'continue') $('continuePlay').click()
 }
 
@@ -4845,7 +8600,7 @@ function walkLoop(dir) {
 //   User   your own colour for everything
 // Pro and User mark every C faintly (in its hand's colour / yours) so you can find your place.
 const LIGHT_STYLES = ['Piano', 'Pro', 'Stage', 'User']
-const STYLE_LABELS = { Piano: 'Piano — white', Pro: 'Pro — hand colours', Stage: 'Stage — a colour per note', User: 'User — your own colour' }
+const STYLE_LABELS = { Piano: 'Piano: white', Pro: 'Pro: hand colours', Stage: 'Stage: a colour per note', User: 'User: your own colour' }
 const lightStyle = () => (LIGHT_STYLES.includes(settings.keyboardMode) ? settings.keyboardMode : 'Pro')
 let stylePreviewAt = 0          // a new style sweeps across the keys once
 const letGoAt = new Map()       // pitch -> when the key came up (its light fades out)
@@ -4864,11 +8619,34 @@ function cycleLightStyle() {
 
 // LED level for the next note group. LEDs are linear while eyes are not, so
 // "dim" has to be far below half to read as clearly dimmer than "now".
-const NEXT_LEVEL = 0.16
-const REST_LEVEL = 0.1
+const NEXT_LEVEL = 0.30
+const REST_LEVEL = 0.22
+let nextPreviewAt = 0     // when a light setting last changed: restFrame() shows both styles for 2.5 s
 // Scale a colour down without losing its hue: RGB565 drops anything under 8,
 // so non-zero channels keep at least one step.
 function dimRgb(c, k) { return c.map((v) => (v === 0 ? 0 : Math.max(8, Math.round(v * k)))) }
+// How bright the keys waiting for you breathe: ~1 Hz between 0.3 and 1, or steady.
+function waitLevelAt(now) {
+  if (settings.waitStyle === 'steady' || prefersReducedMotion()) return 1
+  return 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(now / 160))
+}
+// progress rises from 0 to 1 as the next note gets closer. null keeps the glow steady.
+function nextBrightness(now, progress) {
+  const style = settings.nextStyle || 'glow'
+  if (style === 'off') return 0
+  if (prefersReducedMotion()) return NEXT_LEVEL
+  if (style === 'pulse') return NEXT_LEVEL + 0.15 * Math.sin((now / 1000) * 2 * Math.PI * 0.55)
+  if (style === 'buildup' && progress != null) return 0.08 + 0.52 * progress ** 2
+  return NEXT_LEVEL
+}
+function nextLevelAt(n, snap, now) {
+  let progress = null
+  if (!snap.waiting && snap.position != null && snap.tempo > 0 && n && n.start != null) {
+    const span = 1.5 * 60 / snap.tempo
+    progress = 1 - Math.min(1, Math.max(0, n.start - snap.position) / span)
+  }
+  return nextBrightness(now, progress)
+}
 function stageRgb(pitch) {
   const h = (((pitch % 12) + 12) % 12) / 12
   const k = (n) => (n + h * 12) % 12
@@ -4895,6 +8673,7 @@ function restRgb(pitch, i, style = lightStyle()) {
   if (pc !== 0 || style === 'Piano') return [0, 0, 0]
   return dimRgb(pressRgb(pitch, i, style), REST_LEVEL)
 }
+const quizHintRgb = () => quiz?.course ? dimRgb(userRgb(), REST_LEVEL) : userRgb()
 const brighter = (a, b) => a.map((v, c) => Math.max(v, b[c]))
 // Keys you are playing, on top of `frame`: full light while held, fading out over
 // a quarter second after you let go.
@@ -4933,9 +8712,9 @@ function drawOctaveSweep(frame, base) {
     if (k > 0) frame[i] = brighter(frame[i], dimRgb(pressRgb(base + i, i), k))
   }
 }
-// The setup's keyboard step pulses the end key to press next (key 0, then key 23)
+// The setup's "Set key range" pulses the end key to press next (key 0, then key 23)
 function drawSetupGuide(frame, base) {
-  if (!setup.open || SETUP_STEPS[setup.step] !== 'keyboard' || setup.rangeDone || !midiInput) return
+  if (!setup.open || !setup.ranging || setup.rangeDone || !midiInput) return
   const i = setup.lowKey == null ? 0 : frame.length - 1
   const k = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(performance.now() / 160))
   frame[i] = brighter(frame[i], dimRgb(pressRgb(base + i, i), k))
@@ -4944,14 +8723,39 @@ function drawSetupGuide(frame, base) {
 // whatever you play.
 function restFrame() {
   const base = kbBase()
+  if (handGuideRun) {   // hand placement: only the guide's keys and the ones you play
+    const dark = Array.from({ length: lightKeys() }, () => [0, 0, 0])
+    drawPlayedKeys(dark, base, 0.4)
+    drawHandGuide(dark, base)
+    return dark
+  }
+  if (screen === 'quiz') {
+    const frame = Array.from({ length: lightKeys() }, () => [0, 0, 0])
+    for (const pitch of quizHintPitches()) if (pitch >= base && pitch < base + frame.length) frame[pitch - base] = quizHintRgb()
+    drawPlayedKeys(frame, base)
+    return frame
+  }
   const frame = Array.from({ length: lightKeys() }, (_, i) => restRgb(base + i, i))
-  for (const pitch of quizHintPitches()) if (pitch >= base && pitch < base + frame.length) frame[pitch - base] = userRgb()
   for (const pitch of jamLitPitches()) frame[pitch - base] = userRgb()
   drawPlayedKeys(frame, base)
   drawStylePreview(frame, base)
   drawOctaveSweep(frame, base)
   drawSetupGuide(frame, base)
+  drawNextPreview(frame)
   return frame
+}
+
+// Settings preview: for 2.5 s after either light setting changes, two keys near the middle of
+// the visible row show it: a "now" key in the wait style and a "next" key (two semitones up) in the next style.
+function drawNextPreview(frame) {
+  const now = performance.now(), age = now - nextPreviewAt
+  if (!nextPreviewAt || age < 0 || age > 2500) return
+  const i = Math.floor(frame.length / 2)
+  const rgb = hexToRgb(COLORS.hand.right)
+  frame[i] = dimRgb(rgb, waitLevelAt(now))
+  if (i + 2 >= frame.length) return
+  const k = nextBrightness(now, (age % 1500) / 1500)
+  if (k > 0) frame[i + 2] = dimRgb(rgb, k)
 }
 
 function buildKeyFrame(s) {
@@ -4973,6 +8777,7 @@ function buildKeyFrame(s) {
     return frame
   }
   if (!s || !s.song) return frame
+  if (handGuideRun) { drawPlayedKeys(frame, s.windowStart, 0.3); drawHandGuide(frame, s.windowStart); return frame }   // "Place your hands"
   const snap = s.snapshot
   const mode = lightStyle()
   const ws = s.windowStart
@@ -4983,7 +8788,7 @@ function buildKeyFrame(s) {
   const ctxNow = ac ? ac.currentTime : 0
   if (s.countInUntil && s.countInUntil > ctxNow) {
     // on the beat of the running count-in, which follows the speed (tempo x rate)
-    const beats = Math.max(1, player ? player.countIn : 4)
+    const beats = Math.max(1, player ? (player._countInRunBeats || player.countIn) : 4)
     const beat = (s.countInStart > 0 ? s.countInUntil - s.countInStart : s.countInSeconds) / beats
     const phase = beat > 0 ? (((ctxNow - s.countInStart) / beat) % 1 + 1) % 1 : 0
     const k = 0.2 + 0.8 * Math.pow(1 - phase, 3)
@@ -4994,13 +8799,13 @@ function buildKeyFrame(s) {
   // keys you are playing that the song isn't asking for: a softer version of your light
   drawPlayedKeys(frame, ws, 0.3)
   drawOctaveSweep(frame, ws)
-  // next group: dim, in its hand colour
-  for (const n of snap.upcomingNotes) put(n.pitch, dimRgb(noteRgb(n, mode), NEXT_LEVEL))
+  // next group: dim in its hand colour (glow, slow pulse, build-up or off: see nextLevelAt)
+  for (const n of snap.upcomingNotes) { const k = nextLevelAt(n, snap, now); if (k > 0) put(n.pitch, dimRgb(noteRgb(n, mode), k)) }
   // sounding now: full colour
   for (const n of snap.activeNotes) put(n.pitch, noteRgb(n, mode))
   // waiting for you: the keys to press breathe in their hand colour
   if (snap.waiting) {
-    const pulse = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(now / 160))
+    const pulse = waitLevelAt(now)
     for (const n of snap.waitNotes || []) if (snap.needPitches.has(n.pitch)) put(n.pitch, dimRgb(noteRgb(n, mode), pulse))
   }
   // judgement flashes win over everything
@@ -5030,7 +8835,7 @@ function resize() {
   const locked = isRecording() && (w !== canvas.width || h !== canvas.height)
   canvas.classList.toggle('take-locked', locked)
   if (!$('sheetStrip').classList.contains('hidden')) sheet.place()
-  if (locked) return
+  if (locked || (w === canvas.width && h === canvas.height && dpr === stageDpr)) return
   canvas.width = w
   canvas.height = h
   stageDpr = dpr
@@ -5039,16 +8844,21 @@ function resize() {
 
 // Send a key frame only when it changed (the daemon is ACK-gated anyway).
 function sendKeys(frame) {
-  if (!framesDrive() || frame.join('|') === daemon.lastSig) return
-  daemon.send(frame)
+  if (!framesDrive() || frame.join('|') === lightSink.lastSig()) return
+  lightSink.send(frame)
 }
 
 // Away from a song the only keys lit by note are the ones you hold and a note game's hint.
 function idleNoteLights() {
+  updatePartyLights(null)     // a key-light keyboard: quiz hints, jam and the hand guide only (never held keys)
   if (framesDrive()) return
   const desired = new Map()
-  if (midiOutput) {
-    for (const pitch of quizHintPitches()) desired.set(pitch, noteLightColour(userRgb()))
+  if (hasNoteLightPort() && handGuideRun) { addHandGuideNoteLights(desired); addHeldNoteLights(desired) }
+  else if (hasNoteLightPort()) {
+    for (const pitch of quizHintPitches()) {
+      const colour = noteLightColour(quizHintRgb())
+      desired.set(pitch, quiz.course ? asNext(colour) : colour)
+    }
     for (const pitch of jamLitPitches()) desired.set(pitch, noteLightColour(userRgb()))
     addHeldNoteLights(desired)
   }
@@ -5062,7 +8872,8 @@ function freeplayScene(chordAlpha) {
     waiting: false, needPitches: new Set(), playing: false,
     countInUntil: 0, countInSeconds: 0, tempo: 120, now: performance.now() / 1000,
     handFilter: 'both', loop: {}, held: fpDemo ? new Set([...held, ...fpDemo]) : held, feedback,
-    scale: freeScalePcs(), scaleRoot: freeRoot, chordName: fpChord.name, chordAlpha
+    scale: freeScalePcs(), scaleRoot: freeRoot, chordName: fpChord.name, chordAlpha,
+    sustain: sustainDown(), heldVel: noteVel
   }
 }
 
@@ -5072,7 +8883,7 @@ function frame(ts) {
   syncOwnColours()
   if (screen === 'settings') drawCamera($('camSetupCanvas'))
   if (screen === 'quiz') updateQuiz()
-  if (screen !== 'play' || freeplay) idleNoteLights()
+  if (screen !== 'play' || freeplay) { idleNoteLights(); tvTick() }
   if (screen !== 'play') {
     if (performance.now() > ledOverrideUntil) sendKeys(restFrame())
     return
@@ -5084,6 +8895,7 @@ function frame(ts) {
   // has taken the last one.
   if (ts - lastFrame < 1000 / 60 - 3) return
   lastFrame = ts
+  if (stageResizePending) { stageResizePending = false; resize() }
 
   // the ratio the stage was sized for, not the window's: they differ while a take keeps
   // the stage's size after the window's ratio changed (a zoom, another screen)
@@ -5104,31 +8916,37 @@ function frame(ts) {
   if (!player || !song) return
 
   const snap = player.tick()
+  announceWaitNotes(snap)
+  tvTick()
   player.snapshot.activeNotes = snap.activeNotes
   player.snapshot.upcomingNotes = snap.upcomingNotes
 
-  if (!$('screen-play').classList.contains('sheet-only')) try {
+  const guideScene = songGuideScene()   // "Place your hands": the drawn keys show the same cues as the lit ones
+  if (!$('screen-play').classList.contains('sheet-only') && !tvHidesNotes()) try {   // a TV shows the notes; the phone shows only the remote
   const geo = drawScene(ctx2d, W, H, {
     position: snap.position,
     notes: player.speedNotes,
-    activeNotes: snap.activeNotes,
-    upcomingNotes: snap.upcomingNotes,
+    activeNotes: guideScene ? [] : snap.activeNotes,
+    upcomingNotes: guideScene ? guideScene.placed : snap.upcomingNotes,
     view: settings.view,
     noteLabels: settings.labels,
     windowStart: snap.windowStart,
-    waiting: snap.waiting,
-    needPitches: snap.needPitches,
+    waiting: guideScene ? true : snap.waiting,
+    needPitches: guideScene ? guideScene.need : snap.needPitches,
     playing: snap.playing,
     countInStart: snap.countInStart,
     countInUntil: snap.countInUntil,
     countInSeconds: snap.countInSeconds,
-    countIn: player.countIn,
+    countIn: player._countInRunBeats || player.countIn,   // the running count-in's own length (a bar when the meter is known)
     tempo: snap.tempo,
     now: snap.now,
     handFilter: snap.handFilter,
     loop: snap.loop,
     held,
-    waitNotes: snap.waitNotes,
+    waitNotes: guideScene ? guideScene.waitNotes : snap.waitNotes,
+    // the drawn "Your turn" pill: not over the hand guide card or beside the armed-start pill, and below the floating top bar
+    waitPill: !guideScene && !waitArmed(),
+    hudTop: snap.waiting && !guideScene ? waitPillTop() : 0,
     feedback,
     backdrop: backdropImg
   })
@@ -5148,9 +8966,11 @@ function frame(ts) {
   updateSheet(snap)
 
   // lights
+  updatePartyLights(snap)     // a key-light keyboard: paused is dark, playing lights the notes to play
   if (!framesDrive()) {
     const desired = new Map()
-    if (midiOutput) {
+    if (hasNoteLightPort() && handGuideRun) { addHandGuideNoteLights(desired); addHeldNoteLights(desired) }
+    else if (hasNoteLightPort()) {
       const style = lightStyle()
       for (const n of snap.activeNotes) desired.set(n.pitch, noteLightColour(noteRgb(n, style)))
       for (const n of snap.upcomingNotes) if (!desired.has(n.pitch)) desired.set(n.pitch, asNext(noteLightColour(nextNoteColour(n, style))))
@@ -5187,14 +9007,16 @@ function frame(ts) {
     mA.style.left = at(loop.a) + '%'
     mB.style.left = at(loop.b) + '%'
   } else { region.style.display = mA.style.display = mB.style.display = 'none' }
+  if (playerHud && hudTickSong !== song) { hudTickSong = song; playerHud.setTicks(song.bars, secFrom, secLen) }
   const fmt = (t) => Math.floor(t / 60) + ':' + String(Math.floor(t % 60)).padStart(2, '0')
   $('timeLabel').textContent = fmt(Math.max(0, snap.position - secFrom)) + ' / ' + fmt(secLen)
   setPlayIcon(snap.playing || snap.waiting)
+  syncStartCues()
   $('playhead').style.left = (pct * 100).toFixed(2) + '%'
   if (player.mode === 'WATCH') $('scoreHud').textContent = 'Watching'
   else if (player.score) {
     const s = summarize(player.score)
-    $('scoreHud').textContent = s.totalNotesHit + s.missed ? `${Math.round(s.overallAccuracy * 100)}% · ${s.totalNotesHit} hit` : `${player.score.total} notes`
+    $('scoreHud').textContent = s.totalNotesHit + s.missed ? `${Math.round(s.overallAccuracy * 100)}%${dot()}${s.totalNotesHit} hit` : `${player.score.total} notes`
   }
 }
 
@@ -5213,6 +9035,8 @@ let toastTimer = null
 function status(msg, action) {
   const el = $('status')
   if (!el || !msg) return
+  // the Results sheet is modal: the player's "Ready..." cue would sit on top of its stars; other notices still show
+  if (!action && msg.startsWith('Ready') && !$('results')?.classList.contains('hidden')) return
   el.textContent = msg
   el.classList.toggle('has-action', !!action)
   if (action) {
@@ -5234,6 +9058,7 @@ function askConfirm(title, text, ok = 'OK', danger = true) {
   const back = document.activeElement
   $('confirmTitle').textContent = title
   $('confirmText').textContent = text
+  if (danger) haptic('warning')
   const okBtn = $('confirmOk')
   okBtn.textContent = ok
   okBtn.className = danger ? 'ghost danger' : 'primary'
@@ -5249,16 +9074,19 @@ function askConfirm(title, text, ok = 'OK', danger = true) {
 
 // What to try when no keyboard shows up
 function noKeyboardNextStep() {
-  return IS_WIN ? 'If it still isn’t found, install the keyboard maker’s Connect app (it adds the USB driver), then unplug and replug it.'
+  return IS_WIN ? 'Close other apps that use the keyboard, then unplug it and plug it back in.'
+    : IS_IOS ? 'You can also tap the keys on the screen to play.'
     : 'Try another cable or USB port, then replug it.'
 }
-function supportDeviceAction() { return { label: 'Support my device', run: () => deviceSupport && deviceSupport.open(0) } }
-function keyboardSettingsAction() { return { label: 'Keyboard settings', run: () => jumpSettings('setLights', true) } }
+function supportDeviceAction() { return deviceSupport ? { label: 'Support my device', run: () => deviceSupport.open(0) } : undefined }   // every platform: on iPhone/iPad it emails or shares the report
+function keyboardSettingsAction() { return { label: 'Keyboard settings', run: () => jumpSettings('setKeyboard', true) } }
 let paintJump = null, jumpLock = '', jumpLockTill = 0   // the chip you clicked stays lit until you scroll yourself
 function jumpSettings(id, open) {
   if (open && screen !== 'settings') showScreen('settings')
   const card = $(id)
   if (!card) return
+  const fold = card.closest('details')   // a section inside a collapsed group (Advanced) opens first
+  if (fold && !fold.open) fold.open = true
   jumpLock = id; jumpLockTill = performance.now() + 1200   // the smooth scroll's own events don't count
   if (paintJump) paintJump()
   const calm = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -5287,7 +9115,7 @@ setInterval(() => { if (screen === 'settings') for (const r of document.querySel
 
 // The jump chip for the card being read lights up as Settings scrolls
 if ($('screen-settings') && $('settingsJump')) {
-  const order = ['setLights', 'setSound', 'setDisplay', 'setPractice', 'setExternal', 'setCamera', 'setProgress', 'setExperimental', 'airCard']
+  const order = ['setKeyboard', 'setSound', 'setLights', 'setPlaying', 'setPractice', 'setDisplay', 'setCamera', 'setProgress', 'setAdvanced', 'setExperimental', 'airCard']
   const chipFor = id => id === 'airCard' ? 'setExperimental' : id
   let queued = false
   const paint = () => {
@@ -5296,7 +9124,7 @@ if ($('screen-settings') && $('settingsJump')) {
     if (screen !== 'settings') return
     // the card read last: the one lowest above the line (cards side by side tie, the first in order wins)
     let active = order[0], best = -Infinity
-    for (const id of order) { const el = $(id); if (!el) continue; const top = el.getBoundingClientRect().top; if (top <= 190 && top > best) { best = top; active = id } }
+    for (const id of order) { const el = $(id); if (!el?.getClientRects().length) continue; const top = el.getBoundingClientRect().top; if (top <= 190 && top > best) { best = top; active = id } }
     if (sc.scrollTop + sc.clientHeight >= sc.scrollHeight - 4) active = order.filter((id) => $(id) && $(id).getClientRects().length).pop()
     if (jumpLock && performance.now() < jumpLockTill) active = jumpLock
     else jumpLock = ''
@@ -5340,14 +9168,19 @@ async function runSelfTest() {
   // shows the Windows page really ran on Windows) and whether Web MIDI with sysex opens.
   // The MIDI check runs with nokb too: it only lists the ports, never listens or sends,
   // and closes them again (a CI runner has none, so it expects 0 and 0 there).
-  console.log(`SELFTEST platform isWin=${IS_WIN} reported=${(navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || 'unknown'}`)
+  console.log(`SELFTEST platform isWin=${IS_WIN} reported=${(navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || 'unknown'} viewport=${innerWidth}x${innerHeight}`)
   try {
     const m = await Promise.race([navigator.requestMIDIAccess({ sysex: true }),
       new Promise((_r, reject) => setTimeout(() => reject(new Error('no answer in 10 s')), 10000))])
     const ports = [...m.inputs.values(), ...m.outputs.values()]
+    if (!m.sysexEnabled) throw new Error('SysEx was not enabled')
     console.log(`SELFTEST midi access ok sysex=${m.sysexEnabled} inputs=${m.inputs.size} outputs=${m.outputs.size}`)
     for (const port of ports) port.close().catch(() => {})
-  } catch (e) { console.log('SELFTEST midi access FAIL ' + ((e && (e.name + ': ' + e.message)) || e)) }
+  } catch (e) {
+    const platform = navigator.userAgentData?.platform || navigator.platform
+    const unavailable = /Linux/i.test(platform) && e?.name === 'InvalidStateError' && e.message === 'Platform dependent initialization failed.'
+    console.log(`SELFTEST midi access ${unavailable ? 'SKIP Linux MIDI backend unavailable:' : 'FAIL'} ${e}`)
+  }
   try {
     const res = await fetch('songs/twinkle.xml')
     song = await loadSongFile({ name: 'twinkle.xml', text: () => res.text() })
@@ -5511,10 +9344,18 @@ async function runSelfTest() {
     }
     // O) hand tracking model loads and runs (no camera needed)
     try {
-      const { selfTestLandmarker } = await import('./handtrack.js')
-      const t0 = performance.now()
-      const n = await selfTestLandmarker()
-      console.log(`SELFTEST hands model ok, hands on a blank picture=${n} in ${((performance.now() - t0) / 1000).toFixed(1)}s`)
+      const probe = document.createElement('canvas')
+      const gl = probe.getContext('webgl2')
+      // only a Linux test box may lack WebGL 2; anywhere else that is a failure
+      const linux = /Linux/i.test(navigator.userAgentData?.platform || navigator.platform || '')
+      if (!gl) console.log(linux ? 'SELFTEST hands model SKIP WebGL 2 context unavailable' : 'SELFTEST hands FAIL WebGL 2 context unavailable')
+      else {
+        gl.getExtension('WEBGL_lose_context')?.loseContext()
+        const { selfTestLandmarker } = await import('./handtrack.js')
+        const t0 = performance.now()
+        const n = await selfTestLandmarker()
+        console.log(`SELFTEST hands model ok, hands on a blank picture=${n} in ${((performance.now() - t0) / 1000).toFixed(1)}s`)
+      }
       const ht = new HandTracker()
       ht.calib = { a: { x: 0.1, y: 0.5 }, b: { x: 0.9, y: 0.5 } }
       const q = ht.project({ x: 0.5, y: 0.52 })
@@ -5642,24 +9483,27 @@ async function runSelfTest() {
     settings.keyboardMode = 'Piano'; cycleLightStyle()
     console.log('SELFTEST mode button Piano->' + settings.keyboardMode + ' (expect Pro)')
     settings.keyboardMode = savedStyle
-    const savedExpr = settings.expression
-    settings.expression = false
+    const savedExpr = settings.expression, savedGlide = settings.glide
+    settings.expression = false; settings.glide = false
     const off = desiredDeviceConfig()
-    settings.expression = true
+    settings.expression = true; settings.glide = true
     const on = desiredDeviceConfig()
-    settings.expression = savedExpr
+    settings.expression = savedExpr; settings.glide = savedGlide
     console.log('SELFTEST device config off=' + [2, 102, 103, 109, 110, 116, 117, 123, 124].map((k) => off[k]).join('') +
       ' on=' + [2, 102, 103, 109, 110, 116, 117, 123, 124].map((k) => on[k]).join('') + ' (expect 000000000 / 111111111)')
 
     // N) render smoke test (count-in HUD used to crash with s.now number)
     try {
-      drawScene(ctx2d, canvas.width / stageDpr, canvas.height / stageDpr, {
+      const scene = {
         position: 0.5, notes: song.notes, activeNotes: [], upcomingNotes: [],
         view: 'CASCADE', noteLabels: 'names', windowStart: player ? player.windowStart : 60,
         waiting: true, needPitches: new Set([60]), playing: true,
-        countInUntil: audioContext() ? audioContext().currentTime + 2 : 0, countInSeconds: 2.5,
-        tempo: 120, now: performance.now() / 1000, handFilter: 'both', loop: {}
-      })
+        countInStart: 9.5, countInUntil: 12, countInSeconds: 2.5,
+        tempo: 120, now: 10, handFilter: 'both', loop: {}
+      }
+      const probe = document.createElement('canvas').getContext('2d')
+      drawScene(probe, 320, 150, scene)
+      drawScene(probe, 16, 1, scene)  // a collapsed stage must still have finite projection coordinates
       console.log('SELFTEST render ok')
     } catch (e) { console.log('SELFTEST render FAIL ' + e.message) }
 
@@ -5672,10 +9516,10 @@ async function runSelfTest() {
       const e = [readEndKeys(null, 48, 48), readEndKeys(48, 71, 48), readEndKeys(60, 83, 48), readEndKeys(null, 50, 48)]
       console.log(`SELFTEST setup end keys low=${e[0].low} done=${e[1].done} shift=${e[1].shift} octaveOff=${e[2].shift} wrong=${e[3].wrong} (expect 48 true 0 12 50)`)
       const onboarded = store.get('lumi.onboarded', false)
-      openSetup(2)
+      openSetup('connect')
       const shown = !$('onboarding').classList.contains('hidden') && $('onboarding').dataset.step
       closeSetup()
-      console.log(`SELFTEST setup opened=${shown} closed=${$('onboarding').classList.contains('hidden')} appInert=${$('app').inert} onboardedKept=${store.get('lumi.onboarded', false) === onboarded} (expect keyboard true false true)`)
+      console.log(`SELFTEST setup opened=${shown} closed=${$('onboarding').classList.contains('hidden')} appInert=${$('app').inert} onboardedKept=${store.get('lumi.onboarded', false) === onboarded} (expect connect true false true)`)
     }
     // Q) octave − / +: the range moves 12 and back, and the sweep travels the way it moved
     {
@@ -6009,6 +9853,29 @@ async function runSelfTest() {
       console.log(`SELFTEST engine scheduler boundary note2.5=x${count(notesAt, 2.5)} click2.5=x${count(clicksAt, 2.5)} notes=${notesAt.length} clicks=${clicksAt.length} (expect x1 x1 8 6)`)
     }
 
+    // Wait mode starts on the first key (the right one counts, no count-in); timed play always
+    // counts in, also on a resume from the middle (one bar of the song's meter, from the bar start)
+    {
+      const clk = { currentTime: 50 }
+      const sg = (extra = {}) => ({ title: 'start', tempo: 120, duration: 12, ...extra, notes: [4, 5, 6, 7].map((t, i) => ({ pitch: 60 + i, start: t, dur: 0.4, vel: 90, hand: 'right' })) })
+      const pa = new Player({ getCtx: () => clk })
+      pa.load(sg()); pa.setCountIn(4); pa.setMode('PRACTISE')
+      const armedBefore = pa.armed
+      pa.startArmed()
+      const waitingOn = pa.waiting && pa.needPitches.has(60) && pa._countInUntil === 0
+      pa.noteOn(60)
+      const counted = pa.score.expected[0].state === 'hit' && pa.playing && !pa.waiting
+      const armedAfter = pa.armed
+      console.log(`SELFTEST engine armed wait armed=${armedBefore} waitingOnFirst=${waitingOn} firstCounted=${counted} armedWhileRunning=${armedAfter} (expect true true true false)`)
+      const pr = new Player({ getCtx: () => clk })
+      pr.load(sg({ timeSignature: { beats: 3, beatType: 4 } })); pr.setCountIn(4); pr.setMode('PLAY')
+      pr.seek(4.0); pr.play()
+      const secs = pr._countInUntil - pr._countInStart
+      console.log(`SELFTEST engine resume countIn pos=${pr.position.toFixed(2)} beats=${pr._countInRunBeats} secs=${secs.toFixed(2)} (expect 3.00 3 1.50: one 3/4 bar, from the bar start)`)
+      pr.pause(); pr.setCountIn(0); pr.play()
+      console.log(`SELFTEST engine resume countIn off=${pr._countInUntil === 0 && pr.playing} (expect true: 0 stays off)`)
+    }
+
     // Other keyboards: choosing the port, the 49-key ROLI Piano, a MIDI file. Songs opened here
     // would move a real keyboard through blocksd, so this runs only off it (scripts/selftest.js).
     if (daemon) console.log('SELFTEST keyboards skipped: the light service is in use')
@@ -6021,6 +9888,22 @@ async function runSelfTest() {
       check('auto skips a loopback', got === 'USBMidi2-ACX/-', got)
       got = pick(['LoopBe Internal MIDI', 'ROLI Piano'], ['LoopBe Internal MIDI', 'ROLI Piano'])
       check('auto finds the piano', got === 'ROLI Piano/ROLI Piano', got)
+      got = pick(['MIDIIN2 (LUMI Keys BLOCK)'], ['LUMI Keys BLOCK', 'MIDIOUT2 (LUMI Keys BLOCK)'])
+      check('Windows MIDI directions pair by device name', got === 'MIDIIN2 (LUMI Keys BLOCK)/MIDIOUT2 (LUMI Keys BLOCK)', got)
+      got = pick(['2- LUMI Keys BLOCK'], ['LUMI Keys BLOCK'], '2- LUMI Keys BLOCK')
+      check('a missing light port does not redirect to another keyboard', got === '2- LUMI Keys BLOCK/-', got)
+      got = pick(['LUMI Keys BLOCK'], ['MIDIOUT2 (LUMI Keys BLOCK)'])
+      check('Windows: a plain input lights its MIDIOUT-named output', got === 'LUMI Keys BLOCK/MIDIOUT2 (LUMI Keys BLOCK)', got)
+      got = pick(['LUMI Keys BLOCK', '2- LUMI Keys BLOCK'], ['LUMI Keys BLOCK', '2- LUMI Keys BLOCK'], '2- LUMI Keys BLOCK')
+      check('the second LUMI lights its own output', got === '2- LUMI Keys BLOCK/2- LUMI Keys BLOCK', got)
+      got = pick(['LUMI Keys BLOCK'], ['MIDIOUT2 (ROLI Piano)'])
+      check('a light keyboard never lights another model', got === 'LUMI Keys BLOCK/-', got)
+      got = pick(['2- LUMI Keys BLOCK'], ['MIDIOUT2 (2- LUMI Keys BLOCK)'])
+      check('Windows: the second LUMI finds its wrapped output', got === '2- LUMI Keys BLOCK/MIDIOUT2 (2- LUMI Keys BLOCK)', got)
+      got = pick(['LUMI Keys BLOCK', '2- LUMI Keys BLOCK'], ['MIDIOUT2 (LUMI Keys BLOCK)', 'MIDIOUT2 (2- LUMI Keys BLOCK)'], '2- LUMI Keys BLOCK')
+      check('Windows: two LUMIs never swap wrapped outputs', got === '2- LUMI Keys BLOCK/MIDIOUT2 (2- LUMI Keys BLOCK)', got)
+      got = pick(['LUMI Keys BLOCK'], ['LUMI Keys BLOCK Bluetooth'])
+      check('a USB LUMI never lights its Bluetooth twin', got === 'LUMI Keys BLOCK/-', got)
       got = pick(['loopMIDI-sim-in', 'USBMidi2-ACX'], ['USBMidi2-ACX'])
       check('auto skips a simulator port', got === 'USBMidi2-ACX/-', got)
       check('auto asks between unnamed inputs', pickPorts([port('Casio'), port('USBMidi2-ACX')], []).ask === true && pick(['Casio', 'USBMidi2-ACX'], []) === '-/-')
@@ -6036,13 +9919,16 @@ async function runSelfTest() {
       got = names(pickPorts([port('ROLI Piano', 'disconnected'), port('Casio')], [], 'ROLI Piano'))
       check('choice disconnected waits', got === '-/-', got)
       {
+        // a keyboard's own colours are never written before they are read and saved (blocks.js)
         const sent = [], fake = { name: 'fake', send: (m) => sent.push([...m]) }
-        blankOwnColours(fake)
-        const hex = sent.map((m) => m.map((b) => b.toString(16).padStart(2, '0')).join(' '))
-        check('own colours off, on both addresses', sent.length === 6 && hex.includes('f0 00 21 10 77 00 10 40 22 00 00 00 00 00 ' + hex[0].slice(-5)) && hex[1].includes('77 37 10 40 22') && hex.some((h) => h.includes('77 00 10 20 04 00 00 00 7e 03')) && hex.some((h) => h.includes('77 37 10 30 04 00 00 00 7e 03')), hex[0])
-        sent.length = 0
-        restoreOwnColours(fake)
-        check('own colours back', sent.length === 2 && sent[0].slice(6, 9).join() === [0x10, 0x40, 0x02].join())
+        const probe = new BlocksLink({ send: (m) => fake.send(m), store: { get: () => null, set() {} } })
+        probe.start(); probe.setDark(true)
+        const isSet = (m) => m[0] === 0xf0 && m[4] === 0x77 && m[6] === 0x10 && (m[7] & 0x0f) === 0
+        check('own colours stay until they are read', sent.length >= 2 && !sent.some(isSet), sent.length)
+        probe.stop()
+        check('black on black is an old blank, not a choice', looksBlanked({ 34: 0xff000000 | 0, 35: 0xff000000 | 0 }) && !looksBlanked({ 34: -1, 35: 0xff000000 | 0 }))
+        const ki = keyboardInfo()
+        check('keyboard info has every field', ['connected', 'family', 'name', 'keys', 'blocks', 'joined', 'lights', 'models', 'octave'].every((f) => f in ki) && Array.isArray(ki.models), JSON.stringify(ki))
         const near = (rgb, lo, hi) => { const v = velocityForColour(rgb); return v >= lo && v <= hi }
         check('colours to velocities', velocityForColour([255, 255, 255]) === 127 && near([255, 0, 0], 1, 12) && near([0, 255, 0], 55, 72) && near([0, 100, 255], 90, 108) && near([120, 60, 240], 110, 126), [velocityForColour([255, 0, 0]), velocityForColour([0, 255, 0]), velocityForColour([0, 100, 255])].join())
         check('styles light in different colours', new Set(['Piano', 'Pro', 'Stage'].map((st) => velocityForColour(noteRgb({ pitch: 62, hand: 'right' }, st)))).size === 3)
@@ -6085,11 +9971,12 @@ async function runSelfTest() {
         const sent = [], fake = { name: 'LUMI Keys BLOCK', state: 'connected', send: (m) => sent.push([...m]) }
         const out0 = midiOutput, style0 = lightStyle()
         await openLibrary('twinkle.xml')
+        cancelSongGuide()
         leaveApiMode()
         midiOutput = fake
-        blankedPorts.delete(fake)
         await new Promise((r) => setTimeout(r, 250))
-        const blanked = sent.some((m) => m[0] === 0xf0 && m[6] === 0x10 && m[7] === 0x40 && m[8] === 0x22)
+        // it never answered, so its own colours were left alone
+        const blanked = !sent.some((m) => m[0] === 0xf0 && m[4] === 0x77 && m[6] === 0x10 && (m[7] & 0x0f) === 0)
         const next = new Set([...player.activeNotes(), ...player.upcomingNotes()].map((n) => n.pitch))
         const lit = [...litNotes.keys()]
         check('only the next keys are lit', blanked && !framesDrive() && lit.length > 0 && lit.length <= 4 && lit.every((p) => next.has(p)), lit.join())
@@ -6103,9 +9990,79 @@ async function runSelfTest() {
         leaveApiMode()
         midiOutput = out0
         syncOwnColours()
-        check('own colours come back when the port goes', sent.some((m) => m[0] === 0xf0 && m[8] === 0x02) && !blankedPorts.has(fake))
+        check('the keyboard\'s link goes with its port', !blockLinks.has(fake))
         setLightStyle(style0, false)
         song = null; player = null
+      }
+      if (!midiInput2 && !document.hidden) {
+        // the page's own key lights on two joined LUMI Keys, each on its own Bluetooth link (two ports): each link
+        // lights the block that answers on it, the row's frame split 24 keys per block, left to right
+        const keep = [...blockLinks], daemon0 = daemon, got = {}
+        const fakeLink = (...owned) => ({
+          info: { blocks: [{ serial: 'LKBTESTLEFT', index: 15 }, { serial: 'LKBTESTRIGHT', index: 61 }], keys: 48, models: ['keys24', 'keys24'], indices: [15, 61], master: 15, joined: true, minOffset: 0 },
+          noReply: false, on: false, fail: false, fed: 0, wantDark: false, octave: null,
+          lightsState() { return !this.on ? 'idle' : this.fail ? 'failed' : 'ready' },
+          lightsDetails() { return this.on ? owned.map((serial) => ({ serial, state: this.fail ? 'failed' : 'ready', reason: this.fail ? 'timeout' : null })) : [] },
+          startLights() { this.on = true }, stopLights() { this.on = false },
+          setKeyFrame(serial, colors) { got[serial] = colors; return true },
+          feed() { this.fed++; return true }, indices() { return [] }, setDark() {}, flush() {}, lowestNote() { return null }, setApi() {}
+        })
+        const left = fakeLink('LKBTESTLEFT'), right = fakeLink('LKBTESTRIGHT')
+        daemon = null
+        blockLinks.clear()
+        blockLinks.set({ name: 'left' }, { link: left, slot: 0, port: { name: 'left' } })
+        blockLinks.set({ name: 'right' }, { link: right, slot: 2, port: { name: 'right' } })
+        Object.assign(pageLights, { ready: false, gaveUp: false, sig: '' })
+        syncPageLights()
+        check('in-app lights start on both links and drive the row', left.on && right.on && framesDrive() && !noteLightsOnly() && lightSink.canSend())
+        sendKeys(Array.from({ length: 48 }, (_, i) => [i, 0, 0]))
+        const l = got.LKBTESTLEFT, r = got.LKBTESTRIGHT
+        check('the row\'s frame splits 24 keys per block', l?.length === 24 && r?.length === 24 && l[0][0] === 0 && l[23][0] === 23 && r[0][0] === 24 && r[23][0] === 47)
+        delete got.LKBTESTLEFT
+        sendKeys(Array.from({ length: 48 }, (_, i) => [i, 0, 0]))
+        check('an unchanged frame isn\'t sent again', !got.LKBTESTLEFT)
+        blocksFeed([0xf0, 0xf7], 2)
+        check('the row\'s second input feeds only its own link', right.fed === 1 && left.fed === 0)
+        daemon = { ready: true, frameCapable: false, count: 2 }
+        syncPageLights()
+        check('an old light service stops in-app renderers on both links', !left.on && !right.on && noteLightsOnly())
+        daemon = null
+        syncPageLights()
+        check('in-app lights return when the light service leaves', left.on && right.on && pageDrives())
+        // only the left block's port connected: the right block has no link and the row can't get ready
+        blockLinks.delete([...blockLinks.keys()].find((k) => k.name === 'right'))
+        right.on = false
+        syncPageLights()
+        check('a joined block no link reaches keeps the row waiting, on a timer', !framesDrive() && pageLights.pending && rowWait.timer != null && pageLights.waiting.join() === 'LKBTESTRIGHT')
+        rowWait.expired = true
+        syncPageLights()
+        check('the row gives up waiting: note lights and dark mode', !framesDrive() && pageLights.gaveUp && !pageLights.pending && !left.on && rowWait.timer == null, pageLights.why)
+        syncPageLights()
+        check('the same row doesn\'t try again', pageLights.gaveUp && !left.on)
+        // the right block's link connects late: another row, its own try
+        blockLinks.set({ name: 'right' }, { link: right, slot: 2, port: { name: 'right' } })
+        syncPageLights()
+        check('a link that comes late gets the row a new try', !pageLights.gaveUp && left.on && right.on && framesDrive())
+        right.fail = true
+        syncPageLights()
+        check('a block that can\'t run the program puts the keyboard back on note lights', !framesDrive() && pageLights.gaveUp && !left.on && !right.on)
+        right.fail = false
+        syncPageLights()
+        check('a failed row isn\'t tried again while it stays the same', pageLights.gaveUp && !left.on && !right.on)
+        const usb = fakeLink('LKBTESTLEFT', 'LKBTESTRIGHT')
+        blockLinks.clear()
+        blockLinks.set({ name: 'usb' }, { link: usb, slot: 0 })
+        resetPageLightsTry()
+        syncPageLights()
+        sendKeys(Array.from({ length: 48 }, (_, i) => [i, 10, 0]))
+        check('one USB link sends both halves of a joined row', pageDrives() &&
+          pageLights.blocks.every(({ link }) => link === usb) && got.LKBTESTLEFT?.[0][1] === 10 && got.LKBTESTRIGHT?.[0][0] === 24)
+        blockLinks.clear()
+        for (const [k, v] of keep) blockLinks.set(k, v)
+        daemon = daemon0
+        Object.assign(pageLights, { gaveUp: false, why: '' })
+        rowWait.reset()
+        syncPageLights()
       }
       check('names', [['ROLI Piano', 49], ['ROLI ROLI Piano', 49], ['ROLI Piano M', 24], ['LUMI Keys BLOCK', 24], ['Piano M', 24], ['USBMidi2-ACX', 24]].every(([n, k]) => keysFromName(n) === k))
 
@@ -6150,6 +10107,27 @@ async function runSelfTest() {
         loadIntoPlayer(song)
       }
       try {
+        if (!IS_NATIVE_HOST) {
+          fresh()
+          const input = fakePort('LUMI Keys BLOCK'), output = fakePort('LUMI Keys BLOCK')
+          const access = { inputs: new Map([[0, input]]), outputs: new Map([[0, output]]) }
+          let attempts = 0
+          output.open = async () => { attempts++; throw new Error('Port in use') }
+          midi = access
+          bindMidiPorts()
+          await wait(0)
+          bindMidiPorts()
+          check('busy output leaves the keyboard playable and reports lights unavailable', midiInput === input &&
+            !midiOutput && !midiOpening && attempts === 1 && $('daemonState').textContent.includes('lights are unavailable'))
+          output.open = async () => { output.connection = 'open' }
+          retryMidiOpen()
+          await wait(0)
+          check('retry restores the light port', midiInput === input && midiOutput === output && !midiOutputFailure)
+          access.sysexEnabled = false
+          syncOwnColours()
+          check('without SysEx the same port can still send note lights', !blockLinks.has(output) &&
+            lightFallbackMessage().includes('Using MIDI note lights.') && noteRoute(60)?.[0] === output)
+        }
         // The reporter's case: setup long since skipped, the keyboard called "USBMidi2-ACX" next to a loopback
         fresh()
         plug('Loopback', 'USBMidi2-ACX')
@@ -6322,7 +10300,7 @@ async function runSelfTest() {
         fresh()
         plug('USBMidi2-ACX')
         open()
-        Object.assign(setup, { step: SETUP_STEPS.indexOf('keyboard'), lowKey: null, wrongKey: null, rangeDone: false })
+        Object.assign(setup, { step: SETUP_STEPS.indexOf('connect'), ranging: true, lowKey: null, wrongKey: null, rangeDone: false })
         kbSetAt = 0
         for (const p of [36, 84]) { calibrateFromNote(p); onSetupKey(p) }
         got = keysRange()
@@ -6484,8 +10462,11 @@ async function runSelfTest() {
       bytes(0, 0x90, 60, 100); bytes(1, 0x90, 60, 100)
       check('same note from each is two keys in the row', held.has(60) && held.has(84), [...held].join(','))
       check('two voices, on separate channels', !!voiceState(0, 60) && !!voiceState(16, 84))
+      const glide0 = settings.glide
+      settings.glide = true      // bend from rocking a key is off by default
       bytes(0, 0xe0, 0, 127)
       check('one keyboard\'s bend leaves the other alone', voiceState(0, 60).bend !== voiceState(16, 84).bend, voiceState(0, 60).bend + ' vs ' + voiceState(16, 84).bend)
+      settings.glide = glide0
       bytes(0, 0x80, 60, 0)
       check('letting go on one keeps the other sounding', !held.has(60) && held.has(84) && !!voiceState(16, 84))
       bytes(1, 0x80, 60, 0)
@@ -6507,18 +10488,12 @@ async function runSelfTest() {
       check('a keyboard that moved itself is followed', pair.low[1] === 60 || pair.low[1] === 72, pair.low[1])
       pair.low = [48, 48]
       // setup: which port pressed what says which is where, here plugged the other way round and an octave apart
-      setup.open = true; setup.step = SETUP_STEPS.indexOf('keyboard')
-      Object.assign(setup, { lowKey: null, wrongKey: null, rangeDone: false, otherKeyboard: false })
+      setup.open = true; setup.step = SETUP_STEPS.indexOf('connect')
+      Object.assign(setup, { sidesDone: false, ranging: false })
       const press = (i, raw) => { bytes(i, 0x90, raw, 100); const p = [...setup.pressOf.keys()].pop(); onSetupKey([...held].pop()); bytes(i, 0x80, raw, 0); return p }
-      press(1, 50)
-      check('setup wants a C first', setup.lowKey == null && setup.wrongKey != null)
-      press(1, 48)
-      check('setup takes the far-left key', setup.lowKey != null && !setup.rangeDone)
-      press(1, 59)
-      check('setup says when it\'s the same keyboard', setup.otherKeyboard && !setup.rangeDone)
       pair.low = [60, 48]     // the left-hand port's keys sit an octave higher
-      press(0, 83)
-      check('setup finishes with one press on each', setup.rangeDone && pair.side[1] === 0 && pair.side[0] === 1 && pair.low[1] === 48 && pair.low[0] === 60, 'sides ' + pair.side + ' from ' + pair.low)
+      press(1, 50)
+      check('setup: one key on the left keyboard says which is which', setup.sidesDone && pair.side[1] === 0 && pair.side[0] === 1 && pair.low[1] === 48 && pair.low[0] === 60, 'sides ' + pair.side + ' from ' + pair.low)
       setup.open = false
       setKeyboardWindow(48)
       bytes(1, 0x90, 48, 100); bytes(0, 0x90, 60, 100)
@@ -6583,22 +10558,26 @@ async function runSelfTest() {
       settings.kbPort = ''
       // the second keyboard arriving half way through the setup's keyboard step
       plug([port('in-a')], [port('out-a')])
-      setup.open = true; setup.step = SETUP_STEPS.indexOf('keyboard')
-      Object.assign(setup, { lowKey: 48, lowPress: null, wrongKey: null, rangeDone: false, otherKeyboard: false })
+      setup.open = true; setup.step = SETUP_STEPS.indexOf('connect')
+      Object.assign(setup, { sidesDone: false, ranging: false })
       twins()
       bytes(0, 0x90, 60, 100); onSetupKey([...held].pop()); bytes(0, 0x80, 60, 0)
-      check('a keyboard arriving during setup doesn\'t break it', !!setup.lowPress)
+      check('a keyboard arriving during setup doesn\'t break it', setup.sidesDone && pair.side[0] === 0)
       setup.open = false
-      setup.lowKey = null; setup.lowPress = null
+      setup.sidesDone = false
       // the light service counting one keyboard rules out a pair (the same one over USB and Bluetooth)
       const realDaemon = daemon
-      daemon = { ready: true, count: 1, boards: [{ serial: 'A' }], setConfig() {}, brightness() {}, setLeft() {}, send() {}, lastSig: '' }
+      daemon = { ready: true, frameCapable: true, count: 1, boards: [{ serial: 'A' }], setConfig() {}, brightness() {}, setLeft() {}, send() {}, lastSig: '' }
       twins()
       check('the light service counting one means one keyboard', !midiInput2 && kbKeys() === 24)
       plug([port('in-a')], [port('out-a')])
       settings.kbKeysFor[kbLabel()] = 48
       check('48 keys it can\'t fully reach light from notes', !framesDrive() && noteLightsOnly())
       delete settings.kbKeysFor[kbLabel()]
+      check('a light service with key frames drives 24 keys', daemonFrames() && !noteLightsOnly())
+      daemon.frameCapable = false
+      check('an old light service holds the keyboard and falls back to notes',
+        !lightSink.canSend() && noteLightsOnly() && !canMoveOctave() && !exactWanted() && daemonIssue() === OLD_DAEMON_MESSAGE)
       daemon = realDaemon
       // joined with the magnetic connector: one port, 48 keys, found by the two end keys
       plug([port('in-a')], [port('out-a')])
@@ -6668,6 +10647,91 @@ async function runSelfTest() {
     }
   } else console.log('SELFTEST two keyboards: skipped, a light service is running')
 
+  // ---------- PartyKeys key lights, through the real port binding (the controller itself: scripts/test-partykeys-lights.js) ----------
+  {
+    const check = (what, ok, got) => console.log('SELFTEST partykeys ' + what + ': ' + (ok ? 'ok' : 'FAIL') + (got !== undefined ? ' (' + got + ')' : ''))
+    const keep = { midi, midiInput, midiOutput, midiInput2, midiOutput2, player, song, kbOctave, sysex: midiSysexGranted, kbPort: settings.kbPort, partyColor: settings.partyColor, step: setup.step, open: setup.open }
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms))
+    const pair = (name, id, { withInput = true } = {}) => {
+      const sent = []
+      const input = withInput ? { id: id + '-in', name, manufacturer: '', state: 'connected', connection: 'open', type: 'input', onmidimessage: null } : null
+      const output = { id: id + '-out', name, manufacturer: '', state: 'connected', connection: 'open', type: 'output', send(m) { sent.push([...m]) } }
+      return { input, output, sent }
+    }
+    const plug = (pairs, sysexEnabled = true) => {
+      midi = { sysexEnabled, inputs: new Map(pairs.filter((p) => p.input).map((p) => [p.input.id, p.input])), outputs: new Map(pairs.map((p) => [p.output.id, p.output])) }
+      bindMidiPorts()
+    }
+    const channelBytes = (p) => p.sent.filter((f) => f[0] !== 0xf0 || (f[1] === 0 && f[2] === 0x21 && f[3] === 0x10)).length
+    try {
+      Object.assign(settings, { kbPort: '', partyColor: 'one' })
+      leaveApiMode(); midiSysexGranted = true; midiInput = null; midiOutput = null; midiInput2 = null; midiOutput2 = null; player = null; song = null
+      held.clear(); letGoAt.clear()
+      // hot-plug: the output first, then its input
+      const A = pair('PartyKeys', 'pk-a')
+      plug([{ input: null, output: A.output }])
+      check('output first: it is the light port, lights wait for the input', midiOutput === A.output && !partyLights && lightFallbackMessage() === 'Key lights unavailable: input not paired', lightFallbackMessage())
+      plug([A])
+      check('then the input: the lights attach', midiInput === A.input && midiOutput === A.output && !!partyLights && !midiInput2 && kbKeys() === 36, String(kbKeys()))
+      const made = partyLights
+      bindMidiPorts(); bindMidiPorts(); bindMidiPorts()
+      await wait(300)
+      check('a port-open statechange does not rebuild it', partyLights === made && partyStatus.state === 'ready', partyStatus.state)
+      check('Settings and the setup say it is on', showLightState() === undefined && $('daemonState').textContent === 'On: keys to play (beta)' && setupLightsState() === 'party' && !$('partyColorRow').classList.contains('hidden'), $('daemonState').textContent)
+      check('Hand colours and Full colour are offered on a direct keyboard', [...$('partyColor').options].map((o) => o.value).join() === 'rgb,one,hands' && !$('partyColor').querySelector('option[value="rgb"]').hidden)
+      // every old light path, pointed at it: nothing channel-like, nothing from ROLI
+      const before = A.sent.length
+      sweepSetupLights()
+      identifyKeyboard(0)
+      updateNoteLights(new Map([[60, 127], [64, 20]]))
+      midiLightSweep()
+      runLightTest()
+      await wait(400)
+      cancelLightTest()
+      clearNoteLights()
+      swapLights(); swapLights()
+      await wait(100)
+      check('setup sweep, identify, Test lights, sweep, clear and swap write only SysEx', A.sent.length > before && channelBytes(A) === 0, 'frames=' + A.sent.length + ' channel=' + channelBytes(A))
+      check('a Note On never reached the port', !A.sent.some((f) => [0x80, 0x90, 0xa0].includes(f[0] & 0xf0)))
+      // the keyboard's own SysEx is not played: a note still is
+      const handler = midiInput.onmidimessage
+      const heardBefore = [...held].length
+      handler({ data: new Uint8Array([240, 5, 48, 32, 0, 2, 0x3f, 2, 1, 247]) })
+      handler({ data: new Uint8Array([0xf0, 5, 0x30, 0x7f, 0x7f, 0x20, 0, 0x71, 1, 60, 8, 0xf7]) })
+      check('its SysEx is not a key press', [...held].length === heardBefore && partyRange?.units === 1, JSON.stringify(partyRange))
+      handler({ data: new Uint8Array([0x90, 60, 100]) })
+      check('but a key press is', held.has(60)); handler({ data: new Uint8Array([0x80, 60, 0]) })
+      // two PartyKeys, and a PartyKeys beside a LUMI: never a two-keyboard row
+      const B = pair('PartyKeys', 'pk-b')
+      plug([A, B])
+      check('two PartyKeys: one keyboard, no guessed pairing', !midiInput2 && !partyLights, String(!!midiInput2))
+      const L = pair('LUMI Keys BLOCK', 'lumi'); L.input.manufacturer = L.output.manufacturer = 'ROLI Ltd.'
+      plug([A, L])
+      check('a PartyKeys beside a LUMI is not a 24 + 24 row', !midiInput2 && midiInput === L.input, midiInput && midiInput.name)
+      // SysEx denied
+      plug([A], false)
+      check('SysEx denied: plays, no lights, Test lights off', midiInput === A.input && !partyLights && lightFallbackMessage() === 'The keyboard plays, but key lights need MIDI SysEx access.' && $('testLights').disabled, lightFallbackMessage())
+      // PopuPiano
+      const P = pair('PopuPiano', 'pop', { withInput: false })
+      plug([P])
+      await wait(120)
+      check('PopuPiano: palette first, 29 keys, no input needed', !!partyLights && P.sent[0] && P.sent[0][2] === 0x1e && keysFromName('PopuPiano') === 29 && channelBytes(P) === 0, P.sent[0] && P.sent[0].slice(0, 4).join(','))
+    } catch (e) { check('ran to the end', false, e && e.message) }
+    finally {
+      if (midiInput) midiInput.onmidimessage = null
+      held.clear(); letGoAt.clear()
+      midi = null; midiInput = null; midiOutput = null; midiInput2 = null; midiOutput2 = null
+      syncPartyLights()
+      cancelLightTest()
+      Object.assign(settings, { kbPort: keep.kbPort, partyColor: keep.partyColor })
+      ;({ midi, midiInput, midiOutput, midiInput2, midiOutput2, player, song, kbOctave } = keep)
+      midiSysexGranted = keep.sysex
+      setup.step = keep.step; setup.open = keep.open
+      syncPartyLights()
+      applyKeyCount()
+      saveSettings()
+    }
+  }
   // ---------- instrument and Playground view pickers ----------
   {
     const check = (what, ok, got) => console.log('SELFTEST pickers ' + what + ': ' + (ok ? 'ok' : 'FAIL') + (got !== undefined ? ' (' + got + ')' : ''))
@@ -6713,8 +10777,21 @@ async function runSelfTest() {
     $('btnSheet').click()
     check('turning it on shows the strip', settings.sheet && !$('sheetStrip').classList.contains('hidden') && $('btnSheet').classList.contains('on'))
     check('the stage makes room, hiding no notes', canvas.parentElement.clientHeight === stageBefore - $('sheetStrip').offsetHeight, canvas.parentElement.clientHeight)
+    const toastTop = parseFloat(getComputedStyle($('status')).top)
+    const stripBottom = $('sheetStrip').getBoundingClientRect().bottom
+    check('the player toast sits below the notation strip', toastTop >= stripBottom, 'gap=' + (toastTop - stripBottom))
     const drawn = async (s) => { for (let i = 0; i < 300 && sheet.score !== s; i++) await new Promise((r) => setTimeout(r, 20)); return sheet.score === s }
+    const checkNotationFits = (view) => {
+      const music = $('sheetMusic')
+      const svg = music.querySelector('svg')?.getBoundingClientRect()
+      const stripRect = $('sheetStrip').getBoundingClientRect()
+      const clipTop = Math.max(music.getBoundingClientRect().top, stripRect.top)
+      const clipBottom = stripRect.bottom - 10
+      check('the notation fits inside the strip', !!svg && svg.bottom <= clipBottom && svg.top >= clipTop - 1 && svg.height > 100,
+        svg ? view + ', height=' + svg.height + ', top gap=' + (svg.top - clipTop) + ', bottom gap=' + (clipBottom - svg.bottom) : view + ', no SVG')
+    }
     check('draws the score', await drawn(song.score) && !!$('sheetMusic').querySelector('svg'))
+    checkNotationFits('normal')
     check('at full size, not an icon\'s', $('sheetMusic').querySelector('svg').getBoundingClientRect().width > 500, $('sheetMusic').querySelector('svg').getBoundingClientRect().width)
     const lastX = () => sheet.timeline[sheet.timeline.length - 1].x
     check('every position is on the line, left to right', sheet.timeline.length >= song.notes.length * 0.5 && sheet.timeline.every((r, i, a) => !i || r.x >= a[i - 1].x), sheet.timeline.length)
@@ -6755,8 +10832,10 @@ async function runSelfTest() {
       check('Sheet only is in the view menu', !!item && item.getAttribute('aria-disabled') === 'false')
       item.click()
       await drawn(song.score)
-      for (let i = 0; i < 40 && $('sheetStrip').offsetHeight <= 200; i++) await sleep(50)   // layout can lag the drawing on a slow machine
-      check('Sheet only hides the falling notes and fills the stage', settings.view === 'SHEET' && $('screen-play').classList.contains('sheet-only') && !$('sheetStrip').classList.contains('hidden') && $('sheetStrip').offsetHeight > 200 && getComputedStyle(canvas.parentElement).display === 'none', $('sheetStrip').offsetHeight)
+      for (let i = 0; i < 40 && $('sheetStrip').offsetHeight <= 300; i++) await sleep(50)   // layout can lag the drawing on a slow machine
+      check('Sheet only hides the falling notes and fills the stage', settings.view === 'SHEET' && $('screen-play').classList.contains('sheet-only') && !$('sheetStrip').classList.contains('hidden') && $('sheetStrip').offsetHeight > 300 && getComputedStyle(canvas.parentElement).display === 'none', $('sheetStrip').offsetHeight)
+      sheet.update(player.currentPosition())
+      checkNotationFits('Sheet only')
       check('Sheet only keeps the player controls and the Sheet button is locked on', $('btnPlay').offsetParent !== null && $('btnSheet').disabled)
       const row = sheet.timeline.find((r) => r.notes && r.notes.length)
       if (row) {
@@ -6793,9 +10872,9 @@ async function runSelfTest() {
   // expressive keyboards: an announced bend range wins over the setting; a silent keyboard keeps the setting
   {
     const check = (what, ok, got) => console.log('SELFTEST mpe ' + what + ': ' + (ok ? 'ok' : 'FAIL') + (got !== undefined ? ' (' + got + ')' : ''))
-    const savedExpr = settings.expression, savedRange = settings.bendRange
+    const savedExpr = settings.expression, savedGlide = settings.glide, savedRange = settings.bendRange
     try {
-      settings.expression = true; settings.bendRange = 12
+      settings.expression = true; settings.glide = true; settings.bendRange = 12
       for (const m of mpeStates) m.reset()
       const cc = (ch, n, v) => handleMidiMessage([0xB0 | ch, n, v])
       const shown = () => $('mpeState').textContent
@@ -6808,7 +10887,7 @@ async function runSelfTest() {
       const announced = shown()
       check('an announced range of 24 makes a full-up bend 24 semitones on that channel', /semis=24\.00/.test(announced), announced)
     } catch (e) { check('ran to the end', false, e && e.message) }
-    finally { settings.expression = savedExpr; settings.bendRange = savedRange; for (const m of mpeStates) m.reset() }
+    finally { settings.expression = savedExpr; settings.glide = savedGlide; settings.bendRange = savedRange; for (const m of mpeStates) m.reset() }
   }
   // support reminder: a quiet card on Home at a calm moment, never on a fresh profile
   {
@@ -6877,6 +10956,7 @@ async function runSelfTest() {
     const rec = stored.lessons && stored.lessons[l1.id] && stored.lessons[l1.id][q.id]
     check('a course quiz answer is scored and kept', wrongShown && rightShown && !!rec && rec.accuracy === 1 && rec.tries === 2, JSON.stringify(rec))
     const game = l1.items.find((i) => i.type === 'notegame')
+    course.record(l1.id, l1.items.find((i) => i.type === 'hand-intro'), { accuracy: 1 })   // lesson 1 needs three items done
     const r = course.record(l1.id, game, { accuracy: 0.9 })
     showScreen('home'); course.view.itemId = null; course.view.name = 'map'; showScreen('course')
     const row2 = document.querySelector(`#screen-course .cr-lrow[data-id="${l2.id}"]`)
@@ -6890,6 +10970,74 @@ async function runSelfTest() {
     if (saved == null) localStorage.removeItem('lumi.course'); else localStorage.setItem('lumi.course', saved)
     course.show()
     showScreen('home')
+  }
+  // hand placement: the course's "Meet your fingers", "Place your hands" before a piece, the setup's level question
+  {
+    const check = (what, ok, got) => console.log('SELFTEST handguide ' + what + ': ' + (ok ? 'ok' : 'FAIL') + (got !== undefined ? ' (' + got + ')' : ''))
+    const saved = localStorage.getItem('lumi.course')
+    const keep = { experience: settings.experience, handGuide: settings.handGuide, handGuideRuns: settings.handGuideRuns, labels: settings.labels, rate: settings.rate }
+    const press = (p) => { handleNoteOn(p, 90, 0); handleNoteOff(p, 0) }
+    try {
+      localStorage.removeItem('lumi.course'); course.reset()
+      const l1 = COURSE.levels[0].lessons[0], intro = l1.items[0]
+      course.startItem(l1.id, intro.id)
+      check('the intro opens on the finger numbers', handGuideRun?.kind === 'intro' && handGuideRun.step === 'numbers' && !$('handGuide').classList.contains('hidden'))
+      handGuideNext()
+      const cs = handGuideRun.guide ? handGuideRun.guide.targets.map((t) => t.pitch) : []
+      check('find C pulses every C on the keys', handGuideRun.step === 'findC' && cs.length > 0 && cs.every((p) => p % 12 === 0), cs.join(','))
+      const base = kbBase()
+      const lit = restFrame().map((rgb, i) => (rgb.some((v) => v > 0) ? base + i : null)).filter((p) => p != null)
+      check('only the guide keys are lit', lit.every((p) => p % 12 === 0), lit.join(','))
+      press(cs[0] + 2)
+      check('a wrong key only hints', handGuideRun.step === 'findC' && handGuideRun.tone === 'warn')
+      press(cs[0])
+      check('any C finds it', handGuideRun.guide.done && handGuideRun.tone === 'ok')
+      clearTimeout(handGuideRun.timer); handIntroStep('place')
+      const targets = handGuideRun.guide ? handGuideRun.guide.targets : []
+      for (const t of targets) press(t.pitch)
+      check('right hand C to G, thumb first', targets.map((t) => t.finger).join('') === '12345' && targets[0]?.pitch % 12 === 0 && handGuideRun.guide.done, targets.map((t) => t.pitch).join(','))
+      clearTimeout(handGuideRun.timer); handIntroStep('curve'); handGuideNext()
+      const rec = JSON.parse(localStorage.getItem('lumi.course') || '{}').lessons?.[l1.id]?.[intro.id]
+      check('finishing records the item and closes the card', !handGuideRun && !!rec && rec.accuracy === 1 && $('handGuide').classList.contains('hidden'), JSON.stringify(rec))
+      await sleep(120)
+      check('the course moves on to Ode to Joy', screen === 'play' && courseRun?.item.id === l1.items[1].id, screen)
+      // before a piece: the same start position as the intro needs no second guide; a new one does
+      settings.handGuide = 'always'
+      setMode('PRACTISE')
+      check('no second guide right after the intro', !handGuideRun && waitArmed())
+      handGuideShownKey = ''
+      setMode('PRACTISE')
+      check('a new start position shows "Place your hands"', handGuideRun?.kind === 'song' && !waitArmed())
+      const first = handGuideRun?.guide.current()
+      if (first) press(first.pitch)
+      check('a guide press neither starts nor scores the song', !!player && !player.active && player.score.expected.every((e) => e.state === 'pending'))
+      handGuideSkip()
+      check('Skip hands the song back, armed', !handGuideRun && waitArmed())
+      settings.handGuideRuns = 4
+      noteHandGuideRun({ totalNotes: 10, overallAccuracy: 0.9 })
+      check('"always" is never turned off by good runs', settings.handGuide === 'always')
+      settings.handGuide = 'auto'
+      noteHandGuideRun({ totalNotes: 10, overallAccuracy: 0.9 })
+      check('"auto" turns off after five good runs', settings.handGuide === 'off' && settings.handGuideRuns === 0)
+      showScreen('home')
+      // the setup's level question: answers wait for Continue, then set the defaults
+      settings.experience = ''
+      openSetup('level')
+      document.querySelector('#obLevel [data-level="new"]').click()
+      check('the level step shows Continue once answered', !$('obNext').classList.contains('hidden') && settings.experience === '')
+      applySetupLevel()
+      check('Brand new: finger numbers, 0.75x and hand placement on Auto', settings.experience === 'new' && settings.labels === 'fingers' && settings.rate === 0.75 && settings.handGuide === 'auto')
+      closeSetup()
+    } catch (e) { check('ran to the end', false, e && e.message) }
+    finally {
+      if (handGuideRun) endHandGuide('cancel')
+      if (setup.open) closeSetup()
+      Object.assign(settings, keep); saveSettings(); syncLevelSettings()
+      handGuideShownKey = ''
+      if (saved == null) localStorage.removeItem('lumi.course'); else localStorage.setItem('lumi.course', saved)
+      course.reset(); course.show()
+      showScreen('home')
+    }
   }
   // course exercises: echo, rhythm, ear and sight run from the lesson page, report through the same
   // result path as every other item, update the checklist, finish the lesson and open the next one
@@ -7068,7 +11216,10 @@ async function runSelfTest() {
         seedBefore(lesson.id)
         course.openOwner(lesson.id); course.startItem(lesson.id, item.id); await sleep(80)
         const rounds = item.params.rounds || 10
-        for (let i = 0; i < rounds && quiz && !quiz.over; i++) quizPress(quiz.q.pitch)
+        for (let i = 0; i < rounds && quiz && !quiz.over; i++) {
+          if (quiz.every) for (const pitch of quiz.targets) quizPress(pitch)
+          else quizPress(quiz.q.pitch)
+        }
         const rec = recOf(lesson.id, item)
         const back = $('quizBack')
         check('a note game reports and offers the way on', !!rec && rec.accuracy === 1 && !back.classList.contains('hidden'), `${JSON.stringify(rec)} back=${back.textContent}`)
@@ -7082,9 +11233,14 @@ async function runSelfTest() {
         localStorage.setItem('lumi.course', serializeProgress(emptyProgress()))
         showScreen('home'); course.view.name = 'map'; course.view.itemId = null; showScreen('course')
         const skip = document.querySelector('#screen-course [data-act="skip"][data-level="3"]')
-        skip.click(); await sleep(40)
-        const asked = $('confirmDialog').open
-        $('confirmOk').click(); await sleep(60)
+        skip.click()
+        const dialog = $('confirmDialog')
+        const asked = dialog.open && $('confirmOk').textContent === 'Skip ahead'
+        if (asked) {
+          const closed = new Promise((resolve) => dialog.addEventListener('close', resolve, { once: true }))
+          $('confirmOk').click()
+          await Promise.race([closed, sleep(2000)])
+        }
         const prog = stored()
         check('skip ahead asks, then opens the levels up to it', asked && JSON.stringify(prog.unlocked) === '[2,3]' && !!document.querySelector('#cr-level-3.st-open'), `asked=${asked} unlocked=${JSON.stringify(prog.unlocked)}`)
 
@@ -7254,7 +11410,7 @@ async function runSelfTest() {
       const total = grid()
       check('library count', total === allSongs().length && label() === total + ' songs', label())
       const labels = [...$('levelChips').children].map((b) => b.textContent)
-      check('level chips are the real levels', labels[0] === 'All levels' && labels.includes('Virtuoso') && labels.includes('Intermediate') && labels.includes('Level 1'), labels.join(','))
+      check('level chips are the real levels', labels[0] === 'All levels' && labels.includes('Virtuoso') && labels.includes('Intermediate') && labels.includes('First steps'), labels.join(','))
       setFilter({ level: 'Virtuoso' })
       const nV = grid()
       check('level filter', nV > 0 && nV < total && nV === allSongs().filter((i) => i.level === 'Virtuoso').length && label() === nV + ' songs', nV + ' of ' + total)
@@ -7266,6 +11422,16 @@ async function runSelfTest() {
       check('empty state offers Clear filters', grid() === 0 && !$('searchEmpty').classList.contains('hidden') && !$('searchEmptyClear').classList.contains('hidden') && label() === 'No songs', label())
       $('searchEmpty').querySelector('[data-empty="clear"]').click()
       check('clear filters', grid() === total && !libFilter.level && !libFilter.composer && $('clearFilters').classList.contains('hidden'), grid())
+      // the catalogue: quick browse, accent-blind multi-word search, era and mood filters, the empty state
+      check('quick browse shows with no search and no filter', !$('libBrowse').classList.contains('hidden') && $('browseMoods').children.length > 0 && $('browseComposers').children.length > 0, $('browseComposers').children.length)
+      $('search').value = 'fur elise'; searchTerm = 'fur elise'; renderLibrary()
+      check('search ignores accents', grid() >= 1 && [...$('libraryGrid').querySelectorAll('.tile-name')].some((n) => n.textContent === 'Für Elise') && $('libBrowse').classList.contains('hidden'), grid())
+      $('search').value = 'beethoven calm zzz'; searchTerm = 'beethoven calm zzz'; renderLibrary()
+      check('every typed word is required', grid() === 0 && !$('searchEmpty').classList.contains('hidden') && !!$('searchEmpty').querySelector('[data-empty="add"]:not([hidden])'), grid())
+      $('search').value = ''; searchTerm = ''
+      const mood = $('moodChips').firstElementChild && $('moodChips').firstElementChild.dataset.mood
+      if (mood) { setFilter({ mood }); check('mood filter', grid() > 0 && grid() <= total && allSongs().filter((i) => (i.moods || []).includes(mood)).length === grid() && $('filterBadge').textContent === '1', mood + ' ' + grid()) }
+      setFilter({ level: '', composer: '', era: '', mood: '', length: '' })
       const long = [...allSongs()].filter((i) => i.heavy).length
       check('long piece marker', document.querySelectorAll('#libraryGrid .long-tag').length === long && long > 0, long)
       check('search chips kept', ['songs', 'lessons', 'games', 'fav'].every((c) => document.querySelector('#searchChips [data-chip="' + c + '"]')))
@@ -7453,7 +11619,7 @@ async function runSelfTest() {
       q('#screen-exercise [data-ex="back"]').click(); await sleep(30)
       check('Back from a Practice exercise returns to Practice and writes nothing', screen === 'practice' && localStorage.getItem(STATS_KEY) === beforeLeave && localStorage.getItem('lumi.course') === courseBefore, screen)
       const sel = q('#screen-practice [data-id="ear"] select')
-      check('the picker suggests the next level after a 90% round', sel.value === '2' && sel.selectedOptions[0].textContent.includes('suggested'), sel.value + ' ' + sel.selectedOptions[0].textContent)
+      check('the picker suggests the next level after a 90% round', sel.value === '2' && sel.selectedOptions[0].getAttribute('aria-label').includes('suggested'), sel.value + ' ' + sel.selectedOptions[0].textContent)
       // a poor round: Back to Practice and Again; Escape and the Android back button also return
       sel.value = '1'; sel.dispatchEvent(new Event('change'))
       check('the best result shows for the chosen level', q('#screen-practice [data-id="ear"] .pr-best').textContent.includes('100%'), q('#screen-practice [data-id="ear"] .pr-best').textContent)
@@ -7613,8 +11779,9 @@ async function runSelfTest() {
       check('no sideways overflow at 360 px wide', narrow && wider === 0, `scroll=${el.scrollWidth} client=${el.clientWidth} cardsOver=${wider}`)
       el.style.width = ''; el.style.maxWidth = ''
       el.scrollTop = el.scrollHeight; await sleep(60)
-      const cards = all('#screen-jam .jam-card'), navTop = $('nav').getBoundingClientRect().top
-      check('nothing sits under the nav bar once scrolled to the end', cards[cards.length - 1].getBoundingClientRect().bottom <= navTop + 1, `bottom=${Math.round(cards[cards.length - 1].getBoundingClientRect().bottom)} nav=${Math.round(navTop)}`)
+      const cards = all('#screen-jam .jam-card'), navRect = $('nav').getBoundingClientRect(), navTop = navRect.width > navRect.height ? navRect.top : window.innerHeight   // a side column (wide windows) cannot cover the page's end
+      const lowest = Math.max(...cards.filter((c) => c.getClientRects().length).map((c) => c.getBoundingClientRect().bottom))   // the Keyboard card is no longer the last one on a phone
+      check('nothing sits under the nav bar once scrolled to the end', lowest <= navTop + 1, `bottom=${Math.round(lowest)} nav=${Math.round(navTop)}`)
       el.scrollTop = 0
       await sleep(650)
       const stored = (() => { try { return JSON.parse(localStorage.getItem('lumi.jam')) } catch { return null } })()
@@ -7682,6 +11849,199 @@ async function runSelfTest() {
     } catch (e) { check('ran to the end', false, e && e.message) }
     finally { searchTerm = savedTerm; searchChip = savedChip; $('search').value = savedTerm; showScreen('home'); hideResults() }
   }
+  // piano-roll note editor: opens on an imported song, an edit through its model is saved by Done, the song
+  // reopens with the new note and the grid settings, and the normal player has the edited notes
+  {
+    const check = (what, ok, got) => console.log('SELFTEST roll ' + what + ': ' + (ok ? 'ok' : 'FAIL') + (got !== undefined ? ' (' + got + ')' : ''))
+    let savedId = null
+    try {
+      const notes = [60, 62, 64, 65, 67].map((pitch, i) => ({ pitch, start: i * 0.6, dur: 0.5, vel: 90, hand: 'right', finger: i + 1 }))
+      const rec = await saveImported({ title: 'selftest roll', notes, duration: 3, tempo: 100, source: 'score' })
+      savedId = rec.id
+      await loadImportedLibrary(); await openImported(rec.id)
+      $('editSong').click(); await sleep(150)
+      const ui = rollEditor.controller
+      check('Edit notes opens the piano roll on the song', rollEditor.isOpen() && !!ui && ui.model.notes.length === 5 && !!document.querySelector('.rl-overlay canvas'), ui && ui.model.notes.length)
+      const btn = [...document.querySelectorAll('.rl-overlay button')].filter((b) => b.getClientRects().length)
+      check('toolbar buttons are at least 44 points', btn.length > 8 && btn.every((b) => b.getBoundingClientRect().width >= 43.5 && b.getBoundingClientRect().height >= 43.5), btn.filter((b) => b.getBoundingClientRect().height < 43.5).length)
+      nav.back(); await sleep(50)
+      check('back closes the unchanged editor', !rollEditor.isOpen() && !document.querySelector('.rl-overlay'))
+      $('editSong').click(); await sleep(150)
+      const edit = rollEditor.controller
+      const first = edit.model.notes[0]
+      edit.model.select([first.key]); edit.model.moveNotes([first.key], 0, 2)
+      edit.model.setDivision(4); edit.model.setGridOffset(0.05)
+      await edit.done(); await sleep(250)
+      const back = await getImported(rec.id)
+      const moved = back.notes.find((n) => n.start === 0)
+      check('Done saved the moved note', !!moved && moved.pitch === 62 && back.notes.length === 5, moved && moved.pitch)
+      check('the grid settings are saved with the song', !!back.grid && back.grid.division === 4 && Math.abs(back.grid.offset - 0.05) < 1e-6, JSON.stringify(back.grid))
+      check('the editor closed and the song reopened with the edit', !rollEditor.isOpen() && screen === 'play' && !!song && !!song.notes.find((n) => n.start === 0 && n.pitch === 62), screen)
+      const p = new Player({ getCtx: audioContext }); p.load(song)
+      check('the player plays the edited notes', p.song && p.song.notes.some((n) => n.start === 0 && n.pitch === 62), p.song && p.song.notes.length)
+      $('editSong').click(); await sleep(150)
+      check('reopening restores the grid', rollEditor.isOpen() && rollEditor.controller.model.division === 4 && Math.abs(rollEditor.controller.model.gridOffset - 0.05) < 1e-6)
+      rollEditor.close(); await sleep(50)
+      check('close removes the editor', !rollEditor.isOpen() && !document.querySelector('.rl-overlay'))
+    } catch (e) { check('ran to the end', false, e && e.message) }
+    finally {
+      if (rollEditor.isOpen()) rollEditor.close()
+      if (savedId) await deleteImported(savedId)
+      await loadImportedLibrary(); showScreen('home'); hideResults()
+    }
+  }
+  // The lyrics editor uses the live clock, saves the imported record, and restores the player on close.
+  {
+    const check = (what, ok, got) => console.log('SELFTEST lyrics editor ' + what + ': ' + (ok ? 'ok' : 'FAIL') + (got !== undefined ? ' (' + got + ')' : ''))
+    let savedId
+    try {
+      const notes = [0, 1, 2].map((start, i) => ({ pitch: 60 + i, start, dur: 0.4, hand: 'right', vel: 90 }))
+      const rec = await saveImported({ title: 'selftest lyrics', notes, duration: 4, tempo: 100, source: 'score' })
+      savedId = rec.id
+      await openImported(savedId)
+      const p = player
+      p.setMode('PRACTISE')
+      p.setAdvancement('pauseAndPlay')
+      p.setRate(0.75)
+      p.setCountIn(4)
+      p.setSection(0.5, 3.5)
+      p.setLoop(1, 2, true)
+      const transportSettings = () => JSON.stringify([p.mode, p.advancement, p.rate, p.loop, p.countIn, p.sectionStart, p.endAt, p.position])
+      const before = transportSettings()
+      $('hudMore').click()
+      $('btnEditLyrics').focus()
+      $('btnEditLyrics').click()
+      for (let i = 0; i < 50 && !lyricsEditor.isOpen(); i++) await sleep(20)
+      check('opens from More', lyricsEditor.isOpen() && !document.body.classList.contains('hud-more') && $('btnEditLyrics').ariaLabel === 'Add lyrics')
+      const input = $('lyricsText')
+      input.value = 'First line\nSecond line\nThird line'
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      for (const key of [' ', '1', '2', '3', 'z', 'x']) {
+        input.dispatchEvent(new KeyboardEvent('keydown', { key, code: key === ' ' ? 'Space' : undefined, bubbles: true }))
+      }
+      check('typing leaves the player paused in Watch', p.mode === 'WATCH' && !p.active)
+      $('lyricsStart').click()
+      check('uses Watch without count-in, loop or section', p.mode === 'WATCH' && p.active && p.countIn === 0 && !p.loop.on && p.sectionStart === 0 && p.endAt == null && p.rate === 0.75)
+      check('focuses the tap pad', document.activeElement === $('lyricsTap'))
+      const hidden = Object.getOwnPropertyDescriptor(document, 'hidden')
+      try {
+        Object.defineProperty(document, 'hidden', { configurable: true, value: true })
+        document.dispatchEvent(new Event('visibilitychange'))
+      } finally {
+        if (hidden) Object.defineProperty(document, 'hidden', hidden)
+        else delete document.hidden
+        document.dispatchEvent(new Event('visibilitychange'))
+      }
+      check('backgrounding pauses timing without closing the editor', lyricsEditor.isOpen() && !p.active && $('lyricsPause').textContent === 'Resume')
+      $('lyricsPause').dispatchEvent(new MouseEvent('click', { detail: 1, bubbles: true }))
+      check('mouse resume returns focus to the pad', p.active && document.activeElement === $('lyricsTap'))
+      try {
+        p.currentPosition = () => 0.15
+        $('lyricsTap').dispatchEvent(new PointerEvent('pointerdown', { isPrimary: true, button: 0 }))
+        $('lyricsTap').dispatchEvent(new MouseEvent('click', { detail: 0, bubbles: true }))
+        check('pointer activation taps once even with a zero-detail click', lyricsEditor.session.tapper.timedCount === 1)
+        const keyTap = (key, repeat = false) => $('lyricsTap').dispatchEvent(new KeyboardEvent('keydown', { key, repeat, bubbles: true, cancelable: true }))
+        p.currentPosition = () => 1.15
+        keyTap(' ', true)
+        check('holding Space does not repeat a tap', lyricsEditor.session.tapper.timedCount === 1)
+        keyTap(' ')
+        p.currentPosition = () => 2.15
+        keyTap('Enter')
+      } finally { delete p.currentPosition }
+      check('last tap pauses in review', lyricsEditor.session.step === 'review' && !p.active)
+      await lyricsEditor.save()
+      const lines = lyricsOfSong(await getImported(savedId))
+      check('saves three timed lines', lines.length === 3 && lines.every((line, i) => line.t === i), JSON.stringify(lines))
+      check('shows saved lyrics and restores playback settings', !lyricsEditor.isOpen() && !p.active && before === transportSettings() &&
+        $('btnEditLyrics').ariaLabel === 'Lyric timing' && $('btnLyrics').ariaPressed === 'true' && !$('lyrics').classList.contains('hidden') &&
+        document.activeElement === $('hudMore'))
+      await lyricsEditor.open(song)
+      check('reopens in review with Save disabled and Back hidden', lyricsEditor.session.step === 'review' &&
+        document.activeElement === $('lyricsReviewTitle') && $('lyricsSave').disabled && $('lyricsBack').hidden && getComputedStyle($('lyricsBack')).display === 'none')
+      lyricsEditor.session.clear(0)
+      $('lyricsEditor').querySelector('[data-step="review"] [data-cancel]').click()
+      check('cancel restores playback and discards changes', !lyricsEditor.isOpen() && before === transportSettings() &&
+        lyricsOfSong(await getImported(savedId)).length === 3)
+      await lyricsEditor.open(song)
+      $('lyricsReview').querySelector('button[aria-label="Clear, line 1"]').click()
+      $('lyricsBack').click()
+      onFinish({ mode: 'WATCH' })
+      check('song end returns to review without results', lyricsEditor.session.step === 'review' && $('results').classList.contains('hidden'))
+      for (const button of $('lyricsReview').querySelectorAll('button[aria-label^="Clear,"]')) button.click()
+      check('offers removal when all times are cleared', $('lyricsSave').textContent === 'Remove lyrics')
+      await lyricsEditor.save()
+      check('clears saved lyrics', lyricsOfSong(await getImported(savedId)).length === 0 && $('btnLyrics').classList.contains('hidden') &&
+        $('lyrics').classList.contains('hidden') && $('btnEditLyrics').ariaLabel === 'Add lyrics' && showLyrics)
+      await lyricsEditor.open(song)
+      const attached = await importSongFile(new File(['[00:01.00]From the lyrics file'], 'selftest.lrc'))
+      check('attaching an LRC closes the editor and applies the file', attached === 'saved' && !lyricsEditor.isOpen() &&
+        lyricsOfSong(await getImported(savedId))[0]?.text === 'From the lyrics file')
+    } catch (e) { check('ran to the end', false, e.message) }
+    finally {
+      lyricsEditor.close()
+      if (savedId) await deleteImported(savedId)
+      await loadImportedLibrary(); showScreen('home'); hideResults()
+    }
+  }
+  // first-lesson tour: stops with a missing target are skipped, Skip sets the flag, and the page is left clean
+  {
+    const check = (what, ok, got) => console.log('SELFTEST tour ' + what + ': ' + (ok ? 'ok' : 'FAIL') + (got !== undefined ? ' (' + got + ')' : ''))
+    try {
+      const was = settings.tourDone
+      settings.tourDone = false
+      const box = { left: 20, top: 20, width: 120, height: 48 }
+      const ctl = await startTour({ stops: [
+        { target: '#noSuchControl', title: 'Missing', body: 'x' },
+        { target: () => null, title: 'Empty', body: 'x' },
+        { target: () => box, title: 'Here', body: 'y' },
+        { target: () => box, when: () => false, title: 'Vetoed', body: 'z' }
+      ] })
+      check('skips missing targets', ctl.count === 1 && !!document.querySelector('.tour-card') && document.querySelector('.tour-title').textContent === 'Here', 'count=' + ctl.count)
+      check('the flag waits until it is seen', settings.tourDone === false)
+      ctl.skip()
+      check('skip sets the flag and removes the tour', settings.tourDone === true && !document.querySelector('.tour-root') && ctl.done, 'flag=' + settings.tourDone)
+      settings.tourDone = was; saveSettings()
+    } catch (e) { check('run', false, e && e.message) }
+  }
+  // review fixes: the tour and the setup screen hold the page back, identify fits the bridge queue, BLE names match like Swift
+  {
+    const check = (what, ok, got) => console.log('SELFTEST overlays ' + what + ': ' + (ok ? 'ok' : 'FAIL') + (got !== undefined ? ' (' + got + ')' : ''))
+    const keep = { out: midiOutput, in2: midiInput2, exact: settings.exactColors, tour: settings.tourDone }
+    try {
+      // a tour on screen: keys do not arm or start Wait mode, and opening the setup screen ends the tour
+      settings.tourDone = true
+      const box = { left: 20, top: 20, width: 120, height: 48 }
+      await startTour({ stops: [{ target: () => box, title: 'Here', body: 'y' }] })
+      check('tour is open', tourIsOpen())
+      check('no armed Wait under the tour', waitArmed() === false)
+      openSetup('welcome')
+      check('setup closes the tour', !tourIsOpen() && !document.querySelector('.tour-root'))
+      check('setup sits over the sheets', parseInt(getComputedStyle($('onboarding')).zIndex, 10) > 80, getComputedStyle($('onboarding')).zIndex)
+      check('no armed Wait under the setup', waitArmed() === false)
+      const space = new KeyboardEvent('keydown', { code: 'Space', key: ' ', bubbles: true, cancelable: true })
+      document.dispatchEvent(space)
+      check('keys are not for the player behind the setup', space.defaultPrevented === false)
+      closeSetup()
+      // identify: a handful of sends (the iOS bridge queue holds 64), and the frame loop leaves that port alone meanwhile
+      settings.exactColors = false
+      const sent = []
+      const fake = { id: 'identify-fake', name: 'Fake', state: 'connected', send: (d) => sent.push([...d]) }
+      midiOutput = fake; midiInput2 = null
+      check('identify starts', identifyKeyboard(0) === true)
+      const notes = sent.flat().filter((_, i) => i % 3 === 1)
+      check('identify batches all 128 notes', sent.length <= 8 && notes.length === 128, 'sends=' + sent.length)
+      const before = sent.length
+      updateNoteLights(new Map([[60, 127]]))
+      check('lights leave the flash alone', sent.length === before)
+      clearTimeout(identifyTimers.get(fake)); identifyTimers.delete(fake)
+      litNotes.clear(); litRoutes.clear()
+    } catch (e) { check('run', false, e && e.message) }
+    finally {
+      midiOutput = keep.out; midiInput2 = keep.in2; settings.exactColors = keep.exact; settings.tourDone = keep.tour; saveSettings()
+      if (setup.open) closeSetup()
+      if (tourIsOpen()) closeTour()
+    }
+  }
   console.log('SELFTEST done')
   } catch (e) { console.log('SELFTEST FAIL ' + (e && e.message)) }
 }
@@ -7692,7 +12052,6 @@ async function runSelfTest() {
 async function envelopeReport(id, pressureZero) {
   const sr = 48000, secs = 8
   const oc = new OfflineAudioContext(1, sr * secs, sr)
-  await prepareInstrument(oc, id)
   const v = new Voice(oc, oc.destination, 60, 90, id, 12)
   if (pressureZero) oc.suspend(0.3).then(() => { v.setPressure(0); oc.resume() })
   oc.suspend(7).then(() => { v.release(); oc.resume() })
@@ -7756,7 +12115,6 @@ async function levelReport(id, buildOutputChain) {
   const sr = 48000
   const render = async (pitches, vel) => {
     const oc = new OfflineAudioContext(4, sr * 2, sr)
-    await prepareInstrument(oc, id)
     const chain = buildOutputChain(oc, 0.8)
     const taps = new ChannelMergerNode(oc, { numberOfInputs: 4 })
     const post = new ChannelSplitterNode(oc, { numberOfOutputs: 2 })
@@ -7789,14 +12147,13 @@ async function levelReport(id, buildOutputChain) {
 }
 
 // Audio nodes one key press creates (counts node constructor calls during one voice).
-async function nodesPerVoice(id) {
-  const oc = new OfflineAudioContext(2, 128, 48000)
-  await prepareInstrument(oc, id)
+function nodesPerVoice(id) {
   const names = ['OscillatorNode', 'GainNode', 'BiquadFilterNode', 'ChannelMergerNode', 'AudioBufferSourceNode', 'WaveShaperNode', 'StereoPannerNode']
   const real = names.map((n) => window[n])
   let count = 0
   names.forEach((n, i) => { window[n] = class extends real[i] { constructor(...a) { super(...a); count++ } } })
   try {
+    const oc = new OfflineAudioContext(2, 128, 48000)
     new Voice(oc, oc.destination, 60, 90, id, 12)
   } finally { names.forEach((n, i) => { window[n] = real[i] }) }
   return count
@@ -7819,7 +12176,7 @@ async function runPerfProbe() {
     for (const inst of instrumentList()) {
       const id = inst.id
       const { note: n, chord: c } = (levels[id] = await levelReport(id, audio.buildOutputChain))
-      out(`level ${id.padEnd(7)} note  peak=${dB(n.peak)}dBFS rms=${dB(n.rms)}dBFS loud=${n.loud.toFixed(1)}LUFS limiter in=${dB(n.inPeak)} out=${dB(n.peak)}dBFS onset=${n.onset.toFixed(1)}ms nodes=${await nodesPerVoice(id)}`)
+      out(`level ${id.padEnd(7)} note  peak=${dB(n.peak)}dBFS rms=${dB(n.rms)}dBFS loud=${n.loud.toFixed(1)}LUFS limiter in=${dB(n.inPeak)} out=${dB(n.peak)}dBFS onset=${n.onset.toFixed(1)}ms nodes=${nodesPerVoice(id)}`)
       out(`level ${id.padEnd(7)} chord peak=${dB(c.peak)}dBFS rms=${dB(c.rms)}dBFS loud=${c.loud.toFixed(1)}LUFS limiter in=${dB(c.inPeak)} out=${dB(c.peak)}dBFS max|s|=${c.peak.toFixed(3)} over-knee=${c.over.toFixed(0)}ms err=${c.err.toFixed(0)}dB`)
       if (c.peak >= 0.99) fail(id + ' chord clips: max|s|=' + c.peak.toFixed(3))
       if (n.onset > 25) fail(id + ' onset ' + n.onset.toFixed(1) + 'ms')

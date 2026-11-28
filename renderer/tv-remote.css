@@ -1,0 +1,252 @@
+/* Keylight TV remote (docs/DESIGN-DIRECTION.md 3.4, 3.5, 3.7 and 4.8). The stylesheet for TV mode in the iOS app:
+   when an Apple TV is connected over AirPlay the page adds "tv-on" to <body> and the player turns into a remote, so the
+   phone is a set of large controls and the notes live on the television. "tv-notes" (notes also drawn on the phone) keeps
+   the canvas on screen instead of the status card, and "hud-idle" must not fade the remote away.
+
+   Nothing changes without "tv-on": every .tv-extra is display: none by default, and .tv-tools is display: contents by
+   default (no box of its own). The transport buttons are direct children of .player-bottom (not wrapped), so the
+   player's own fade and layout still apply to #btnPlay on the other builds. Everything else is scoped to body.tv-on. */
+
+/* ---------------------------------------------------------------- defaults: inert unless a TV is connected */
+.tv-tools { display: contents; }
+.tv-extra, .tv-delay-tools { display: none; }
+.tv-sync-panel[hidden] { display: none; }
+
+/* ---------------------------------------------------------------- TV chip and top bar layout */
+body.tv-on #tvChip {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 30px; padding: 0 12px; border: 1px solid var(--accent-line); border-radius: var(--r-pill);
+  background: var(--accent-soft); color: var(--accent); font-size: var(--fs-caption); font-weight: 650; letter-spacing: .04em;
+}
+/* keep back, speed, TV and HUD controls from colliding on narrow portrait phones (375-440 pt) */
+body.tv-on[data-screen="play"] #topbar { flex-wrap: wrap; }
+body.tv-on[data-screen="play"] .top-left { min-width: 44px; }
+body.tv-on[data-screen="play"] #back { flex: 0 0 auto; }
+body.tv-on[data-screen="play"] .top-center { flex: 0 1 auto; min-width: 0; }
+body.tv-on[data-screen="play"] .top-center:has(.speed-track.compact) { min-width: 0; }
+body.tv-on[data-screen="play"] .speed-track.compact:not(.open) { min-width: 0; max-width: 100%; }
+/* the open list keeps the 184px width from player.css even when the top bar is tight */
+body.tv-on[data-screen="play"] .speed-track.compact.open { max-width: none; }
+body.tv-on[data-screen="play"] .speed-track.compact button.on { overflow: hidden; text-overflow: ellipsis; }
+body.tv-on[data-screen="play"] .top-actions { flex: 1 1 auto; min-width: 0; justify-content: flex-end; gap: 6px; }
+
+@media (max-width: 560px) {
+  body.tv-on[data-screen="play"] .top-left { flex: 0 0 auto; }
+  body.tv-on[data-screen="play"] #topbar .titles { display: none; }
+}
+@media (max-width: 460px) {
+  body.tv-on[data-screen="play"] #topbar {
+    gap: 3px; padding-left: calc(var(--sal) + 6px); padding-right: calc(var(--sar) + 6px);
+  }
+  body.tv-on[data-screen="play"] .top-actions { gap: 2px; }
+  body.tv-on[data-screen="play"] #tvChip { height: 28px; padding: 0 7px; font-size: calc(var(--fs-caption) * .92); }
+  body.tv-on[data-screen="play"] .speed-track.compact:not(.open) button.on,
+  body.tv-on[data-screen="play"] .speed-track.compact:not(.open):not(:has(button.on))::before {
+    padding: 0 18px 0 9px; font-size: var(--fs-caption);
+  }
+  body.tv-on[data-screen="play"] .speed-track.compact:not(.open) button.on::after,
+  body.tv-on[data-screen="play"] .speed-track.compact:not(.open):not(:has(button.on))::after { right: 8px; width: 6px; height: 6px; }
+}
+
+/* ---------------------------------------------------------------- the bottom bar becomes the remote */
+/* One row for restart, the round play button and back 5; the time, the scrubber and the tools each take a full line. */
+body.tv-on[data-screen="play"] .player-bottom {
+  flex-wrap: wrap; justify-content: center; align-items: center; gap: 10px;
+  padding: 10px 16px; padding-bottom: max(12px, var(--sab));
+}
+body.tv-on[data-screen="play"] .tv-extra {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 14px;
+  min-height: 44px; min-width: 44px; border: 0; border-radius: var(--r-pill);
+  background: var(--surface-2); color: var(--text); font-size: var(--fs-body); font-weight: 600;
+  transition: background-color var(--d-base) var(--ease-out), transform var(--d-fast) var(--ease-out);
+}
+body.tv-on[data-screen="play"] .tv-extra:hover { background: var(--surface-3); }
+body.tv-on[data-screen="play"] .tv-extra:active { transform: scale(.97); }
+body.tv-on[data-screen="play"] .tv-extra[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+
+/* the biggest control in the row: accent colours come from player.css, only the size and the icon change here */
+body.tv-on[data-screen="play"] #btnPlay { width: 88px; height: 88px; border-radius: 50%; }
+body.tv-on[data-screen="play"] #btnPlay svg { width: 36px; height: 36px; }
+
+/* time, then the scrubber, then the tools: each on its own full line */
+body.tv-on[data-screen="play"] #timeLabel {
+  order: 1; width: 100%; text-align: center; color: var(--muted); font-size: var(--fs-caption); font-variant-numeric: tabular-nums;
+}
+body.tv-on[data-screen="play"] #customSpeed { order: 2; width: 100%; text-align: center; color: var(--muted); font-size: var(--fs-caption); }
+body.tv-on[data-screen="play"] #progress {
+  order: 3; flex: none; width: 100%; height: 44px; min-height: 44px; margin: 0; touch-action: none;
+  background: linear-gradient(var(--line-strong), var(--line-strong)) center / 100% 6px no-repeat;
+}
+body.tv-on[data-screen="play"] #progress .progress-fill { height: 6px; margin-top: -3px; }
+body.tv-on[data-screen="play"] .tv-tools {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px; width: 100%; order: 4;
+}
+body.tv-on[data-screen="play"] .tv-tools > .tv-extra { flex: 1 1 auto; }
+body.tv-on[data-screen="play"] .tv-delay-tools {
+  flex: 1 0 auto; display: flex; align-items: center; justify-content: center; gap: 8px;
+  color: var(--muted); font-size: var(--fs-caption); font-variant-numeric: tabular-nums;
+}
+body.tv-on[data-screen="play"] .tv-delay-tools output { min-width: 6ch; text-align: center; }
+body.tv-on[data-screen="play"] .tv-delay-tools .tv-extra { padding: 0 8px; }
+
+/* ---------------------------------------------------------------- what the remote replaces */
+body.tv-on[data-screen="play"] #editSong,
+body.tv-on[data-screen="play"] #btnEditLyrics,
+body.tv-on[data-screen="play"] #coachFeedback,
+body.tv-on[data-screen="play"] #playHint,
+body.tv-on[data-screen="play"] #sheetStrip,
+body.tv-on[data-screen="play"] #scoreHud,
+body.tv-on[data-screen="play"] #stage { display: none; }
+body.tv-on[data-screen="play"].tv-notes #stage { display: block; }
+
+/* the phone card while the notes are on the TV: top bar stays in flow, then a vertical stack in order:
+   "Showing on your TV", song title, hand legend pill, live score line */
+body.tv-on[data-screen="play"]:not(.tv-notes) #app {
+  padding: var(--sat) var(--sar) 0 var(--sal);
+}
+body.tv-on[data-screen="play"]:not(.tv-notes) #topbar {
+  position: relative; inset: auto; grid-column: 1 / -1; grid-row: 1;
+  padding: 6px 10px; background: var(--stage-top);
+}
+@media (max-width: 460px) {
+  body.tv-on[data-screen="play"]:not(.tv-notes) #topbar { padding: 6px; }
+}
+body.tv-on[data-screen="play"]:not(.tv-notes) .top-left { flex: 0 0 auto; }
+body.tv-on[data-screen="play"]:not(.tv-notes) #topbar .titles,
+body.tv-on[data-screen="play"]:not(.tv-notes) #handLegend { display: none !important; }
+
+/* #screen-play > raises this over glass.css:478 (#screen-play.sheet-only > .canvas-wrap), which hides the stage in Sheet only */
+body.tv-on[data-screen="play"]:not(.tv-notes) #screen-play > .canvas-wrap {
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+  gap: 8px; padding: 12px 16px; overflow-y: auto; text-align: center;
+}
+body.tv-on[data-screen="play"]:not(.tv-notes) .canvas-wrap::before,
+body.tv-on[data-screen="play"]:not(.tv-notes) .canvas-wrap::after { content: ""; flex: 1 0 0; }
+body.tv-on[data-screen="play"]:not(.tv-notes) .canvas-wrap::before { order: 0; }
+body.tv-on[data-screen="play"]:not(.tv-notes) .canvas-wrap::after { order: 99; }
+
+body.tv-on[data-screen="play"]:not(.tv-notes) .tv-stage:not(.hidden) { display: contents; }
+body.tv-on[data-screen="play"] .tv-stage-head {
+  order: 1; margin: 0; max-width: 100%; color: var(--text); font-size: var(--fs-headline); font-weight: 650;
+}
+body.tv-on[data-screen="play"] #tvStageSong {
+  order: 2; margin: 0; max-width: 100%; color: var(--muted); font-size: var(--fs-sub);
+}
+body.tv-on[data-screen="play"]:not(.tv-notes) #tvStageSong:empty { display: none; }
+body.tv-on[data-screen="play"]:not(.tv-notes) #handIntro {
+  order: 3; position: static; left: auto; top: auto; transform: none; z-index: auto;
+  max-width: 100%; margin: 2px 0; opacity: 1; transition: none; pointer-events: none;
+}
+body.tv-on[data-screen="play"]:not(.tv-notes) #handIntro:not(:has(.hi:not(.is-gone))) { display: none; }
+body.tv-on[data-screen="play"] #tvStageLive {
+  order: 4; margin: 0; max-width: 100%; color: var(--text); font-family: var(--font-round);
+  font-size: calc(var(--fs-title) * 1.27); font-variant-numeric: tabular-nums; line-height: 1.2;
+}
+body.tv-on[data-screen="play"]:not(.tv-notes) #armPill:not(.hidden) {
+  order: 5; position: static; left: auto; bottom: auto !important; transform: none; z-index: auto;
+  max-width: 100%; margin-top: 2px;
+}
+
+/* the remote never fades with the rest of the HUD, and it stays clickable while idle */
+body.tv-on[data-screen="play"]:not(.tv-notes).hud-idle #topbar { opacity: 1; transform: none; }
+body.tv-on[data-screen="play"]:not(.tv-notes).hud-idle #topbar > * { pointer-events: auto; }
+body.tv-on[data-screen="play"].hud-idle .player-bottom > :not(.hud-line) { opacity: 1; pointer-events: auto !important; }
+/* the remote keeps its place in the flow when idle: player.css:199 would float the bar over the stage and collide with the controls */
+body.tv-on[data-screen="play"].hud-idle .player-bottom {
+  position: relative; inset: auto; background: rgba(4, 5, 13, 0.72);
+}
+
+/* ---------------------------------------------------------------- a short screen on its side: smaller play button, tighter stack */
+@media (orientation: landscape) and (max-height: 500px) {
+  body.tv-on[data-screen="play"]:not(.tv-notes) #topbar { padding: 4px 10px; }
+  body.tv-on[data-screen="play"]:not(.tv-notes) #screen-play > .canvas-wrap { gap: 2px; padding: 2px 12px; }
+  body.tv-on[data-screen="play"]:not(.tv-notes) .tv-stage-head { font-size: var(--fs-sub); line-height: 1.15; }
+  body.tv-on[data-screen="play"]:not(.tv-notes) #tvStageSong { font-size: var(--fs-caption); line-height: 1.15; }
+  body.tv-on[data-screen="play"]:not(.tv-notes) #handIntro { margin: 1px 0; padding: 2px 6px; font-size: var(--fs-caption); }
+  body.tv-on[data-screen="play"]:not(.tv-notes) #handIntro .hi { padding: 2px 6px; gap: 5px; }
+  body.tv-on[data-screen="play"] #tvStageLive { font-size: var(--fs-headline); line-height: 1.15; }
+  body.tv-on[data-screen="play"] .player-bottom { row-gap: 4px; column-gap: 8px; padding: 5px 12px; padding-bottom: max(6px, var(--sab)); }
+  body.tv-on[data-screen="play"] .player-bottom::before { content: ""; order: 1; flex: 1 0 100%; height: 0; margin-top: -4px; }
+  body.tv-on[data-screen="play"] #btnPlay { width: 52px; height: 52px; }
+  body.tv-on[data-screen="play"] #btnPlay svg { width: 24px; height: 24px; }
+  body.tv-on[data-screen="play"] #progress { order: 2; flex: 1 1 120px; width: auto; height: 44px; min-height: 44px; }
+  body.tv-on[data-screen="play"] #timeLabel { order: 3; width: auto; }
+  body.tv-on[data-screen="play"] #customSpeed { order: 1; }
+  body.tv-on[data-screen="play"] .tv-tools { order: 4; }
+  body.tv-on[data-screen="play"] .guided-btn { order: 5; }
+}
+
+/* ---------------------------------------------------------------- key calibration sheet (shown only without .hidden) */
+#tvCalib:not(.hidden) {
+  position: fixed; inset: 0; z-index: 900; display: flex; flex-direction: column; gap: 16px; overflow-y: auto;
+  padding: max(16px, var(--sat)) 16px max(16px, var(--sab));
+  background: var(--surface); color: var(--text);
+}
+#tvCalib .tv-calib-head { display: flex; align-items: center; gap: 12px; min-height: 44px; }
+#tvCalib .tv-calib-head h2 { flex: 1 1 auto; margin: 0; font-size: var(--fs-title); font-weight: 650; letter-spacing: -.01em; }
+#tvCalib #tvCalibClose {
+  min-height: 44px; min-width: 44px; padding: 0 8px; border: 0; background: none;
+  color: var(--accent); font-size: var(--fs-headline); font-weight: 600;
+}
+#tvCalib .tv-calib-copy { margin: 0; color: var(--muted); font-size: var(--fs-body); line-height: 1.4; }
+/* the sixteen dots, filled in as each tap lands */
+#tvCalib .tv-calib-dots { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; }
+#tvCalib .tv-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--surface-3); }
+#tvCalib .tv-dot.on { background: var(--accent); }
+/* the tap area is the lower part of the sheet: no selection, no double tap zoom */
+#tvCalib #tvCalibTap {
+  flex: 1 1 auto; min-height: 55vh; min-height: 55dvh; display: flex; align-items: center; justify-content: center; padding: 16px; border: 0;
+  border-radius: var(--r-lg); background: var(--surface-2); color: var(--text); font-size: var(--fs-title); font-weight: 650;
+  text-align: center; line-height: 1.3; user-select: none; -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+}
+#tvCalib #tvCalibTap:active { background: var(--surface-3); }
+#tvCalib .tv-calib-result { margin: 0; text-align: center; font-size: var(--fs-headline); color: var(--text); font-variant-numeric: tabular-nums; }
+#tvCalib .tv-calib-actions { display: flex; gap: 12px; }
+#tvCalib .tv-calib-actions .primary { flex: 1 1 auto; min-height: 44px; }
+
+/* ---------------------------------------------------------------- the white flash for the delay preview and the sync */
+#tvPulse { position: fixed; inset: 0; z-index: 950; background: #fff; opacity: 0; pointer-events: none; transition: none; }
+#tvPulse.on { opacity: 1; }
+
+/* ---------------------------------------------------------------- reduced motion: no transitions on the remote parts */
+@media (prefers-reduced-motion: reduce) {
+  body.tv-on[data-screen="play"] .tv-extra,
+  body.tv-on[data-screen="play"] .tv-extra:active,
+  body.tv-on[data-screen="play"] #btnPlay { transition: none; }
+  #tvPulse, #tvPulse.on { transition: none; }
+}
+
+/* ---------------------------------------------------------------- safety net: the chip is also .play-only, which can force a display value */
+.tv-chip.hidden, .tv-stage.hidden, .tv-calib.hidden { display: none !important; }
+body.tv-on .tv-chip.hidden, body[data-screen="play"] .tv-chip.hidden { display: none !important; }
+
+/* ---------------------------------------------------------------- iPhone/iPad (P8): one continuous ebony surface, one Wait, a Sync pill */
+/* the remote is one surface: the bar, the stage and the controls share the ebony ground, divided by hairlines instead of bands and boxes */
+html.ios body.tv-on[data-screen="play"]:not(.tv-notes) :is(#app, #screen-play, #screen-play > .canvas-wrap) { background: var(--ebony); }
+html.ios body.tv-on[data-screen="play"]:not(.tv-notes) #topbar { background: var(--ebony); box-shadow: none; border-bottom: .5px solid var(--line); }
+html.ios body.tv-on[data-screen="play"] .player-bottom,
+html.ios body.tv-on[data-screen="play"].hud-idle .player-bottom { background: var(--ebony); border-top: .5px solid var(--line); box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+/* one Wait: the remote's own Wait button is it; the speed list drops its Wait unless Wait is what is on */
+html.ios body.tv-on[data-screen="play"] #speedTrack [data-speed="wait"]:not(.on) { display: none; }
+/* transport as one group: Restart, Play, Back 5 s, with the play button as the one ivory shape */
+html.ios body.tv-on[data-screen="play"] .tv-extra { background: none; box-shadow: inset 0 0 0 1px var(--line-strong); color: var(--text); }
+html.ios body.tv-on[data-screen="play"] .tv-extra:active { background: var(--accent-soft); }
+html.ios body.tv-on[data-screen="play"] .tv-extra[aria-pressed="true"] { background: var(--accent); color: var(--ink); box-shadow: none; }
+html.ios body.tv-on[data-screen="play"] #btnPlay { background: var(--ivory); color: var(--ink); }
+html.ios body.tv-on[data-screen="play"] .tv-tools { justify-content: center; }
+html.ios body.tv-on[data-screen="play"] .tv-tools > .tv-extra { flex: 1 1 0; }
+/* the Sync pill: "Sync 160 ms", and its -10 / +10 steps open beside it when it is tapped */
+html.ios body.tv-on[data-screen="play"] .tv-delay-tools { flex: 1 0 100%; flex-wrap: wrap; gap: var(--s2); justify-content: center; }
+html.ios body.tv-on[data-screen="play"] .tv-sync-pill { flex: none; padding: 0 var(--s4); font-variant-numeric: tabular-nums; }
+html.ios body.tv-on[data-screen="play"] .tv-sync-pill span { color: var(--muted); font-weight: 500; }
+html.ios body.tv-on[data-screen="play"] .tv-sync-panel:not([hidden]) { display: inline-flex; align-items: center; gap: var(--s2); }
+/* the tools are one quiet row (Hands, Wait, Loop, Sync) at the sub size, so "Hands: Both" never wraps and nothing stacks into equal rows;
+   the Sync steps open on their own line under it, and Guided practice is a plain text action, not a fourth band of pills */
+html.ios body.tv-on[data-screen="play"] .tv-tools { flex-wrap: wrap; gap: var(--s2); }
+html.ios body.tv-on[data-screen="play"] .tv-tools > .tv-extra,
+html.ios body.tv-on[data-screen="play"] .tv-sync-pill { flex: 1 1 auto; min-width: 0; padding: 0 var(--s2); font-size: var(--fs-sub); white-space: nowrap; }
+html.ios body.tv-on[data-screen="play"] .tv-delay-tools { flex: 1 1 auto; }
+html.ios body.tv-on[data-screen="play"] .tv-delay-tools:has(.tv-sync-panel:not([hidden])) { flex-basis: 100%; }
+html.ios body.tv-on[data-screen="play"] .tv-delay-tools:has(.tv-sync-panel:not([hidden])) .tv-sync-pill { flex: none; padding: 0 var(--s4); }
+html.ios body.tv-on[data-screen="play"] #screen-play .guided-btn, html.ios body.tv-on[data-screen="play"] #screen-play .guided-btn:hover { min-height: 44px; background: none; box-shadow: none; color: var(--muted); font-size: var(--fs-sub); font-weight: 500; }

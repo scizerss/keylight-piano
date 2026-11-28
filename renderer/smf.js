@@ -7,6 +7,8 @@
 // hysteresis; three or more parts each take the hand of their average pitch.
 // Channel 10 (drums) is skipped.
 
+import { MAX_LYRIC_TEXT } from './lyrics-model.js'
+
 const BAND = 5   // semitones either side of the split where a note follows its line
 
 // Track names that are not a song's title
@@ -22,6 +24,15 @@ export function parseMidi(buffer, opts = {}) {
   const u32 = () => { const v = dv.getUint32(pos); pos += 4; return v }
   const tag = () => { let s = ''; for (let i = 0; i < 4; i++) s += String.fromCharCode(u8()); return s }
   const vlq = () => { let v = 0, b; do { b = u8(); v = v * 128 + (b & 0x7f) } while (b & 0x80); return v }
+  // a text meta event as written: line breaks and edge spaces matter to karaoke words
+  const rawText = (at, n) => {
+    const bytes = new Uint8Array(dv.buffer, dv.byteOffset + at, Math.max(0, Math.min(n, size - at)))
+    try { return new TextDecoder('utf-8', { fatal: true }).decode(bytes) } catch {
+      let s = ''
+      for (const b of bytes) s += String.fromCharCode(b)
+      return s
+    }
+  }
   const text = (at, n) => {
     const bytes = new Uint8Array(dv.buffer, dv.byteOffset + at, Math.max(0, Math.min(n, size - at)))
     let s
@@ -48,6 +59,7 @@ export function parseMidi(buffer, opts = {}) {
   let meter = null                          // first time signature { tick, beats, beatType }
   const tracks = []                         // tracks that have notes
   const names = []                          // every track's name, for the title
+  const textEvents = []                     // { tick, type: 0x05 lyric | 0x01 text, track, raw }, for the lyrics
   const firstProgram = new Array(16).fill(-1)
   for (let t = 0; t < ntracks && pos + 8 <= size; t++) {
     const id = tag()
@@ -74,6 +86,8 @@ export function parseMidi(buffer, opts = {}) {
             if (us >= 20000) tempos.push({ tick, us })   // ignore broken values (over 3000 bpm or 0)
           } else if (type === 0x58 && n >= 2 && (!meter || tick < meter.tick)) {
             meter = { tick, beats: dv.getUint8(pos), beatType: 2 ** Math.min(6, dv.getUint8(pos + 1)) }
+          } else if ((type === 0x05 || type === 0x01) && n > 0 && textEvents.length < 100000) {
+            textEvents.push({ tick, type, track: t, raw: rawText(pos, n) })
           } else if (type === 0x03 && !track.name) track.name = text(pos, n)
           else if (type === 0x04 && !instrument) instrument = text(pos, n)
           pos += n
@@ -193,6 +207,7 @@ export function parseMidi(buffer, opts = {}) {
   const seqName = format === 0 || (tracks[0] && tracks[0].index !== 0) ? names[0] : ''
   return {
     notes, duration, tempo,
+    lyrics: midiLyrics(textEvents, names, sec),
     title: seqName && !NOT_A_TITLE.test(seqName) && seqName.length <= 80 ? seqName : '',
     timeSignature: meter && meter.beats ? { beats: meter.beats, beatType: meter.beatType } : null,
     parts: parts.map((p) => ({ index: p.index, name: p.name, channel: p.channel, program: p.program, noteCount: p.noteCount, low: p.low, high: p.high, hand: p.hand }))
@@ -249,4 +264,57 @@ function splitHands(notes, split, ticksPerBeat) {
     }
     i = j
   }
+}
+
+// Lyrics from lyric events (0x05), or, in a karaoke (.kar) file, from its text events (0x01). A karaoke file says so with
+// "@KMIDI KARAOKE FILE" (or keeps its words on a track named Words); other text events are chord names, cues and so on.
+// "/" or "\\" at the start of a text, or a line break, starts a line. A syllable that does not end in a space carries on into
+// the next ("Twin" "kle " is one word); a file with no spaces anywhere writes a word per event.
+// Returns [{ t, text, cont?, nl? }] in seconds.
+function midiLyrics(events, names, sec) {
+  let list = events.filter((e) => e.type === 0x05)
+  if (!list.length) {
+    const marked = events.some((e) => e.type === 0x01 && /^@KMIDI KARAOKE FILE/i.test(e.raw.trim()))
+    const wordTracks = new Set(names.map((n, i) => (/^words?$/i.test((n || '').trim()) ? i : -1)).filter((i) => i >= 0))
+    list = events.filter((e) => e.type === 0x01 && !/^@/.test(e.raw) && (marked || wordTracks.has(e.track)))
+  }
+  if (!list.length) return []
+  // one track's words are enough (several tracks often repeat them)
+  const first = list[0].track
+  if (list.some((e) => e.track !== first)) {
+    const counts = new Map()
+    for (const e of list) counts.set(e.track, (counts.get(e.track) || 0) + 1)
+    let best = first
+    for (const [track, n] of counts) if (n > counts.get(best)) best = track
+    list = list.filter((e) => e.track === best)
+  }
+  list.sort((a, b) => a.tick - b.tick)
+  let spaced = 0
+  for (const e of list) if (/^\s|\s$/.test(e.raw.replace(/[\r\n]/g, ''))) spaced++
+  const spaceMode = spaced * 10 >= list.length
+  const out = []
+  let newLine = false
+  for (let i = 0; i < list.length; i++) {
+    let raw = list[i].raw
+    if (/^[\\/]/.test(raw)) { newLine = true; raw = raw.slice(1) }
+    if (/^[\r\n]/.test(raw)) newLine = true
+    const endsLine = /[\r\n]\s*$/.test(raw)
+    const body = raw.replace(/[\r\n]+/g, ' ').replace(/[\0-\x1f]/g, '')
+    const textOut = body.trim()
+    const nextRaw = i + 1 < list.length ? list[i + 1].raw : ''
+    if (textOut) {
+      const t = Math.round(sec(list[i].tick) * 1000) / 1000
+      const item = { t, text: textOut.slice(0, MAX_LYRIC_TEXT) }
+      if (newLine) item.nl = true
+      const wordEnds = !spaceMode || /\s$/.test(body) || /^(\s|[\\/\r\n])/.test(nextRaw) || endsLine || i + 1 === list.length
+      if (!wordEnds) item.cont = true
+      out.push(item)
+      newLine = false
+    }
+    if (endsLine) newLine = true
+  }
+  const last = out[out.length - 1]
+  if (last && last.cont) delete last.cont
+  // the same words twice at one time (two tracks, a doubled event): once
+  return out.filter((e, i) => !(i && out[i - 1].t === e.t && out[i - 1].text === e.text))
 }

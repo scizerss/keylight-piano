@@ -1,0 +1,66 @@
+/* Hand placement card (hand-guide-view.js): "Meet your fingers" (intro, centred over a dim page) and
+   "Place your hands" before a song (song, a small card at the top of the player). */
+.hg { position: fixed; inset: 0; z-index: 1500; display: grid; place-items: center; padding: max(var(--s4), env(safe-area-inset-top, 0px)) var(--gutter, 16px) max(var(--s4), env(safe-area-inset-bottom, 0px)); background: var(--scrim); }
+.hg.hidden { display: none; }
+.hg[data-mode="song"] { inset: 0 0 auto 0; place-items: start center; background: none; pointer-events: none; padding-top: max(64px, calc(env(safe-area-inset-top, 0px) + 56px)); }
+.hg-card {
+  pointer-events: auto; width: min(440px, 100%); max-height: calc(100dvh - 32px); overflow: auto;
+  display: flex; flex-direction: column; gap: var(--s2); padding: var(--s4) var(--s5) var(--s5);
+  border-radius: var(--r-lg); background: var(--surface); color: var(--text); box-shadow: var(--shadow), inset 0 0 0 1px var(--line);
+}
+.hg[data-mode="song"] .hg-card { width: min(380px, 100%); padding: var(--s3) var(--s4) var(--s4); gap: var(--s1); }
+.hg-top { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); min-height: 32px; }
+.hg-kicker { font-size: var(--fs-caption); font-weight: 650; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.hg-skip { min-height: 36px; padding: 0 var(--s3); border: 0; border-radius: var(--r-pill); background: none; color: var(--muted); font: inherit; font-size: var(--fs-sub); cursor: pointer; }
+.hg-skip:hover { color: var(--text); background: var(--hover, rgba(255, 255, 255, 0.06)); }
+.hg-skip.hidden, .hg-next.hidden, .hg-main.hidden, .hg-finger.hidden, .hg-keys.hidden { display: none; }
+.hg-main { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--s5); }
+.hg-finger { display: flex; flex-direction: column; align-items: center; line-height: 1; color: var(--right); }
+.hg-finger[data-hand="left"] { color: var(--left); }
+.hg-finger b { font-size: 72px; font-weight: 750; font-variant-numeric: tabular-nums; }
+.hg-finger small { font-size: var(--fs-caption); color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+.hg[data-mode="song"] .hg-finger b { font-size: 48px; }
+.hg-hand { width: 120px; }
+.hg[data-mode="song"] .hg-hand { width: 100px; }
+.hg-hand-svg { display: block; width: 100%; height: auto; }
+/* the hand (hand-guide-view.js handSvg): outline layer under, fills on top, so it reads as one silhouette */
+.hg-hand-svg { --hg-skin: #2c3352; --hg-edge: #5a6386; overflow: visible; stroke: none; }   /* not the app-wide icon stroke (style.css svg) */
+.hg-sil > * { fill: var(--hg-edge); stroke: var(--hg-edge); stroke-width: 3; stroke-linejoin: round; }
+.hg-body > *, .hg-f > rect:first-child { fill: var(--hg-skin); }
+.hg-nail { fill: rgba(255, 255, 255, 0.07); }
+.hg-hand-svg.right .hg-f.on > rect:first-child { fill: var(--right); }
+.hg-hand-svg.left .hg-f.on > rect:first-child { fill: var(--left); }
+.hg-f.on .hg-nail { fill: rgba(255, 255, 255, 0.18); }
+.hg-hand-svg.right .hg-f.on { filter: drop-shadow(0 0 5px color-mix(in srgb, var(--right) 70%, transparent)); }
+.hg-hand-svg.left .hg-f.on { filter: drop-shadow(0 0 5px color-mix(in srgb, var(--left) 70%, transparent)); }
+.hg-n { fill: #cfd6ee; font: 750 12.5px var(--font, system-ui); text-anchor: middle; dominant-baseline: middle; }
+.hg-n.on { fill: var(--ink, #0b0d18); }
+@media (forced-colors: active) {
+  .hg-sil > * { fill: CanvasText; stroke: CanvasText; }
+  .hg-body > *, .hg-f > rect:first-child { fill: Canvas; }
+  .hg-hand-svg.right .hg-f.on > rect:first-child, .hg-hand-svg.left .hg-f.on > rect:first-child { fill: Highlight; }
+  .hg-hand-svg.right .hg-f.on, .hg-hand-svg.left .hg-f.on { filter: none; }
+  .hg-n { fill: CanvasText; } .hg-n.on { fill: HighlightText; }
+}
+.hg-title { margin: 0; font-size: var(--fs-headline); font-weight: 700; text-align: center; outline: 0; }
+.hg-line { margin: 0; color: var(--muted); font-size: var(--fs-body); text-align: center; line-height: 1.4; }
+.hg-hint { min-height: 1.4em; margin: 0; font-size: var(--fs-sub); text-align: center; color: var(--muted); }
+.hg-hint[data-tone="ok"] { color: var(--ok); font-weight: 650; }
+.hg-hint[data-tone="warn"] { color: var(--warn); }
+.hg-next { margin-top: var(--s2); height: 48px; border-radius: var(--r-pill); font-weight: 650; }
+
+/* the small drawn keyboard (intro only): the same cues as the lit keys, and tappable */
+.hg-keys { position: relative; height: 92px; margin-top: var(--s2); touch-action: none; user-select: none; -webkit-user-select: none; }
+.hg-key { position: absolute; top: 0; padding: 0; border: 0; cursor: pointer; display: flex; align-items: flex-end; justify-content: center; font: 650 11px var(--font, system-ui); }
+.hg-key.w { height: 100%; background: #e9ecf4; color: #59607a; border-radius: 0 0 6px 6px; box-shadow: inset -1px 0 0 rgba(0, 0, 0, 0.25); z-index: 1; }
+.hg-key.b { height: 60%; background: #161a2a; color: #cfd5e6; border-radius: 0 0 4px 4px; z-index: 2; }
+.hg-key span { padding-bottom: 6px; pointer-events: none; }
+.hg-key.placed.right { background: color-mix(in srgb, var(--right) 45%, #e9ecf4); color: #1b1006; }
+.hg-key.placed.left { background: color-mix(in srgb, var(--left) 45%, #e9ecf4); color: #06101b; }
+.hg-key.b.placed.right { background: color-mix(in srgb, var(--right) 55%, #161a2a); }
+.hg-key.b.placed.left { background: color-mix(in srgb, var(--left) 55%, #161a2a); }
+.hg-key.pulse.right, .hg-key.pulse:not(.left) { background: var(--right); color: #1b1006; animation: hg-pulse 1s ease-in-out infinite; }
+.hg-key.pulse.left { background: var(--left); color: #06101b; animation: hg-pulse 1s ease-in-out infinite; }
+@keyframes hg-pulse { 50% { filter: brightness(.55); } }
+@media (prefers-reduced-motion: reduce) { .hg-key.pulse { animation: none; } }
+html.reduce-motion .hg-key.pulse { animation: none; }

@@ -3,6 +3,7 @@
 import { seq, itemsFor } from '../builders.js'
 
 const FIVE_C = { 60: 1, 62: 2, 64: 3, 65: 4, 67: 5 }
+const WHITE_NAMES = ['C', 'D', 'E', 'F', 'G', 'A', 'B']
 const find = itemsFor('l1-find-c')
 const alpha = itemsFor('l1-alphabet')
 const fing = itemsFor('l1-fingers')
@@ -27,15 +28,18 @@ export const level1 = {
       goal: 'Find every C on your keyboard using the groups of black keys.',
       teach: [
         'Look at the black keys. They come in groups: two together, then three together, then two again. The pattern repeats along the whole keyboard, so it works like a map.',
-        'Find a group of two black keys. The white key just to the left of that group is C. Every group of two gives you one C. The C closest to the middle of your keyboard is called middle C.'
+        'Find a group of two black keys. The white key just to the left of that group is C. Every group of two gives you one C. The C closest to the middle of your keyboard is called middle C.',
+        'On both hands, your thumb is finger 1. Count up to your little finger, which is finger 5.'
       ],
       tip: 'Say each note name out loud as you press it. Hearing the name while you play helps it stay in your memory.',
       diagram: { type: 'keys', range: [60, 72], highlight: [60, 72], names: true },
       items: [
+        { id: 'hand-intro', title: 'Meet your fingers', type: 'hand-intro', params: { hand: 'right', findC: true }, passAt: 1 },
+        find('ode-intro', 'Ode to Joy: watch and play', 'piece', { notes: seq(ODE.split(' ').slice(0, 8).join(' ')), tempo: 80, hand: 'right', watchFirst: true }, { accuracy: 0.8 }),
         find('theory', 'Spot the C', 'theory', { q: 'Which white key is C?', options: ['Just left of a group of two black keys', 'Just left of a group of three black keys', 'The lowest key, always', 'Between two groups'], answer: 0, why: 'C sits directly to the left of every group of two black keys.' }, { accuracy: 1 }),
-        find('game', 'Find the Key', 'notegame', { game: 'find-the-key', rounds: 10 }, { accuracy: 0.8 })
+        find('game', 'Find every C', 'notegame', { game: 'find-the-key', names: ['C'], mode: 'every', rounds: 3 }, { accuracy: 0.8 })
       ],
-      pass: { minItemsDone: 2 }
+      pass: { minItemsDone: 3 }
     },
     {
       id: 'l1-alphabet', title: 'The musical alphabet', minutes: 8,
@@ -48,7 +52,7 @@ export const level1 = {
       items: [
         alpha('theory', 'What comes after G?', 'theory', { q: 'Which letter comes right after G?', options: ['H', 'A', 'B', 'C'], answer: 1, why: 'The alphabet has only seven letters, so after G it starts again at A.' }, { accuracy: 1 }),
         alpha('theory2', 'Up or down', 'theory', { q: 'You play a key to the right of the one before. What happens to the sound?', options: ['It gets higher', 'It gets lower', 'It stays the same', 'It gets louder'], answer: 0, why: 'Keys further right sound higher; keys further left sound lower.' }, { accuracy: 1 }),
-        alpha('game', 'Find the Key', 'notegame', { game: 'find-the-key', rounds: 15 }, { accuracy: 0.8 })
+        alpha('game', 'Find the Key', 'notegame', { game: 'find-the-key', names: WHITE_NAMES, rounds: 15 }, { accuracy: 0.8 })
       ],
       pass: { minItemsDone: 2 }
     },
@@ -122,11 +126,12 @@ export const level1 = {
       ],
       diagram: { type: 'keys', range: [48, 55], highlight: [48, 50, 52, 53, 55], fingers: { 48: 5, 50: 4, 52: 3, 53: 2, 55: 1 } },
       items: [
+        { id: 'hand-intro-left', title: 'Place your left hand', type: 'hand-intro', params: { hand: 'left', findC: false }, passAt: 1 },
         left('pattern', 'Left-hand walk', 'five-finger', { tb: { type: 'five', tonic: 0, hand: 'left' } }, { accuracy: 0.8 }),
         left('au-clair', 'Au clair de la lune, left hand', 'piece', { notes: seq(AU_CLAIR_LH), tempo: 72, hand: 'left' }, { accuracy: 0.8 }),
         left('theory', 'Which clef?', 'theory', { q: 'Which clef usually holds the left hand\'s notes?', options: ['Treble clef', 'Bass clef', 'Neither', 'Both equally'], answer: 1, why: 'The bass clef is for lower notes, which the left hand normally plays.' }, { accuracy: 1 })
       ],
-      pass: { minItemsDone: 2 }
+      pass: { minItemsDone: 3 }
     },
     {
       id: 'l1-landmarks', title: 'Landmarks and Ode to Joy', minutes: 14,
@@ -153,7 +158,7 @@ export const level1 = {
       exam('piece', 'Mary Had a Little Lamb', 'piece', { notes: seq(MARY), tempo: 80, hand: 'right' }, { accuracy: 0.8 }),
       exam('left', 'Au clair de la lune, left hand', 'piece', { notes: seq(AU_CLAIR_LH), tempo: 72, hand: 'left' }, { accuracy: 0.8 }),
       exam('rhythm', 'Tap the rhythm', 'rhythm', { pattern: [1, 1, 2, 4], tempo: 80, timeSignature: '4/4' }, { accuracy: 0.8 }),
-      exam('names', 'Name the notes', 'notegame', { game: 'find-the-key', rounds: 10 }, { accuracy: 0.8 }),
+      exam('names', 'Name the notes', 'notegame', { game: 'find-the-key', names: WHITE_NAMES, rounds: 10 }, { accuracy: 0.8 }),
       exam('theory', 'Quarter note', 'theory', { q: 'How many beats does a quarter note last?', options: ['1', '2', '3', '4'], answer: 0, why: 'A quarter note lasts one beat.' }, { accuracy: 1 })
     ]
   }

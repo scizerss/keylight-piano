@@ -7,13 +7,13 @@
 // The device UID is a 64-bit integer, which JavaScript cannot represent exactly -
 // so the UID is kept as raw decimal text and spliced into the JSON by hand.
 
-// The packaged Mac app starts its own blocksd on a random loopback port and passes it as
-// ?daemonPort=N; otherwise (a blocksd installed by hand, a development checkout) it is 9010.
+// The opt-in bundled service uses a random loopback port passed in ?daemonPort=N.
+// An external service uses port 9010.
 export function daemonPort(search = typeof location !== 'undefined' ? location.search : '') {
   const n = Number(new URLSearchParams(search).get('daemonPort'))
   return Number.isInteger(n) && n >= 1024 && n <= 65535 ? n : 9010
 }
-// True when the app carries its own light service (the packaged Mac app)
+// True when the app was asked to supervise its bundled light service.
 export function bundledDaemon(search = typeof location !== 'undefined' ? location.search : '') {
   return new URLSearchParams(search).get('bundledDaemon') === '1'
 }
@@ -33,7 +33,7 @@ export function deviceInfo(dev) {
   const level = dev.battery_level == null ? NaN : Number(dev.battery_level)
   return {
     type: dev.block_type || dev.device_type || '',
-    keyCount: Number(dev.key_count) > 0 ? Number(dev.key_count) : KEY_COUNT,
+    keyCount: 'key_count' in dev ? Number(dev.key_count) || 0 : null,
     battery: Number.isFinite(level) ? Math.round((Math.max(0, Math.min(31, level)) / 31) * 100) : null,
     charging: !!dev.battery_charging
   }
@@ -48,6 +48,9 @@ export class LedDaemon {
     this.lastConfig = {}
     this.ws = null
     this.boards = []        // the keyboards being driven, left to right: { uidText, serial, device, pending, busy }
+    this.frameCapable = false
+    this.unsupportedFrames = false
+    this.discoveryDeadline = 0
     this.leftSerial = ''    // which of two keyboards is on the left, where someone has said so
     this.closed = false
     this.reconnectTimer = null
@@ -60,6 +63,7 @@ export class LedDaemon {
   }
 
   get ready() { return !!(this.ws && this.boards.length) }
+  get discovering() { return this.discoveryDeadline > Date.now() }
   get count() { return this.boards.length }
   get uidText() { return this.boards.length ? this.boards[0].uidText : null }
   get device() { return this.boards.length ? this.boards[0].device : null }   // deviceInfo() of the first keyboard
@@ -71,7 +75,9 @@ export class LedDaemon {
     let ws
     try { ws = new WebSocket(`ws://127.0.0.1:${this.port}/ws`) } catch (e) { this.onStatus('unavailable', e.message); this.scheduleReconnect(); return }
     this.ws = ws
+    this.discoveryDeadline = Date.now() + 2000
     ws.onopen = () => {
+      this.discoveryDeadline = Date.now() + 2000
       // device events arrive even before a keyboard is found, so a late keyboard is picked up
       try { ws.send(JSON.stringify({ type: 'subscribe', events: ['button', 'device'] })) } catch {}
       this.discover()
@@ -82,6 +88,9 @@ export class LedDaemon {
     ws.onmessage = (ev) => this.handle(String(ev.data))
     ws.onclose = () => {
       this.ws = null; this.boards = []
+      this.frameCapable = this.unsupportedFrames = false
+      this.discoveryDeadline = 0
+      clearTimeout(this.retryTimer)
       clearTimeout(this.discoverTimer); this.discoverTimer = null
       clearInterval(this.infoTimer); this.infoTimer = null
       this.onStatus('disconnected')
@@ -138,15 +147,15 @@ export class LedDaemon {
   }
 
   // The keyboards in a discover reply. The uids are 64-bit, so they are read as raw digits, in the
-  // same order as the devices. Any other kind of block (a Lightpad) is left out, unless there's
-  // nothing else.
+  // same order as the devices. Older services omit key_count, but still take API mode
+  // on the keyboards they report. Keep those boards for ownership and battery status.
   readBoards(raw, msg) {
     const devices = msg.devices || []
     const all = [...raw.matchAll(/"uid"\s*:\s*(-?\d+)/g)].map((m, i) => ({ uidText: m[1], dev: devices[i] }))
-    const keys = all.filter((b) => b.dev && Number(b.dev.key_count) === KEY_COUNT)
+    const keys = all.filter(({ dev }) => dev && (Number(dev.key_count) > 0 || /^(LKB|RP4)/i.test(dev.serial || '')))
     const seen = new Set()
     const list = []
-    for (const { uidText, dev } of keys.length ? keys : all.slice(0, 1)) {
+    for (const { uidText, dev } of keys) {
       if (seen.has(uidText)) continue
       seen.add(uidText)
       const known = this.boards.find((b) => b.uidText === uidText)
@@ -155,22 +164,30 @@ export class LedDaemon {
     return list
   }
 
+  updateFrameCapability() {
+    this.frameCapable = !this.unsupportedFrames && this.boards.length > 0 &&
+      this.boards.every((b) => b.device.keyCount === KEY_COUNT)
+  }
+
   handle(raw) {
     let msg
     try { msg = JSON.parse(raw) } catch { return }
     if (msg.type === 'discover_response') {
+      this.discoveryDeadline = 0
       const was = this.boards
+      const couldFrame = this.frameCapable
       const list = this.readBoards(raw, msg)
-      if (!list.length) { this.boards = []; this.onStatus('no-device'); this.scheduleDiscover(); return }
       this.boards = list
+      this.updateFrameCapability()
+      if (!list.length) { this.onStatus('no-device'); this.scheduleDiscover(); return }
       this.sortBoards()
       const sameSet = was.length === list.length && list.every((b) => was.some((o) => o.uidText === b.uidText))
       // the keyboards already being driven (the battery check, or a second discover that was
       // in flight at connect): nothing to set up again
-      if (sameSet) { this.onStatus('info', this.device); return }
+      if (sameSet && couldFrame === this.frameCapable) { this.onStatus('info', this.device); return }
       this.lastSig = ''
       const dev = msg.devices && msg.devices.find((d) => d.serial === this.boards[0].serial) || (msg.devices && msg.devices[0])
-      console.log('LED daemon ready uid=' + this.uidText + ' device=' + (dev ? (dev.block_type || dev.device_type) : '?') + describe(this.device) + (list.length > 1 ? ' keyboards=' + list.length + ' serials=' + list.map((b) => b.serial).join(',') : ''))
+      console.log('LED daemon found uid=' + this.uidText + ' device=' + (dev?.block_type || dev?.device_type || '?') + describe(this.device) + (list.length > 1 ? ' keyboards=' + list.length + ' serials=' + list.map((b) => b.serial).join(',') : ''))
       if (was.length && was[0].uidText === this.uidText) this.onStatus('boards')
       else this.onStatus('connected', dev ? (dev.block_type || dev.device_type) : '', this.device)
       this.flush()
@@ -191,7 +208,9 @@ export class LedDaemon {
         this.lastSig = ''
         if (msg.device) {
           known.device = deviceInfo(msg.device)
-          this.onStatus('info', this.device)
+          const couldFrame = this.frameCapable
+          this.updateFrameCapability()
+          this.onStatus(couldFrame === this.frameCapable ? 'info' : 'boards', this.device)
         }
       }
     } else if (msg.type === 'device_removed') {
@@ -200,6 +219,7 @@ export class LedDaemon {
       const at = m ? this.boards.findIndex((b) => b.uidText === m[1]) : -1
       if (at < 0) return
       this.boards.splice(at, 1)
+      this.updateFrameCapability()
       if (this.boards.length) { this.lastSig = ''; this.onStatus('boards'); return }
       this.onStatus('no-device')
       this.scheduleDiscover()
@@ -208,6 +228,18 @@ export class LedDaemon {
       this.onButton(msg.button_id, msg.action)
     } else if (msg.type === 'subscribed') {
       console.log('LED daemon subscribed events=' + (msg.events || []).join(','))
+    } else if (msg.type === 'error' && msg.message === 'unknown type: key_frame') {
+      // This reply has no UID. Release every queued frame and remember the limitation
+      // for this connection, including across later discover replies.
+      this.unsupportedFrames = true
+      this.updateFrameCapability()
+      for (const b of this.boards) { b.busy = false; b.pending = null }
+      this.lastSig = ''
+      this.onStatus('incompatible')
+    } else if (msg.type === 'error') {
+      // any other refusal (it carries no UID): free the boards waiting on an ack so later frames still go out
+      console.log('LED daemon error: ' + (msg.message || '?'))
+      for (const b of this.boards) b.busy = false     // not lastSig: an error every frame must not turn into a resend loop
     } else if (msg.type === 'key_frame_ack') {
       const uid = (raw.match(/"uid"\s*:\s*(-?\d+)/) || [])[1]
       const board = this.boards.find((b) => b.uidText === uid) || this.boards[0]
@@ -242,7 +274,7 @@ export class LedDaemon {
 
   // 0..255 global key brightness (blocksd converts to the device's heap brightness)
   brightness(value) {
-    if (!this.ready) return
+    if (!this.frameCapable) return
     this.lastSig = ''      // blocksd applies brightness to the next frame, so resend it
     const v = Math.max(0, Math.min(255, Math.round(value)))
     for (const b of this.boards) this.ws.send(`{"type":"brightness","uid":${b.uidText},"value":${v}}`)
@@ -250,6 +282,7 @@ export class LedDaemon {
 
   // colors: array of [r,g,b], 24 per keyboard from the left
   send(colors) {
+    if (!this.frameCapable) return
     this.boards.forEach((b, i) => {
       const part = colors.slice(i * KEY_COUNT, (i + 1) * KEY_COUNT)
       // a keyboard this frame doesn't reach goes dark once, rather than keeping its last picture
@@ -261,7 +294,7 @@ export class LedDaemon {
   }
 
   flush() {
-    if (!this.ready) return
+    if (!this.frameCapable) return
     for (const b of this.boards) {
       if (b.busy || !b.pending) continue
       const colors = b.pending
@@ -291,6 +324,8 @@ export class LedDaemon {
     this.infoTimer = null
     if (this.ws) { try { this.ws.close() } catch {} ; this.ws = null }
     this.boards = []
+    this.frameCapable = this.unsupportedFrames = false
+    this.discoveryDeadline = 0
   }
 }
 

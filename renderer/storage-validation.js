@@ -22,18 +22,33 @@ const settingChecks = {
   brightness: isNum, volume: isNum, backingVolume: isNum, countIn: isNum, rate: isNum,
   bendRange: isNum, kbZero: isNum,
   metronome: bool, band: bool, accompany: bool, kbLightsSwap: bool, recordTakes: bool,
-  sheet: bool, camMirror: bool, fingerCoaching: bool,
+  sheet: bool, camMirror: bool, fingerCoaching: bool, tourDone: bool,
   labels: text, view: text, hands: text, waitMode: text, instrument: text, keyboardMode: text,
   fx: (v) => v === 'full' || v === 'lite',
   fingerSource: (v) => v === 'camera' || v === 'airwave',
-  kbPort: text, kbLast: text, kbLightsLeft: text, userColor: text, audioOutput: text, camId: text,
+  kbMidiSeen: bool, kbPort: text, kbLast: text, kbLightsLeft: text, userColor: text, audioOutput: text, camId: text,
   expression: (v) => v === null || bool(v),
-  kbKeysFor: (v) => mapOf(v, (n) => [24, 48, 49].includes(n)),
+  glide: bool,
+  kbKeysFor: (v) => mapOf(v, (n) => Number.isInteger(n) && n >= 24 && n <= 88),
   kbBaseFor: (v) => mapOf(v, isNum),
   kbPair: (v) => mapOf(v, (p) => plain(p) && (p.side === 0 || p.side === 1) && isNum(p.low)),
+  kbOwnColours: (v) => idMap(v, (j) => plain(j) && mapOf(j.values, isNum) && mapOf(j.written, isNum) && bool(j.dirty) && isNum(j.at)),
   airCalib: (v) => v === null || (plain(v) && [v.a, v.b].every((p) => plain(p) && isNum(p.x) && isNum(p.y) && isNum(p.z) && isNum(p.f)) && (v.lift === undefined || v.lift === 1 || v.lift === -1) && (v.n === undefined || Number.isInteger(v.n))),
   camCalib: (v) => v === null || (plain(v) && point(v.a) && point(v.b)),
-  freeScale: (v) => plain(v) && isNum(v.root) && count(v.idx)
+  freeScale: (v) => plain(v) && isNum(v.root) && count(v.idx),
+  // the setup's level answer and the hand placement guide (hand-guide.js)
+  experience: (v) => ['', 'new', 'some', 'experienced'].includes(v),
+  handGuide: (v) => ['auto', 'always', 'off'].includes(v),
+  waitStyle: (v) => ['breathe', 'steady'].includes(v),
+  partyColor: (v) => ['one', 'hands', 'rgb'].includes(v),   // Settings > Lights colour on a key-light keyboard (party-lights.js)
+  nextStyle: (v) => ['glow', 'pulse', 'buildup', 'off'].includes(v),
+  handGuideRuns: count,
+  tvSetup: (v) => ['airplay', 'cable'].includes(v),
+  tvDelayMs: isNum,  // legacy Screen Mirroring delay
+  tvDelayBySetup: (v) => idMap(v, isNum),
+  tvSound: (v) => ['tv', 'phone', 'muted'].includes(v),
+  tvPhoneNotes: bool,
+  tvCalibOffered: bool
 }
 
 export function validStoredValue(key, value) {
@@ -47,7 +62,8 @@ export function validStoredValue(key, value) {
       return Array.isArray(value) && value.every((v) => plain(v) && text(v.file) && positive(v.at))
     case 'lumi.streak.count': return count(value)
     case 'lumi.streak.last': return value === null || text(value)
-    case 'lumi.onboarded': return bool(value)
+    case 'lumi.onboarded':
+    case 'lumi.betaNoticeSeen': return bool(value)
     case 'lumi.audioSafeBuffer':
     case 'lumi.supportOfferSeen': return value === 1
     case 'lumi.guided.mode': return value === 'wait' || value === 'timed'

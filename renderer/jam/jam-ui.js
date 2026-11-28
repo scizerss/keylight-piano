@@ -9,6 +9,7 @@
 //         exit(), download?(filename, bytes, mime) }
 // Returns { destroy, noteOn, noteOff, bend, press, slide, state }.
 import { createClock } from './clock.js'
+import { dot } from '../studio-copy.js'
 import { eventsInWindow, gridFromClip } from './looper.js'
 import { SCALES, inScale, snap, scalePitches } from './scales.js'
 import { sessionToMidi } from './midi-export.js'
@@ -18,7 +19,8 @@ import {
 } from './session.js'
 
 const STORE_KEY = 'lumi.jam'
-const LIGHT_COLOUR = '#7cf0c6'
+// the lock-to-key scale lights sent to the keyboard: right-hand amber in the iPhone/iPad app (Illuminated Studio has no mint), mint elsewhere
+const lightColour = () => (typeof document !== 'undefined' && document.documentElement && document.documentElement.classList.contains('ios') ? '#ff8a3d' : '#7cf0c6')
 const KEY_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 const BLACK = new Set([1, 3, 6, 8, 10])
 const DRUM_PITCH = [60, 62, 64, 65, 67, 69, 71, 72]   // the key that plays each drum
@@ -91,14 +93,9 @@ export function mountJam(root, deps) {
   let audioProblem = ''
   const instrumentOptions = () => {
     const list = audio.instrumentList ? audio.instrumentList() : []
-    const isReady = (id) => {
-      try {
-        if (audio.sampledInstrumentStatus) return audio.sampledInstrumentStatus(id).state === 'ready'
-        if (id === 'sampled-piano' && audio.sampledPianoStatus) return audio.sampledPianoStatus().state === 'ready'
-      } catch (_e) {}
-      return false
-    }
-    return list.filter((i) => !i.sampled || isReady(i.id))
+    let ready = false
+    try { ready = !!(audio.sampledPianoStatus && audio.sampledPianoStatus().state === 'ready') } catch (_e) { ready = false }
+    return list.filter((i) => i.id !== 'sampled-piano' || ready)
   }
   try {
     if (audio.initAudio) audio.initAudio()
@@ -515,12 +512,29 @@ export function mountJam(root, deps) {
   let keyLo = 48
   const keyEls = new Map()
   const kbHost = h('div', { class: 'jam-kbscroll' })
+  const jamWindow = doc.defaultView
+  let centerKeysFrame = 0
   ui.octDown = btn('Octave down', 'ghost jam-btn', () => shiftOctave(-12), 'Move the keyboard down one octave')
   ui.octUp = btn('Octave up', 'ghost jam-btn', () => shiftOctave(12), 'Move the keyboard up one octave')
   ui.kbHelp = h('p', { class: 'jam-help' })
   page.appendChild(h('section', { class: 'jam-card', 'aria-label': 'Keyboard' },
     h('div', { class: 'jam-kbhead' }, h('h2', { class: 'jam-h2' }, 'Keyboard'), h('div', { class: 'jam-head-actions' }, ui.octDown, ui.octUp)),
     kbHost, ui.kbHelp))
+
+  function centerKeyboard() {
+    if (!jamWindow) return
+    jamWindow.cancelAnimationFrame(centerKeysFrame)
+    centerKeysFrame = jamWindow.requestAnimationFrame(() => {
+      centerKeysFrame = 0
+      const key = keyEls.get(60) || keyEls.get(keyLo + 12)
+      if (key && kbHost.scrollWidth > kbHost.clientWidth) {
+        kbHost.scrollLeft = key.offsetLeft + (key.offsetWidth - kbHost.clientWidth) / 2
+      }
+    })
+  }
+
+  const orientation = jamWindow?.matchMedia('(orientation: portrait)')
+  if (orientation) listen(orientation, 'change', centerKeyboard)
 
   function buildKeyboard() {
     releaseScreenKeys()
@@ -557,6 +571,7 @@ export function mountJam(root, deps) {
     }
     kbHost.replaceChildren(kb)
     renderKeys(session.get())
+    centerKeyboard()
   }
   function shiftOctave(delta) {
     keyLo = clamp(keyLo + delta, 24, 72)
@@ -765,7 +780,7 @@ export function mountJam(root, deps) {
     let step = -1
     if (clock.running) {
       const b = currentBeat()
-      readout = st.rec.phase === 'armed' && st.rec.skip > 0 ? 'Count-in' : `Bar ${Math.floor(b / BEATS_PER_BAR) + 1} · Beat ${Math.floor(b % BEATS_PER_BAR) + 1}`
+      readout = st.rec.phase === 'armed' && st.rec.skip > 0 ? 'Count-in' : `Bar ${Math.floor(b / BEATS_PER_BAR) + 1}${dot()}Beat ${Math.floor(b % BEATS_PER_BAR) + 1}`
       const slot = st.tracks[DRUM_TRACK].active[0]
       const clip = slot === st.prefs.slots[DRUM_TRACK] ? st.tracks[DRUM_TRACK].slots[slot] : null
       if (clip && grid.total) step = Math.floor(((b % clip.lengthBeats) / clip.lengthBeats) * grid.total)
@@ -805,7 +820,7 @@ export function mountJam(root, deps) {
       applied.lock = lockKey
       if (lights) {
         try {
-          if (lockKey) lights.show(scalePitches(st.key, st.scale, 21, 108), LIGHT_COLOUR)
+          if (lockKey) lights.show(scalePitches(st.key, st.scale, 21, 108), lightColour())
           else lights.clear()
         } catch (_e) { /* no keyboard attached */ }
       }
@@ -843,6 +858,7 @@ export function mountJam(root, deps) {
 
   function destroy() {
     if (!alive) return
+    if (centerKeysFrame) jamWindow.cancelAnimationFrame(centerKeysFrame)
     stop()
     cancelClicks()
     alive = false
@@ -869,6 +885,7 @@ export function mountJam(root, deps) {
 
   const api = {
     destroy,
+    releaseNotes: releaseAllLive,   // let go of every key still sounding (setup opens over a held note)
     noteOn: (pitch, vel = 100, channel = 0) => startNote(session.get().prefs.track, pitch, vel, channel),
     noteOff: (pitch, lift = 64, channel = 0) => endNote(pitch, lift, channel),
     bend: (channel, semis) => gesture(channel, 'bend', semis),

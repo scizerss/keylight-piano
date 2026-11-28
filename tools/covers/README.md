@@ -1,3 +1,7 @@
+> Retired: the app no longer uses illustrated cover pictures. Covers are now drawn from each song by `renderer/cover-art.js`.
+> The only live tool here is `prints.js` (`node tools/covers/prints.js`), which rebuilds `renderer/cover-prints.js` (each built-in song's
+> opening notes) after a song is added. The illustration generator below is kept for reference and writes to `renderer/covers/` when run.
+
 # Cover art generator
 
 Draws the 57 Mutopia song covers (`renderer/covers/<id>.png`, 512x512) from hand-authored scene specs.

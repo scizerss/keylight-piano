@@ -12,12 +12,13 @@
 // Diagram { type: 'keys',  range: [lo, hi], highlight?: number[], names?: boolean, fingers?: {pitch: 1..5} }
 //         | { type: 'staff', clef: 'treble'|'bass'|'grand', notes: [{ p, label? }] }
 //         | { type: 'hands', hand: 'right'|'left'|'both', numbers?: boolean }
-// Item    { id, title, type, params, passAt }   passAt: { accuracy?: 0..1, stars?: 1..5 }
+// Item    { id, title, type, params, passAt }   passAt: { accuracy?: 0..1, stars?: 1..5 }, or 1 for hand-intro
 // Exam    { id, title, items: Item[], passPercent, minTaskPercent? }   (overall and per-task floor)
 //
 // Item types                 status      params
 //   five-finger|scale|arpeggio|chord   existing  { tb: { type, tonic, hand } }  -> app.js TB_TYPES
-//   notegame                   existing    { game, rounds? }   game is a NOTE_GAMES id
+//   notegame                   existing    { game, rounds?, names?, mode?: 'every' }
+//                                          names and mode are only for 'find-the-key'
 //   piece                      existing/inline  { song, from?, to?, hand? }  (a file in renderer/songs)
 //                                          or    { notes: [{ p, beats }], tempo, hand, timeSignature? }
 //                                          or    { tracks: { right: notes, left: notes }, tempo }  (hands together, equal length)
@@ -27,8 +28,11 @@
 //   ear                        NEW  { kind: 'higher-lower'|'same-different'|'step-skip'|'direction'|'interval'|'chord', rounds? }
 //   sight                      NEW  { range: [lo, hi], hand, key, length }   length in bars
 //   theory                     NEW  { q, options: string[], answer: index, why }
+//   hand-intro                       { hand: 'right'|'left', findC: boolean }
 // 'five-finger'|'scale'|'arpeggio'|'chord' map onto TB_TYPES: five-finger -> five, scale -> scale|minor|harmonic,
 // arpeggio -> chord|minorarp, chord -> cadence (params.tb.type holds the real TB_TYPES key).
+
+import { NOTE_NAMES } from '../notegames.js'
 
 export const MAX_TEACH_WORDS = 60
 export const TB_KEYS = ['scale', 'minor', 'harmonic', 'five', 'chord', 'minorarp', 'cadence']
@@ -36,7 +40,7 @@ export const NOTE_GAME_IDS = ['find-the-key', 'read-treble', 'read-bass']
 export const EAR_KINDS = ['higher-lower', 'same-different', 'step-skip', 'direction', 'interval', 'chord']
 export const ITEM_TYPES = {
   'five-finger': { existing: true }, scale: { existing: true }, arpeggio: { existing: true }, chord: { existing: true },
-  notegame: { existing: true }, piece: { existing: true },
+  notegame: { existing: true }, piece: { existing: true }, 'hand-intro': { existing: true },
   echo: { existing: false }, rhythm: { existing: false }, ear: { existing: false }, sight: { existing: false }, theory: { existing: false }
 }
 const HANDS = ['right', 'left', 'both']
@@ -59,6 +63,10 @@ function checkParams(item, at, bad) {
   const p = item.params
   if (!plain(p)) return bad(at, 'params must be an object')
   switch (item.type) {
+    case 'hand-intro':
+      if (p.hand !== 'right' && p.hand !== 'left') bad(at, 'hand-intro needs hand right or left')
+      if (typeof p.findC !== 'boolean') bad(at, 'hand-intro needs boolean findC')
+      break
     case 'five-finger': case 'scale': case 'arpeggio': case 'chord': {
       const tb = p.tb
       if (!plain(tb) || !TB_KEYS.includes(tb.type) || !(Number.isInteger(tb.tonic) && tb.tonic >= 0 && tb.tonic < 12) || !HANDS.includes(tb.hand)) bad(at, 'params.tb needs {type in TB_TYPES, tonic 0-11, hand}')
@@ -67,6 +75,8 @@ function checkParams(item, at, bad) {
     case 'notegame':
       if (!NOTE_GAME_IDS.includes(p.game)) bad(at, `unknown note game "${p.game}"`)
       if (p.rounds !== undefined && !(Number.isInteger(p.rounds) && p.rounds > 0)) bad(at, 'rounds must be a positive integer')
+      if (p.names !== undefined && (p.game !== 'find-the-key' || !Array.isArray(p.names) || !p.names.length || !Array.from(p.names).every((name) => NOTE_NAMES.includes(name)))) bad(at, 'names must be a non-empty list of note names for find-the-key')
+      if (p.mode !== undefined && (p.game !== 'find-the-key' || p.mode !== 'every')) bad(at, 'mode must be "every" for find-the-key')
       break
     case 'piece':
       if (p.tracks !== undefined) {
@@ -116,6 +126,10 @@ function checkItem(item, at, bad, ids) {
   if (!Object.hasOwn(ITEM_TYPES, item.type)) return bad(at, `unknown item type "${item.type}"`)
   checkParams(item, at, bad)
   const pa = item.passAt
+  if (item.type === 'hand-intro') {
+    if (pa !== 1) bad(at, 'hand-intro needs passAt 1')
+    return
+  }
   if (!plain(pa) || (pa.accuracy === undefined && pa.stars === undefined)) bad(at, 'passAt needs accuracy and/or stars')
   else {
     if (pa.accuracy !== undefined && !(isNum(pa.accuracy) && pa.accuracy > 0 && pa.accuracy <= 1)) bad(at, 'passAt.accuracy must be in (0, 1]')

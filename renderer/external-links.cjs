@@ -5,7 +5,8 @@ const destinations = new Set([
   'https://github.com/scizerss/keylight-piano/issues',
   'https://github.com/scizerss/keylight-piano/releases',
   'https://github.com/scizerss/keylight-piano/releases/latest',
-  'https://github.com/demixme/GRAB'
+  'https://github.com/demixme/GRAB',
+  'https://www.partykeys.com/discount/MMDMAGDY?ref=m7md333magdy'
 ])
 
 // A new GitHub issue with a pre-filled title and body. The check reads the raw string, not a parsed

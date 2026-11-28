@@ -12,7 +12,7 @@
 }
 .ds-steps button i { font-style: normal; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: rgba(255, 255, 255, 0.08); font-size: 12px; }
 .ds-steps button:hover { color: var(--text); background: var(--hover); }
-.ds-steps button.done i { background: rgba(124, 240, 198, 0.2); color: var(--accent-hi, var(--accent)); }
+.ds-steps button.done i { background: rgba(var(--accent-rgb), 0.2); color: var(--accent-hi, var(--accent)); }
 .ds-steps button[aria-current="step"] { color: var(--ink); background: linear-gradient(180deg, var(--mint), var(--mint-2)); border-color: transparent; }
 .ds-steps button[aria-current="step"] i { background: rgba(7, 20, 43, 0.18); color: var(--ink); }
 .ds-steps button:focus-visible, .ds-check input:focus-visible, .ds-field select:focus-visible { outline: 2px solid var(--mint); outline-offset: 2px; }
@@ -32,7 +32,7 @@
 .ds-port-top strong { overflow-wrap: anywhere; }
 .ds-port-meta, .ds-ident span { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
 .ds-pill { font-size: 11.5px; padding: 3px 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); color: var(--muted); flex: none; }
-.ds-pill.on { background: rgba(124, 240, 198, 0.18); color: var(--accent-hi, var(--accent)); }
+.ds-pill.on { background: rgba(var(--accent-rgb), 0.18); color: var(--accent-hi, var(--accent)); }
 .ds-ident { padding: 12px 14px; display: grid; gap: 3px; margin-bottom: 8px; }
 .ds-card { padding: 16px 18px; margin-bottom: 12px; }
 .ds-card h3 { margin: 0 0 4px; font-size: 16px; }
@@ -53,7 +53,7 @@
 .ds-fieldset > .ds-check { display: inline-flex; margin-right: 8px; }
 .ds-check { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 14px; border-radius: 14px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.04); cursor: pointer; font-size: 14px; color: var(--text); }
 .ds-check:hover { background: var(--hover); }
-.ds-check:has(input:checked) { border-color: var(--accent-line, var(--mint-2)); background: rgba(124, 240, 198, 0.1); }
+.ds-check:has(input:checked) { border-color: var(--accent-line, var(--mint-2)); background: rgba(var(--accent-rgb), 0.1); }
 .ds-check input { accent-color: var(--mint-2); width: 18px; height: 18px; margin: 0; }
 #dsPreview { white-space: pre-wrap; overflow-wrap: anywhere; max-height: min(46vh, 420px); overflow: auto; margin: 0 0 10px; padding: 16px; border-radius: 16px; background: rgba(4, 6, 22, 0.7); border: 1px solid var(--pane-line); font: 13px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; user-select: text; color: var(--text); }
 .ds-send { display: flex; gap: 12px; flex-wrap: wrap; margin: 4px 0 16px; }

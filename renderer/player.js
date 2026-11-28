@@ -11,7 +11,7 @@
 //                       minus the audio output latency. Falling notes, key lights,
 //                       wait gating and scoring all use this one so they agree
 //                       with the sound.
-import { createScore, judgeHit, markHit, markWrong, tickMisses, summarize, resetExpected, carryOver, WINDOWS } from './scoring.js'
+import { judgeHit, markHit, markWrong, tickMisses, summarize, resetExpected, carryOver, WINDOWS } from './scoring.js'
 import { noteGroups } from './songloader.js'
 
 export const WINDOW_KEYS = 24      // a longer keyboard sets player.windowKeys
@@ -50,11 +50,17 @@ export class Player {
     // Bumped on every transport discontinuity (play, pause, seek, wait, loop, rate)
     // so the audio scheduler knows to drop what it queued and start over.
     this.epoch = 0
+    // Bumped on every jump of the playhead or the notes (seek, loop wrap, restart, song load, speed, hand, window and
+    // section changes). The TV page snaps on it; play, pause and waits do not move it, so they ease instead.
+    this.rev = 0
+    this.loopIteration = 0
 
     this._anchorAt = 0
     this._anchorPos = 0
+    this.tvOutputLatency = null // native route latency in seconds, set by TV mode
     this._countInUntil = 0
     this._countInStart = 0
+    this._countInRunBeats = 0   // beats of the count-in that last started (the HUD and the clicks follow it)
     this._groups = []
     this._groupIndex = 0
     this._parts = null          // window parts of the song, see windowAt()
@@ -75,11 +81,29 @@ export class Player {
     this.waiting = false
     this.needPitches.clear()
     this.finished = false
+    this.arrangementChangedMidRun = false
     this.sectionStart = 0
     this.score = null
     this.minRate = Infinity
     this._reindex()
     this._emit()
+  }
+
+  replaceArrangement(song, stay = null, windowKeys = this.windowKeys) {
+    const position = this.currentPosition()
+    const wasActive = this.active
+    const wasFinished = this.finished
+    const loop = this.loop
+    const from = this.sectionStart
+    const to = this.endAt
+    this.windowKeys = windowKeys
+    this.load(song, stay)
+    if (from || to != null) this.setSection(from, to)
+    this.setLoop(loop.a, loop.b, loop.on)
+    this.seek(position)
+    this.arrangementChangedMidRun = position > 1e-3
+    this.finished = wasFinished
+    if (wasActive && this.position < this.end - 1e-3) this.play({ countIn: false, quiet: true })
   }
 
   filteredNotes() {
@@ -126,6 +150,7 @@ export class Player {
   }
 
   _reindex() {
+    this.rev++
     this.speedNotes = this.filteredNotes()
     this._groups = noteGroups(this.playableNotes())
     this._groupIndex = this._firstGroupAtOrAfter(this.position)
@@ -145,7 +170,29 @@ export class Player {
   // its last beat leads into the first note.
   get countInSeconds() {
     const beat = 60 / ((this.song ? this.song.tempo : 120) * (this.rate || 1))
-    return this.countIn * beat
+    return this.countInBeats * beat
+  }
+
+  // One bar of the song's meter in beats, 0 when the song doesn't say. 6/8 counts 3, 4/4 counts 4.
+  get barBeats() {
+    const ts = this.song && this.song.timeSignature
+    if (!ts || !(ts.beats > 0) || !(ts.beatType > 0)) return 0
+    return Math.max(2, Math.min(8, Math.round((ts.beats * 4) / ts.beatType)))
+  }
+  // Beats the count-in has: one bar when the meter is known, else the setting. 0 = the user turned it off.
+  get countInBeats() { return this.countIn > 0 ? (this.barBeats || this.countIn) : 0 }
+
+  // Start of the bar holding song time `pos` (song seconds), never before the section start.
+  barStartAt(pos) {
+    const from = this.sectionStart || 0
+    const bars = this.song && this.song.bars
+    if (Array.isArray(bars) && bars.length > 1 && typeof bars[0] === 'number') {
+      let at = from
+      for (const b of bars) { if (b <= pos + 0.02) at = Math.max(at, b); else break }
+      return at
+    }
+    const bar = (this.barBeats || 4) * 60 / (this.song && this.song.tempo > 0 ? this.song.tempo : 120)
+    return from + Math.floor((pos - from) / bar + 0.02) * bar
   }
 
   now() {
@@ -155,6 +202,7 @@ export class Player {
 
   // Seconds between the audio engine rendering a sample and it leaving the speaker.
   outputLatency() {
+    if (this.tvOutputLatency != null) return this.tvOutputLatency
     const ctx = this.getCtx()
     if (!ctx) return 0
     const l = (ctx.outputLatency || 0) || (ctx.baseLatency || 0)
@@ -179,14 +227,28 @@ export class Player {
   timeAt(pos) { return this._anchorAt + (pos - this._anchorPos) / this.rate }
 
   // ---------- transport ----------
-  play() {
+  // opts.countIn === false: start with no count-in (a key press starts Wait mode).
+  // opts.quiet: carry on where it is, no count-in and no step back (internal re-starts, e.g. the keys moved).
+  play(opts = {}) {
     if (!this.song) return
     if (this.waiting) return          // already "running", just waiting for you
     if (this.finished || this.position >= this.end - 1e-3) this.restart(false)
+    const fromStart = this.position <= (this.sectionStart || 0) + 1e-3
+    let beats = 0
+    if (this.countIn > 0 && opts.countIn !== false) {
+      if (fromStart) beats = this.countInBeats
+      // Timed play always counts in, also on a resume or from the middle: step back to the
+      // start of the bar first, so the count leads into notes you can hear coming.
+      else if (!opts.quiet && this.mode === 'PLAY') {
+        this.seek(this.barStartAt(this.position))
+        beats = this.countInBeats
+      }
+    }
     let startAt = this.now()
-    if (this.position === 0 && this.countIn > 0) {
+    if (beats > 0) {
+      this._countInRunBeats = beats
       this._countInStart = startAt
-      this._countInUntil = startAt + this.countInSeconds
+      this._countInUntil = startAt + beats * 60 / ((this.song.tempo || 120) * (this.rate || 1))
       startAt = this._countInUntil
     } else {
       this._countInUntil = 0
@@ -200,6 +262,32 @@ export class Player {
     if (this.mode === 'WATCH') this.advancement = 'continuous'
     this.epoch++
     this._emit()
+  }
+
+  // Wait mode, stopped at the start (or finished): the next key press starts it.
+  get armed() {
+    if (!this.song || this.active || this.mode !== 'PRACTISE' || this.advancement === 'continuous') return false
+    return this.finished || this.position <= (this.sectionStart || 0) + 1e-3
+  }
+
+  // The notes the first wait stops on: what the pill and the lit keys ask for.
+  firstWaitNotes() {
+    if (this.finished) return []
+    const g = this._groups[this._firstGroupAtOrAfter(this.position)]
+    return g ? g.notes.filter((n) => !this._isHit(n)) : []
+  }
+
+  // Start an armed Wait mode: no count-in, straight to waiting on the first notes, so the
+  // key that started it counts if it is the right one. Returns false when not armed.
+  startArmed() {
+    if (!this.armed) return false
+    if (this.finished || this.position >= this.end - 1e-3) this.restart(false)
+    this.play({ countIn: false, quiet: true })
+    for (let i = this._groupIndex; i < this._groups.length; i++) {
+      const pending = this._groups[i].notes.filter((n) => !this._isHit(n))
+      if (pending.length) { this._groupIndex = i; this._enterWait(this._groups[i], pending); break }
+    }
+    return true
   }
 
   pause() {
@@ -220,6 +308,7 @@ export class Player {
   toggle() { this.active ? this.pause() : this.play() }
 
   restart(countIn = true) {
+    this.arrangementChangedMidRun = false
     this.position = this.sectionStart || 0
     this.waiting = false
     this.needPitches.clear()
@@ -230,7 +319,8 @@ export class Player {
     this.minRate = Infinity
     this._reindex()
     this.epoch++
-    if (countIn && this.countIn > 0) this.play()
+    // Wait mode doesn't count in: it is armed and the first key starts it
+    if (countIn && this.countIn > 0 && !(this.mode === 'PRACTISE' && this.advancement !== 'continuous')) this.play()
     this._emit()
   }
 
@@ -262,12 +352,14 @@ export class Player {
     this._anchorPos = clamped
     this._countInUntil = 0
     this.playing = wasRunning
+    this.rev++
     this.epoch++
     this._emit()
   }
 
   // Jump back to the loop start and make every note in the loop playable again.
   _loopBack() {
+    this.loopIteration++
     this.seek(this.loop.a)   // seek puts the loop's notes back to pending
   }
 
@@ -297,6 +389,7 @@ export class Player {
     this._anchorAt = this.now()
     this._anchorPos = pos
     if (this._countInUntil > this._anchorAt) this._anchorAt = this._countInUntil
+    this.rev++
     this.epoch++
     this._emit()
   }
@@ -323,7 +416,7 @@ export class Player {
     this.windowStart = s
     this._reindex()
     this.epoch++
-    if (wasActive && !this.playing) this.play()
+    if (wasActive && !this.playing) this.play({ quiet: true })
     this._emit()
   }
   // The keyboard turned out longer or shorter: fit the song to it again.
@@ -338,7 +431,7 @@ export class Player {
       this._reindex()
       this.epoch++
     }
-    if (wasActive && !this.playing) this.play()
+    if (wasActive && !this.playing) this.play({ quiet: true })
     this._emit()
   }
   _fitWindow(stay) {
@@ -440,9 +533,13 @@ export class Player {
     if (!this.song) return
     if (this.waiting && this.needPitches.has(pitch)) {
       this.needPitches.delete(pitch)
-      const note = this._waitGroup && this._waitGroup.notes.find((n) => n.pitch === pitch)
-      const res = note ? markHit(this.score, note, this.now() - this._waitSince) : null
-      if (res) this.onJudgement(res)
+      const waited = this.now() - this._waitSince
+      let res
+      for (const note of this._waitGroup?.notes || []) {
+        if (note.pitch !== pitch) continue
+        const hit = markHit(this.score, note, waited)
+        if (hit) { res ||= hit; this.onJudgement(hit) }
+      }
       if (this.needPitches.size === 0) this._resumeFromWait()
       return res || { kind: 'waitHit', pitch }
     }
@@ -475,6 +572,9 @@ export class Player {
     this.playing = false
     this.position = this.end
     this.epoch++
+    if (this.mode !== 'WATCH') {
+      for (const missed of tickMisses(this.score)) this.onJudgement({ kind: 'missed', pitch: missed.pitch, hand: missed.hand })
+    }
     const summary = summarize(this.score, this.mode)
     this.onFinish(summary)
     this._emit()
@@ -501,6 +601,7 @@ export class Player {
 
   snapshot() {
     const pos = this.currentPosition()
+    const now = this.now()
     return {
       position: pos,
       playing: this.playing,
@@ -513,13 +614,15 @@ export class Player {
       windowStart: this.windowStart,
       handFilter: this.handFilter,
       loop: this.loop,
+      loopIteration: this.loopIteration,
       rate: this.rate,
       countInStart: this._countInStart,
       countInUntil: this._countInUntil,
+      countInBeats: this._countInUntil > now ? this._countInRunBeats : 0,
       // a running count-in keeps the length it started with, even if the speed changes
       countInSeconds: this._countInUntil > this._countInStart ? this._countInUntil - this._countInStart : this.countInSeconds,
       tempo: this.song ? this.song.tempo : 120,
-      now: this.now(),
+      now,
       activeNotes: this.activeNotes(pos),
       upcomingNotes: this.upcomingNotes(pos),
       summary: this.mode === 'WATCH' ? null : this.score

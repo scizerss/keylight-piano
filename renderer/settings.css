@@ -1,0 +1,152 @@
+/* Settings, About and the licences sheet (docs/DESIGN-DIRECTION.md 4.10, 4.11; Stage 7). Linked after tokens.css and the other stage
+   sheets. Every card of the page is a section: a small caption above a .kl-group of rows. The old .setting / .setting-row /
+   .cam-help markup is kept as the rows, so every control id and behaviour stays. The jump chips only show in the wide layout. */
+
+#settingsJump { display: none; }
+
+#screen-settings .settings-grid { display: block; column-count: auto; max-width: 680px; margin: 0 auto; padding-bottom: var(--s7); }
+#screen-settings .settings-grid > .settings-card, #screen-settings .settings-grid > .settings-group { margin: 0 0 var(--s2); break-inside: auto; }
+#screen-settings .settings-grid > .cam-card, #screen-settings .settings-grid > .settings-group { column-span: none; }
+#screen-settings .settings-card { background: none; box-shadow: none; border-radius: 0; padding: 0; scroll-margin-top: calc(var(--s7) + var(--sat, 0px)); }
+#screen-settings .settings-card > h3, #screen-settings .settings-group > h3 {
+  margin: var(--s5) var(--s4) var(--s2); color: var(--faint); font-family: var(--font); font-size: var(--fs-caption); font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+}
+#screen-settings .settings-card > h3:focus { outline: 0; }
+#screen-settings .settings-card > h3:focus-visible { outline: 0; color: var(--text); }
+
+/* rows: a 52px minimum, a hairline between them inset 16px, the value on the right */
+#screen-settings .kl-group { margin: 0 0 var(--s2); }
+#screen-settings .kl-group > .setting, #screen-settings .kl-group > .setting-row { padding: var(--s3) var(--s4); border-top: 0; position: relative; }
+#screen-settings .kl-group > * + .setting, #screen-settings .kl-group > * + .setting-row,
+#screen-settings .kl-group > .setting + *, #screen-settings .kl-group > .setting-row + * { box-shadow: inset 0 1px 0 var(--line); }
+#screen-settings .kl-group > .cam-help { margin: 0; padding: 0 var(--s4) var(--s3); color: var(--faint); font-size: 13px; line-height: 1.4; box-shadow: none; }
+#screen-settings .kl-group > .setting + .cam-help, #screen-settings .kl-group > .setting-row + .cam-help { margin-top: calc(var(--s2) * -1); padding-top: 0; box-shadow: none; }
+#screen-settings .kl-group > .cam-help + .setting, #screen-settings .kl-group > .cam-help + .setting-row { box-shadow: inset 0 1px 0 var(--line); }
+#screen-settings .setting-text small { color: var(--faint); }
+#screen-settings .setting select { max-width: 55%; }
+#screen-settings .kl-group .range-wrap { display: inline-flex; align-items: center; gap: var(--s3); }
+#screen-settings .kl-group input[type="range"] { width: min(180px, 38vw); }
+#screen-settings .kl-group #backupControls { padding: 0; }
+#screen-settings .kl-group > .danger-zone { margin: var(--s3) var(--s4) var(--s4); }
+#screen-settings .kl-group > .about-actions { display: flex; flex-wrap: wrap; gap: var(--s2); padding: var(--s3) var(--s4) var(--s4); }
+#screen-settings .kl-group > .cam-help:first-child { padding-top: var(--s3); }
+#kbChoiceValue { color: var(--muted); }
+#kbChoiceRow > span:last-child { gap: var(--s3); }
+
+/* Advanced: one folded row; opens into the same kind of group */
+#screen-settings details.kl-adv { margin: var(--s2) 0 0; border-radius: var(--r-md); background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); overflow: hidden; }
+#screen-settings details.kl-adv > summary { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); min-height: var(--row); padding: var(--s3) var(--s4); list-style: none; cursor: pointer; font-size: var(--fs-body); font-weight: 600; }
+#screen-settings details.kl-adv > summary::-webkit-details-marker { display: none; }
+#screen-settings details.kl-adv > summary small { margin-left: auto; color: var(--faint); font-size: 13px; font-weight: 400; text-align: right; }
+#screen-settings details.kl-adv > summary::after { content: ""; width: 8px; height: 8px; border-right: 2px solid var(--faint); border-bottom: 2px solid var(--faint); transform: rotate(45deg); transition: transform var(--d-base) var(--ease-out); flex: none; margin-left: var(--s2); }
+#screen-settings details.kl-adv[open] > summary::after { transform: rotate(-135deg); }
+#screen-settings details.kl-adv > .kl-group { margin: 0; border-radius: 0; box-shadow: inset 0 1px 0 var(--line); background: none; }
+#screen-settings details.kl-adv > summary:focus-visible { outline: 0; box-shadow: inset 0 0 0 2px var(--accent); }
+#screen-settings details.diag-fold { margin-top: var(--s2); background: var(--surface); border-radius: var(--r-md); box-shadow: inset 0 0 0 1px var(--line); padding: 0 var(--s4); }
+#screen-settings details.diag-fold > summary { min-height: var(--row); display: flex; align-items: center; justify-content: space-between; }
+
+/* the cards that keep their own surface (camera, Airwave, Support Keylight, Support my device) */
+#screen-settings .settings-card.cam-card, #screen-settings .settings-card.device-card, #screen-settings .settings-card.support-card {
+  background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: var(--s4); margin: var(--s5) 0 var(--s2);
+}
+#screen-settings .settings-card.cam-card > h3, #screen-settings .settings-card.device-card > h3, #screen-settings .settings-card.support-card > h3 { margin: 0 0 var(--s2); color: var(--text); font-size: var(--fs-headline); font-weight: 650; text-transform: none; letter-spacing: -.01em; }
+
+/* search */
+.settings-search { position: relative; z-index: 3; display: flex; align-items: center; gap: var(--s2); max-width: 680px; margin: 0 auto var(--s2); padding: var(--s2) 0; background: var(--bg-deep); }
+.settings-search > svg { position: absolute; left: var(--s4); width: 20px; height: 20px; color: var(--faint); pointer-events: none; fill: none; stroke: currentColor; stroke-width: 1.8; }
+.settings-search input {
+  flex: 1; min-width: 0; height: 44px; padding: 0 44px 0 calc(var(--s4) + 28px); border: 0; border-radius: var(--r-pill);
+  background: var(--surface-2); color: var(--text); font: inherit; font-size: var(--fs-body); box-shadow: inset 0 0 0 1px var(--line);
+  -webkit-appearance: none; appearance: none;
+}
+.settings-search input::-webkit-search-cancel-button { -webkit-appearance: none; }
+.settings-search input::placeholder { color: var(--faint); }
+.settings-search input:focus { outline: 0; box-shadow: inset 0 0 0 1px var(--accent-line), var(--focus-ring); }
+.settings-search-clear { position: absolute; right: 4px; width: 44px; height: 44px; display: grid; place-items: center; border: 0; background: none; color: var(--muted); border-radius: 50%; cursor: pointer; }
+.settings-search-clear svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; }
+.settings-search-clear:focus-visible { outline: 0; box-shadow: var(--focus-ring); }
+.s-off { display: none !important; }
+#settingsNoMatch { margin-top: var(--s7); }
+
+/* About */
+.about-sheet { width: min(560px, calc(100vw - 32px)); }
+.about-sheet .about-list.kl-group { background: var(--surface-2); margin: var(--s4) 0; }
+.about-sheet .about-list > div { padding: var(--s3) var(--s4); border-top: 1px solid var(--line); }
+.about-sheet .about-list > div:first-child { border-top: 0; }
+.about-sheet .about-list dt { margin: 0 0 2px; color: var(--faint); font-size: 13px; font-weight: 500; letter-spacing: 0; text-transform: none; }
+.about-sheet .about-list dd { margin: 0; color: var(--text); font-size: 14.5px; line-height: 1.5; max-width: none; }
+.about-sheet .about-list dd a { color: var(--accent); text-decoration: none; }
+.about-sheet .about-list dd a:hover { text-decoration: underline; }
+.about-sheet .about-list #aboutNotices, .about-sheet .about-list #aboutMusic { color: var(--muted); font-size: 13.5px; }
+.about-sheet .about-actions-group { background: var(--surface-2); margin: 0 0 var(--s4); }
+.about-sheet .about-row { width: 100%; min-height: 48px; border: 0; border-top: 1px solid var(--line); background: none; color: var(--text); font: inherit; font-size: var(--fs-body); text-align: left; cursor: pointer; }
+.about-sheet .about-row:first-child, .about-sheet .about-row.hidden + .about-row { border-top: 0; }
+.about-sheet .about-row svg { width: 18px; height: 18px; flex: none; fill: none; stroke: var(--faint); stroke-width: 2; transform: scaleX(-1); }
+.about-sheet .about-row:hover { background: var(--hover); }
+.about-sheet .about-row:focus-visible { outline: 0; box-shadow: inset 0 0 0 2px var(--accent); }
+.about-sheet .support-actions { margin-top: var(--s2); }
+.about-sheet .support-actions .primary { width: 100%; }
+.about-sheet h2 { font-family: var(--font); font-size: var(--fs-title); font-weight: 650; }
+.about-sheet .about-mission { font-family: var(--font); font-size: var(--fs-sub); line-height: 1.5; color: var(--muted); margin: 0; }
+
+/* Licences sheet: a scrollable reading pane */
+.notices-sheet { width: min(640px, calc(100vw - 32px)); }
+.notices-body { max-height: min(60dvh, 560px); overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; margin: var(--s3) 0; padding: var(--s4); background: var(--surface-2); border-radius: var(--r-md); box-shadow: inset 0 0 0 1px var(--line); }
+.notices-body h3 { margin: var(--s5) 0 var(--s2); color: var(--text); font-size: var(--fs-sub); font-weight: 650; }
+.notices-body h3:first-child { margin-top: 0; }
+.notices-body pre { margin: 0; color: var(--muted); font: 12.5px/1.5 ui-monospace, "SF Mono", Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; -webkit-user-select: text; }
+.notices-body .notices-wait { color: var(--faint); margin: 0; }
+.notices-body:focus-visible { outline: 0; box-shadow: inset 0 0 0 2px var(--accent); }
+.notices-sheet .support-actions .primary { width: 100%; }
+
+/* the More sheet's Edit notes: only inside the sheet (a wide window has the top-bar button) */
+.hud-edit-notes { display: none !important; }
+body[data-screen="play"].hud-more .hud-actions .hud-edit-notes { display: flex !important; }
+
+/* iPhone: the dialogs here are bottom sheets (tokens.css); the sheet may scroll, the primary button stays at the foot */
+@media (max-width: 699px) {
+  .about-sheet, .notices-sheet { width: 100%; }
+  #screen-settings .kl-group > .setting, #screen-settings .kl-group > .setting-row { min-height: 52px; }
+}
+
+/* reduced motion: the disclosure chevron and the switch just change */
+@media (prefers-reduced-motion: reduce) {
+  #screen-settings details.kl-adv > summary::after { transition: none; }
+}
+html.reduce-motion #screen-settings details.kl-adv > summary::after { transition: none; }
+
+/* touch-ups after the first look on a phone */
+#screen-settings .settings-card > h3 { border: 0; box-shadow: none; background: none; padding: 0; }
+#screen-settings .settings-card > h3::before, #screen-settings .settings-card > h3::after { display: none; }
+#screen-settings .kl-group #backupControls { display: flex; flex-wrap: wrap; gap: var(--s2); padding: var(--s3) var(--s4); box-shadow: inset 0 1px 0 var(--line); }
+#screen-settings .kl-group #backupControls:empty { display: none; }
+#screen-settings .kl-group > .setting-row:has(#playedToday) { min-height: var(--row); }
+#screen-settings .kl-group #backupControls { margin: 0; }
+#screen-settings details.diag-fold > summary { list-style: none; gap: var(--s3); font-family: var(--font); font-size: var(--fs-body); font-weight: 600; cursor: pointer; }
+#screen-settings details.diag-fold > summary::-webkit-details-marker { display: none; }
+#screen-settings details.diag-fold > summary > span { font-family: var(--font); font-size: var(--fs-body); font-weight: 600; }
+#screen-settings details.diag-fold > summary small { margin-left: auto; color: var(--faint); font-size: 13px; font-weight: 400; }
+
+@media (min-width: 960px) and (orientation: landscape) {
+  #screen-settings { --settings-jump-height: calc(44px + var(--s2) * 2); }
+  #settingsJump {
+    display: flex; top: 0; min-height: var(--settings-jump-height); max-width: 1100px;
+    margin: 0 auto var(--s2); padding: var(--s2); gap: var(--s2);
+  }
+  #settingsJump button { height: 44px; min-width: 44px; }
+  #settingsJump button::after { display: none; }
+  #screen-settings:has(#settingsSearch:not(:placeholder-shown)) #settingsJump { display: none; }
+  #screen-settings .settings-grid {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--s6); align-items: start; max-width: 1100px;
+  }
+  #screen-settings .settings-grid > .settings-card, #screen-settings .settings-grid > .settings-group { min-width: 0; }
+  #screen-settings .settings-grid > #setDiagnostics { grid-column: 1 / -1; }
+  #screen-settings :is(.settings-card, .settings-group) { scroll-margin-top: calc(var(--settings-jump-height) + var(--s2)); }
+  .settings-search { max-width: 1100px; }
+}
+
+.reminder-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+#reminderTime {
+  color-scheme: dark; font: inherit; color: inherit; background: rgba(255, 255, 255, .08);
+  border: 1px solid rgba(255, 255, 255, .15); border-radius: 10px; padding: 6px 8px;
+}

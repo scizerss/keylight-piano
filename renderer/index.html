@@ -3,6 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<style>html{background:#04050d}html.ios{background:#0a0b0f}</style>
 <title>Keylight</title>
 <script src="fx.js"></script>
 <link rel="stylesheet" href="style.css">
@@ -16,10 +18,31 @@
 <link rel="stylesheet" href="jam/jam.css">
 <link rel="stylesheet" href="practice/practice.css">
 <link rel="stylesheet" href="touch.css">
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="library.css">
+<link rel="stylesheet" href="course.css">
+<link rel="stylesheet" href="roll-editor.css">
+<link rel="stylesheet" href="lyrics-editor.css">
+<link rel="stylesheet" href="player.css">
+<link rel="stylesheet" href="home.css">
+<link rel="stylesheet" href="settings.css">
+<link rel="stylesheet" href="onboarding.css">
+<link rel="stylesheet" href="hand-guide.css">
+<link rel="stylesheet" href="a11y.css">
+<link rel="stylesheet" href="tv-remote.css">
+<link rel="stylesheet" href="tour.css">
+<link rel="stylesheet" href="paywall.css">
 </head>
 <body data-screen="home">
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <defs>
+    <!-- P7: the lesson and exercise keyboards on iPhone/iPad. Ebony with a bevelled face; the light of a target key is an overlay that fades by opacity -->
+    <linearGradient id="klEbony" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a3c46"/><stop offset=".55" stop-color="#15161c"/><stop offset="1" stop-color="#0a0b0f"/></linearGradient>
+    <linearGradient id="klEbonyFace" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b2d36"/><stop offset="1" stop-color="#101117"/></linearGradient>
+    <linearGradient id="klGlowW" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff8a3d" stop-opacity="0"/><stop offset=".45" stop-color="#ffa968" stop-opacity=".25"/><stop offset="1" stop-color="#ff8a3d" stop-opacity=".95"/></linearGradient>
+    <linearGradient id="klGlowB" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff8a3d" stop-opacity="0"/><stop offset=".55" stop-color="#ff8a3d" stop-opacity=".18"/><stop offset="1" stop-color="#ff9a52" stop-opacity=".95"/></linearGradient>
+    <linearGradient id="klGlowOkW" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3ec982" stop-opacity=".1"/><stop offset="1" stop-color="#3ec982" stop-opacity=".92"/></linearGradient>
+    <linearGradient id="klGlowBadW" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d94f57" stop-opacity=".1"/><stop offset="1" stop-color="#d94f57" stop-opacity=".92"/></linearGradient>
     <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z"/></symbol>
     <symbol id="i-course" viewBox="0 0 24 24"><path d="M4 5.5c2.6-.9 5.4-.8 8 .8v12.7c-2.6-1.6-5.4-1.7-8-.8z"/><path d="M20 5.5c-2.6-.9-5.4-.8-8 .8v12.7c2.6-1.6 5.4-1.7 8-.8z"/></symbol>
     <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></symbol>
@@ -48,17 +71,35 @@
     <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9.5 5 7 7-7 7"/></symbol>
     <symbol id="i-camera" viewBox="0 0 24 24"><rect x="3" y="7" width="13" height="10" rx="2.5"/><path d="m16 11 5-3v8l-5-3"/></symbol>
     <symbol id="i-sort" viewBox="0 0 24 24"><path d="M8 5v14M4.5 8.5 8 5l3.5 3.5M16 19V5M12.5 15.5 16 19l3.5-3.5"/></symbol>
+    <symbol id="i-import-file" viewBox="0 0 24 24"><path d="M5 4h8l6 6v10H5zM13 4v6h6M8 14h8m-8 3h6"/></symbol>
+    <symbol id="i-import-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M6 11v1a6 6 0 0 0 12 0v-1m-6 7v3m-3 0h6"/></symbol>
+    <symbol id="i-import-share" viewBox="0 0 24 24"><path d="M12 15V3m-4 4 4-4 4 4m-8 4H5v10h14V11h-3"/></symbol>
     <symbol id="i-close" viewBox="0 0 24 24"><path d="m6.5 6.5 11 11M17.5 6.5l-11 11"/></symbol>
     <symbol id="i-sheet" viewBox="0 0 24 24"><path d="M3 6.5h18M3 10.5h18M3 14.5h18M3 18.5h18" opacity=".55"/><circle cx="9.2" cy="16.5" r="2" fill="currentColor" stroke="none"/><path d="M11.2 16.5V6"/><circle cx="16.2" cy="14.5" r="2" fill="currentColor" stroke="none"/><path d="M18.2 14.5V4.5"/></symbol>
+    <symbol id="i-note" viewBox="0 0 24 24"><path d="M9 18V5.5l10-2V16"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></symbol>
+    <symbol id="i-heart-empty" viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></symbol>
     <symbol id="i-lyrics" viewBox="0 0 24 24"><path d="M3.5 6.5h12M3.5 11.5h9M3.5 16.5h6"/><path d="M18.5 17V8.5l3-1"/><circle cx="16.8" cy="17" r="1.8"/></symbol>
+    <symbol id="i-home-ios" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M9 21v-7h6v7"/></symbol>
+    <symbol id="i-home-fill" viewBox="0 0 24 24"><path d="m2 10 10-8 10 8v9a2 2 0 0 1-2 2h-5v-7H9v7H4a2 2 0 0 1-2-2Z"/></symbol>
+    <symbol id="i-course-ios" viewBox="0 0 24 24"><path d="M12 6c-3-2-6-2.5-9-1v14c3-1.5 6-1 9 1 3-2 6-2.5 9-1V5c-3-1.5-6-1-9 1Zm0 0v14"/></symbol>
+    <symbol id="i-course-fill" viewBox="0 0 24 24"><path d="M2 5c3-2 6-1 9 1v14c-3-2-6-3-9-1Zm11 1c3-2 6-3 9-1v14c-3-2-6-1-9 1Z"/></symbol>
+    <symbol id="i-practice-ios" viewBox="0 0 24 24"><rect x="3" y="10" width="4" height="10" rx="1.6"/><rect x="10" y="4" width="4" height="16" rx="1.6"/><rect x="17" y="7" width="4" height="13" rx="1.6"/></symbol>
+    <symbol id="i-practice-fill" viewBox="0 0 24 24"><rect x="2" y="10" width="5" height="11" rx="2"/><rect x="9.5" y="3" width="5" height="18" rx="2"/><rect x="17" y="7" width="5" height="14" rx="2"/></symbol>
+    <symbol id="i-note-ios" viewBox="0 0 24 24"><path d="M9 17V6l11-2v11M9 9l11-2"/><ellipse cx="6.1" cy="17.6" rx="2.9" ry="2.4"/><ellipse cx="17.1" cy="15.6" rx="2.9" ry="2.4"/></symbol>
+    <symbol id="i-note-fill" viewBox="0 0 24 24"><path d="M8 6a1 1 0 0 1 .82-.98l11-2A1 1 0 0 1 21 4v11.5c0 1.9-1.75 3.5-4 3.5s-4-1.4-4-3.1 1.75-3.4 4-3.4c.74 0 1.42.13 2 .39V8L10 9.6V18c0 1.85-1.75 3.5-4 3.5s-4-1.4-4-3.1 1.75-3.4 4-3.4c.74 0 1.42.13 2 .39Z"/></symbol>
+    <symbol id="i-gear-ios" viewBox="0 0 24 24"><path d="M9.5 2.5h5l.5 2.5 1.8 1 2.4-.8 2.5 4.3-1.9 1.7v2l1.9 1.7-2.5 4.3-2.4-.8-1.8 1-.5 2.5h-5L9 19.4l-1.8-1-2.4.8-2.5-4.3 1.9-1.7v-2L2.3 9.5l2.5-4.3 2.4.8L9 5Z"/><circle cx="12" cy="12.2" r="3.1"/></symbol>
+    <symbol id="i-gear-fill" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M9.5 2.5h5l.5 2.5 1.8 1 2.4-.8 2.5 4.3-1.9 1.7v2l1.9 1.7-2.5 4.3-2.4-.8-1.8 1-.5 2.5h-5L9 19.4l-1.8-1-2.4.8-2.5-4.3 1.9-1.7v-2L2.3 9.5l2.5-4.3 2.4.8L9 5ZM12 8.7a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z"/></symbol>
+    <symbol id="i-keys-ios" viewBox="0 0 24 24"><rect x="2.5" y="5.5" width="19" height="13" rx="2"/><path d="M7.25 12v6.5M12 12v6.5M16.75 12v6.5M7.25 5.5V12M12 5.5V12M16.75 5.5V12"/></symbol>
+    <symbol id="i-view-ios" viewBox="0 0 24 24"><path d="M4 5v14m8-14v14m8-14v14"/><rect x="2.3" y="8" width="3.4" height="5" rx="1.2" fill="currentColor"/><rect x="10.3" y="13" width="3.4" height="5" rx="1.2" fill="currentColor"/><rect x="18.3" y="6" width="3.4" height="5" rx="1.2" fill="currentColor"/></symbol>
   </defs>
 </svg>
 
 <div id="app">
   <header id="topbar">
     <div class="top-left">
-      <button id="back" class="iconbtn" title="Back" aria-label="Back"><svg><use href="#i-back"/></svg></button>
+      <button id="back" class="iconbtn" title="Back" aria-label="Back"><svg><use href="#i-back"/></svg><span class="ios-course-back">Course</span><span class="ios-exercise-back" id="exerciseBackLabel">Course</span></button>
       <div class="titles"><div id="title">Home</div><div id="subtitle"></div></div>
+      <div class="hand-legend is-off" id="handLegend" role="note" aria-label="Hand colours"><span class="hl hl-left" id="hlLeft"><i aria-hidden="true"></i><b><span class="hl-full">Left hand</span><span class="hl-short" aria-hidden="true">L</span></b></span><span class="hl hl-right" id="hlRight"><i aria-hidden="true"></i><b><span class="hl-full">Right hand</span><span class="hl-short" aria-hidden="true">R</span></b></span></div>
     </div>
 
     <!-- search: the original's centred "Search here" pill -->
@@ -85,9 +126,13 @@
     </div>
 
     <div class="top-actions">
-      <span id="kbStatus" class="kb-chip not-play"><i class="dot"></i><span id="kbStatusText">Keyboard</span></span>
+      <span id="tvChip" class="tv-chip play-only hidden" title="Showing on an Apple TV">TV</span>
+      <button id="tvUnlock" class="mini-btn hidden" type="button">Unlock TV mode</button>
+      <span id="kbStatus" class="kb-chip not-play"><svg class="kb-glyph" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-keys"/><use class="ios-symbol" href="#i-keys-ios"/></svg><i class="dot"></i><span id="kbStatusText">Keyboard</span></span>
       <span id="battery" class="pill hidden"></span>
-      <div class="hud-actions play-only">
+      <button id="hudMore" class="iconbtn play-only hud-more-btn" type="button" title="More controls" aria-label="More controls" aria-haspopup="dialog" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.5" cy="12" r="1.7" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none"/><circle cx="18.5" cy="12" r="1.7" fill="currentColor" stroke="none"/></svg></button>
+      <div class="hud-actions play-only" id="hudActions" role="group" aria-label="Player controls">
+        <div class="hud-sheet-head" aria-hidden="false"><b>More</b><button id="hudMoreClose" class="link" type="button">Done</button></div>
         <!-- octave: − and + move the 24 keys (app.js shiftOctave); the label is the range they play now -->
         <div class="hud-octave" role="group" aria-label="Octave">
           <span class="oct-btns">
@@ -99,13 +144,15 @@
         <button id="btnWatch" class="hudbtn" title="Watch the demo (1)" aria-label="Watch" aria-pressed="false"><svg><use href="#i-eye"/></svg><span class="lbl">Watch</span></button>
         <button id="btnHands" class="hudbtn" title="Hands" aria-label="Hands" aria-pressed="false"><svg><use href="#i-hands"/></svg><span class="lbl" id="lblHands">Both</span></button>
         <button id="btnLabels" class="hudbtn" title="Note labels" aria-label="Note labels" aria-pressed="false"><svg><use href="#i-labels"/></svg><span class="lbl" id="lblLabels">Off</span></button>
-        <button id="btnView" class="hudbtn" title="Note view" aria-label="Note view" aria-haspopup="menu" aria-expanded="false" aria-controls="viewMenu"><svg><use href="#i-view"/></svg><span class="lbl" id="lblView">Cascade</span></button>
+        <button id="btnView" class="hudbtn" title="Note view" aria-label="Note view" aria-haspopup="menu" aria-expanded="false" aria-controls="viewMenu"><svg><use href="#i-view"/><use class="ios-symbol" href="#i-view-ios"/></svg><span class="lbl" id="lblView">Cascade</span></button>
         <button id="btnMetro" class="hudbtn" title="Metronome" aria-label="Metronome" aria-pressed="false"><svg><use href="#i-metro"/></svg><span class="lbl" id="lblMetro">Click</span></button>
         <button id="btnLoop" class="hudbtn" title="Loop a section" aria-label="Loop" aria-pressed="false"><svg><use href="#i-loop"/></svg><span class="lbl" id="lblLoop">Loop</span></button>
         <label class="hudbtn instrument-picker" title="Instrument"><svg aria-hidden="true"><use href="#i-inst"/></svg><select id="btnInst" aria-label="Instrument"></select></label>
         <button id="btnCamera" class="hudbtn" title="Hand tracking camera" aria-label="Camera" aria-pressed="false"><svg><use href="#i-camera"/></svg><span class="lbl">Camera</span></button>
         <button id="btnSheet" class="hudbtn hidden" title="Sheet music" aria-label="Sheet music" aria-pressed="false"><svg><use href="#i-sheet"/></svg><span class="lbl">Sheet</span></button>
         <button id="btnLyrics" class="hudbtn hidden" title="Lyrics" aria-label="Lyrics" aria-pressed="false"><svg><use href="#i-lyrics"/></svg><span class="lbl">Lyrics</span></button>
+        <button id="btnEditNotes" class="hudbtn hud-edit-notes" title="Edit the notes of this song. Only for songs you added" aria-label="Edit notes" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></svg><span class="lbl">Edit notes</span></button>
+        <button id="btnEditLyrics" class="hudbtn hidden" aria-label="Add lyrics" aria-haspopup="dialog" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span class="lbl">Add lyrics</span></button>
         <button id="btnRestart" class="hudbtn" title="Restart" aria-label="Restart"><svg><use href="#i-restart"/></svg><span class="lbl" id="lblRestart">Restart</span></button>
       </div>
       <button id="openSettings" class="iconbtn not-play" title="Settings" aria-label="Settings"><svg><use href="#i-gear"/></svg></button>
@@ -116,19 +163,13 @@
     <!-- ================= HOME ================= -->
     <section id="screen-home" class="screen">
       <div class="home-head">
-        <div>
+        <div class="home-greet">
           <div class="greeting" id="greeting">Good evening</div>
-          <div class="greeting-sub">Ready to play? Your keys will show you the way.</div>
+          <div class="greeting-sub" id="greetingSub">Ready to play? Your keys will show you the way.</div>
         </div>
-        <div class="home-stats">
-          <button type="button" class="goal-ring" id="goalRing" aria-label="Daily goal">
-            <svg viewBox="0 0 44 44" aria-hidden="true"><circle class="gr-track" cx="22" cy="22" r="18" pathLength="100"/><circle class="gr-fill" id="goalArc" cx="22" cy="22" r="18" pathLength="100" stroke-dasharray="0 100"/><path class="gr-check" d="m14 22.5 5.5 5.5L30 16.5"/></svg>
-            <span class="gr-text"><span class="gr-main"><b id="goalNow">0</b> of <span id="goalTotal">10</span> min</span><small id="goalNote">today's goal</small></span>
-          </button>
-          <button type="button" class="stat-chip home-ach" data-go="achievements"><svg><use href="#i-trophy"/></svg>Achievements</button>
-          <button type="button" class="stat-chip home-support" data-support><span aria-hidden="true">&#9829;</span> Support</button>
-          <span class="stat-chip"><svg><use href="#i-flame"/></svg><b id="streakChip">0</b> day streak</span>
-          <span class="stat-chip"><svg><use href="#i-clock"/></svg><b id="minutesChip">0</b> min today</span>
+        <div class="home-acts">
+          <button type="button" class="iconbtn home-support" data-support aria-label="Support Keylight" title="Support Keylight"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.7a4.3 4.3 0 0 1 7.5 2.6c0 5.6-7.5 10.2-7.5 10.2Z"/></svg></button>
+          <button type="button" class="iconbtn home-ach" data-go="achievements" aria-label="Achievements" title="Achievements"><svg aria-hidden="true"><use href="#i-trophy"/></svg></button>
         </div>
       </div>
 
@@ -141,6 +182,7 @@
         </div>
       </div>
 
+      <div class="home-top">
       <div class="hero" id="continueCard">
         <div class="hero-art" id="continueArt"></div>
         <div class="hero-body">
@@ -153,6 +195,26 @@
           </div>
         </div>
       </div>
+
+      <section class="home-today" aria-label="Today">
+        <h2 class="home-today-title">Today</h2>
+        <div class="home-stats">
+          <button type="button" class="goal-ring today-tile" id="goalRing" aria-label="Daily goal">
+            <svg viewBox="0 0 44 44" aria-hidden="true"><circle class="gr-track" cx="22" cy="22" r="18" pathLength="100"/><circle class="gr-fill" id="goalArc" cx="22" cy="22" r="18" pathLength="100" stroke-dasharray="0 100"/><path class="gr-check" d="m14 22.5 5.5 5.5L30 16.5"/></svg>
+            <span class="gr-text"><span class="gr-main"><b id="goalNow">0</b> of <span id="goalTotal">10</span> min</span><small id="goalNote">today's goal</small></span>
+            <span class="today-line" id="todayLine" aria-hidden="true"></span>
+          </button>
+          <div class="today-tile tt-streak" id="streakTile"><svg aria-hidden="true"><use href="#i-flame"/></svg><span class="tt-val"><b id="streakChip">0</b></span><small id="streakLabel">day streak</small></div>
+          <div class="today-tile tt-min"><svg aria-hidden="true"><use href="#i-clock"/></svg><span class="tt-val"><b id="minutesChip">0</b></span><small id="minutesLabel">min today</small></div>
+        </div>
+      </section>
+      </div>
+
+      <section class="home-experience hidden" id="homeExperience" aria-labelledby="homeExperienceTitle">
+        <h2 id="homeExperienceTitle">How much piano have you played?</h2>
+        <div class="home-experience-choices" id="homeExperienceChoices"></div>
+        <button class="link" id="homeExperienceDismiss" type="button">Not now</button>
+      </section>
 
       <section class="rail-section course-home" id="courseHome" aria-label="The piano course"></section>
 
@@ -183,41 +245,89 @@
     <section id="screen-jam" class="screen hidden" aria-label="Jam"></section>
 
     <!-- ================= SEARCH ================= -->
-    <section id="screen-search" class="screen hidden">
-      <div class="chip-row">
-        <div class="chips" id="searchChips">
-          <button data-chip="songs" class="on">Songs</button>
-          <button data-chip="lessons">Lessons</button>
-          <button data-chip="games">Games</button>
-          <button data-chip="fav" class="chip-icon" title="Favourites" aria-label="Favourites"><svg><use href="#i-heart"/></svg></button>
-          <button data-chip="imported" class="hidden" title="Songs you added">Imported</button>
+    <section id="screen-search" class="screen hidden" aria-label="Songs">
+      <div class="chip-row lib-row">
+        <div class="chips lib-chips" id="searchChips" role="group" aria-label="Show">
+          <div class="song-segments">
+            <button data-chip="songs" class="on">Songs</button>
+            <button data-chip="lessons">Lessons</button>
+            <button data-chip="games">Games</button>
+          </div>
+          <div class="song-shortcuts">
+            <button data-chip="fav" class="chip-icon" title="Favourites" aria-label="Favourites"><svg><use href="#i-heart"/></svg><span class="chip-word">Favourites</span></button>
+            <button data-chip="imported" title="Songs you added">Imported</button>
+          </div>
         </div>
-        <div class="chip-actions">
-          <button class="chip-btn" id="openToolbox" title="Scales, chords and arpeggios"><svg><use href="#i-keys"/></svg>Scales &amp; chords</button>
-          <button class="chip-btn" id="openImport" title="Add a recording, MIDI or MusicXML file"><svg><use href="#i-plus"/></svg>Add a song</button>
-          <button class="sort" id="sortBtn" title="Change the order"><svg><use href="#i-sort"/></svg>Sort: <b id="sortLabel">Title</b></button>
+        <button type="button" class="lib-filter-btn" id="openFilters" aria-haspopup="dialog" aria-expanded="false" aria-controls="filterBar" title="Filter songs">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
+          <span>Filter</span><i class="lib-badge hidden" id="filterBadge" aria-hidden="true"></i>
+        </button>
+      </div>
+      <button type="button" class="lib-add" id="openImport" title="Add a recording, video, MIDI or MusicXML file">
+        <span class="lib-add-ico" aria-hidden="true"><svg><use href="#i-plus"/></svg></span>
+        <span class="lib-add-txt"><b>Add a song</b><small id="libAddSub">Turn a recording, video, MIDI or MusicXML file into notes you can play.</small></span>
+        <svg class="lib-add-chev" aria-hidden="true"><use href="#i-chevron"/></svg>
+      </button>
+      <button type="button" class="hidden" id="openToolbox" title="Scales, chords and arpeggios" tabindex="-1" aria-hidden="true">Scales &amp; chords</button>
+      <div class="lib-meta" id="libMeta">
+        <span class="lib-count" id="libCount" role="status" aria-live="polite">76 songs</span>
+        <button type="button" class="link hidden" id="clearFilters">Clear filters</button>
+        <span class="lib-spacer"></span>
+        <button class="sort" id="sortBtn" title="Change the order"><svg><use href="#i-sort"/></svg><span class="sort-pre">Sort:</span> <b id="sortLabel">Title</b></button>
+        <div class="lib-view" role="group" aria-label="Layout">
+          <button type="button" id="viewGrid" aria-pressed="true" title="Grid" aria-label="Grid view"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.6"/></svg></button>
+          <button type="button" id="viewList" aria-pressed="false" title="List" aria-label="List view"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
         </div>
       </div>
-      <div class="filter-bar" id="filterBar" role="group" aria-label="Filter songs">
-        <div class="chips level-chips" id="levelChips" role="group" aria-label="Level"></div>
-        <div class="filter-tools">
-          <div class="comp-wrap" id="composerWrap">
-            <button type="button" class="chip-btn comp-btn" id="composerBtn" aria-haspopup="listbox" aria-expanded="false" aria-controls="composerPop">Composer: <b id="composerLabel">All</b><svg class="comp-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9.5 6 6 6-6"/></svg></button>
-            <div class="comp-pop hidden" id="composerPop">
-              <input type="search" id="composerSearch" class="comp-search" placeholder="Find a composer" aria-label="Find a composer" autocomplete="off" spellcheck="false">
-              <ul id="composerList" class="comp-list" role="listbox" aria-label="Composer"></ul>
+      <div class="filter-scrim" id="filterScrim" aria-hidden="true"></div>
+      <div class="filter-bar lib-filters" id="filterBar" role="group" aria-label="Filter songs">
+        <div class="fs-head"><h3 id="filterTitle">Filters</h3><button type="button" class="iconbtn" id="filterClose" aria-label="Close filters" title="Close"><svg><use href="#i-close"/></svg></button></div>
+        <div class="fs-body">
+          <div class="fs-sect">
+            <h4 class="kl-caption">Difficulty</h4>
+            <div class="chips level-chips" id="levelChips" role="group" aria-label="Level"></div>
+          </div>
+          <div class="fs-sect" id="eraSect">
+            <h4 class="kl-caption">Era</h4>
+            <div class="chips level-chips fs-chips" id="eraChips" role="group" aria-label="Era"></div>
+          </div>
+          <div class="fs-sect" id="moodSect">
+            <h4 class="kl-caption">Mood</h4>
+            <div class="chips level-chips fs-chips" id="moodChips" role="group" aria-label="Mood"></div>
+          </div>
+          <div class="fs-sect" id="lengthSect">
+            <h4 class="kl-caption">Length</h4>
+            <div class="chips level-chips fs-chips" id="lengthChips" role="group" aria-label="Length"></div>
+          </div>
+          <div class="fs-sect">
+            <h4 class="kl-caption">Composer</h4>
+            <div class="filter-tools">
+              <div class="comp-wrap" id="composerWrap">
+                <button type="button" class="chip-btn comp-btn" id="composerBtn" aria-haspopup="listbox" aria-expanded="false" aria-controls="composerPop">Composer: <b id="composerLabel">All</b><svg class="comp-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9.5 6 6 6-6"/></svg></button>
+                <div class="comp-pop hidden" id="composerPop">
+                  <input type="search" id="composerSearch" class="comp-search" placeholder="Find a composer" aria-label="Find a composer" autocomplete="off" spellcheck="false">
+                  <ul id="composerList" class="comp-list" role="listbox" aria-label="Composer"></ul>
+                </div>
+              </div>
             </div>
           </div>
-          <span class="lib-count" id="libCount" role="status" aria-live="polite">76 songs</span>
-          <button type="button" class="link hidden" id="clearFilters">Clear filters</button>
         </div>
+        <div class="fs-foot"><button type="button" class="ghost" id="filterClear">Clear all</button><button type="button" class="primary" id="filterDone">Show songs</button></div>
       </div>
+      <div class="lib-browse hidden" id="libBrowse">
+        <div class="lb-sect"><h4 class="kl-caption">Browse by mood</h4><div class="chips lb-row" id="browseMoods" role="group" aria-label="Browse by mood"></div></div>
+        <div class="lb-sect"><h4 class="kl-caption">Composers</h4><div class="chips lb-row" id="browseComposers" role="group" aria-label="Browse by composer"></div></div>
+      </div>
+      <p id="libraryStorageNotice" class="cam-help hidden" role="status"></p>
       <div id="libraryGrid" class="cover-grid"></div>
       <div id="lessonList" class="lesson-grid hidden"></div>
       <div id="searchGames" class="games-grid hidden"></div>
-      <div class="empty hidden" id="searchEmpty"><span id="searchEmptyText">Nothing here yet.</span>
-        <div class="empty-actions" id="searchEmptyActions"><button class="mini-btn" data-empty="add">Add a song</button><button class="mini-btn" data-empty="lessons">Play a lesson</button></div>
-        <div class="empty-actions hidden" id="searchEmptyClear"><button class="mini-btn is-primary" data-empty="clear">Clear filters</button></div></div>
+      <div class="empty kl-empty hidden" id="searchEmpty">
+        <svg id="searchEmptyIcon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-note"/></svg>
+        <h3 id="searchEmptyTitle">No songs here</h3>
+        <p id="searchEmptyText">Nothing here yet.</p>
+        <div class="empty-actions" id="searchEmptyActions"><button class="mini-btn is-primary" data-empty="add">Add a song</button><button class="mini-btn" data-empty="lessons">Play a lesson</button><button class="mini-btn is-primary" data-empty="recent" hidden>Browse songs</button></div>
+        <div class="empty-actions hidden" id="searchEmptyClear"><button class="mini-btn is-primary" data-empty="clear">Clear filters</button><button class="mini-btn" data-empty="add">Import a file</button></div></div>
     </section>
 
     <!-- ================= ACHIEVEMENTS ================= -->
@@ -287,7 +397,8 @@
     <!-- ================= SETTINGS ================= -->
     <section id="screen-settings" class="screen hidden">
       <nav class="settings-jump" id="settingsJump" aria-label="Jump to a settings section">
-        <button data-jump="setLights" aria-label="Jump to Keyboard lights">Lights</button>
+        <button data-jump="setKeyboard" aria-label="Jump to Keyboard">Keyboard</button>
+        <button class="hidden" data-jump="setLights" aria-label="Jump to Keyboard lights">Lights</button>
         <button data-jump="setSound" aria-label="Jump to Sound">Sound</button>
         <button data-jump="setDisplay" aria-label="Jump to Display">Display</button>
         <button data-jump="setPractice" aria-label="Jump to Practice">Practice</button>
@@ -296,97 +407,141 @@
         <button data-jump="setProgress" aria-label="Jump to Progress and resets">Progress</button>
         <button data-jump="setExperimental" aria-label="Jump to Experimental features">Experimental</button>
       </nav>
+      <div class="settings-search" role="search">
+        <svg aria-hidden="true"><use href="#i-search"/></svg>
+        <input id="settingsSearch" type="search" placeholder="Search settings" aria-label="Search settings" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search">
+        <button class="settings-search-clear hidden" id="settingsSearchClear" type="button" aria-label="Clear search"><svg aria-hidden="true"><use href="#i-close"/></svg></button>
+      </div>
+      <div class="kl-empty hidden" id="settingsNoMatch" role="status"><h3>No setting called that</h3><p>Try another word, like sound, lights or goal.</p></div>
       <div class="settings-grid">
-        <div class="settings-card" id="setLights">
-          <h3 tabindex="-1">Keyboard lights</h3>
-          <label class="setting">Brightness <span class="range-wrap"><input id="brightness" type="range" min="30" max="255" value="255"><output class="range-out" for="brightness" data-for="brightness" data-unit="pct255">100%</output></span></label>
-          <label class="setting">Light style
-            <select id="kbdMode">
-              <option value="Piano">Piano — white</option>
-              <option value="Pro">Pro — hand colours</option>
-              <option value="Stage">Stage — a colour per note</option>
-              <option value="User">User — your own colour</option>
-            </select>
-          </label>
-          <label class="setting" id="userColorRow">Your colour <input id="userColor" type="color" value="#a78bfa"></label>
-          <label class="setting">Pitch bend &amp; pressure <input id="exprToggle" type="checkbox"></label>
-          <label class="setting hidden" id="exactRow">Exact colours <span class="beta">experimental</span> <input id="exactColors" type="checkbox"></label>
-          <p class="cam-help hidden" id="exactHint">Lights each key in its true colour on Windows. Experimental: if the keys stop lighting, turn it off.</p>
-          <div class="setting-row"><span id="lightsLabel">Key lights</span><span><span id="daemonState">checking…</span><button class="mini-btn hidden" id="daemonRetry">Try again</button></span></div>
-          <div class="setting-row hidden" id="batteryRow"><span>Keyboard battery</span><span id="kbBattery"></span></div>
-          <label class="setting" title="The MIDI input Keylight listens to. Automatic looks for your keyboard by name">Keyboard <select id="kbPort"></select></label>
-          <label class="setting" title="Setup also works this out when you press the two end keys">Number of keys <select id="kbKeys"><option value="0">Automatic</option><option value="24">24 keys</option><option value="48">48 keys</option><option value="49">49 keys</option></select></label>
-          <p class="cam-help">Automatic reads the size from the keyboard you plug in.</p>
-          <p class="cam-help hidden" id="kbHelp" role="status"></p>
-          <div class="setting-row hidden" id="kbHelpSupportRow"><span>Keyboard not listed?</span><button class="mini-btn" type="button" data-device-support>Support my device</button></div>
-          <div class="setting-row hidden" id="swapRow"><span>Lights on the wrong keyboard?</span><button class="mini-btn" id="swapLights">Swap keyboards</button></div>
-          <div class="setting-row"><span>Keys play</span><span>
-            <button class="oct-mini" id="setOctDown" title="Octave down" aria-label="Octave down"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
-            <span id="kbRange">—</span>
-            <button class="oct-mini" id="setOctUp" title="Octave up" aria-label="Octave up"><svg><use href="#i-plus"/></svg></button>
-          </span></div>
-          <div class="setting-row"><span>Check sound, keys and lights</span><button class="mini-btn" id="runSetup">Run setup again</button></div>
-          <div class="setting-row"><span>Something not working?</span><button class="mini-btn" id="openDiagnostics">Connection report</button></div>
-          <div class="setting-row"><span>Lights stuck or missing?</span><span><button class="mini-btn" id="testLights" title="A light runs across every key and back, then any light left on goes off">Test lights</button></span></div>
-        </div>
-        <div class="settings-card device-card" id="setDevice">
-          <h3 tabindex="-1">Support my device</h3>
-          <p class="cam-help">Is your keyboard missing, unlit or only half working? Keylight can put together a report of what it sees, so we can add support in a later release. You read it first, and nothing is sent unless you send it.</p>
-          <div class="about-actions"><button class="ghost" id="openDeviceSupport" type="button" data-device-support>Support my device</button></div>
+        <div class="settings-card" id="setKeyboard">
+          <h3 tabindex="-1">Your keyboard</h3>
+          <div class="kl-group">
+            <div class="setting-row" id="kbChoiceRow" data-kw="keyboard choose piano lumi roli midi on-screen"><span>Keyboard</span><span><span id="kbChoiceValue">Not chosen yet</span><button class="mini-btn" id="kbChoose" type="button">Change</button></span></div>
+            <label class="setting" title="The MIDI input Keylight listens to. Automatic looks for your keyboard by name">Connected to <select id="kbPort"></select></label>
+            <label class="setting" title="Setup also works this out when you press the two end keys">Number of keys <select id="kbKeys"><option value="0">Automatic</option><option value="24">24 keys</option><option value="48">48 keys</option><option value="49">49 keys</option></select></label>
+            <p class="cam-help" id="kbAutoHint">Automatic reads the size from the keyboard you plug in.</p>
+            <p class="cam-help hidden" id="kbHelp" role="status"></p>
+            <div class="setting-row hidden" id="kbRetryRow"><span role="status" id="kbRetryMessage"></span><button class="mini-btn" type="button" id="kbRetry">Retry</button></div>
+            <div class="setting-row hidden" id="kbHelpSupportRow"><span>Keyboard not listed?</span><button class="mini-btn" type="button" data-device-support>Support my device</button></div>
+            <div class="setting-row hidden" id="swapRow"><span>Lights on the wrong keyboard?</span><button class="mini-btn" id="swapLights">Swap keyboards</button></div>
+            <div class="setting-row"><span>Keys play</span><span>
+              <button class="oct-mini" id="setOctDown" title="Octave down" aria-label="Octave down"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+              <span id="kbRange"></span>
+              <button class="oct-mini" id="setOctUp" title="Octave up" aria-label="Octave up"><svg><use href="#i-plus"/></svg></button>
+            </span></div>
+            <div class="setting-row" data-kw="setup check sound keys lights again"><span>Check sound, keys and lights</span><button class="mini-btn" id="runSetup">Run setup again</button></div>
+            <div class="kb-affiliate compact" id="setPartyKeys" data-partykeys data-kw="need keyboard buy partykeys discount affiliate"><b class="kb-aff-title">Need a keyboard?</b><p class="kb-aff-body">PartyKeys makes a 36-key keyboard with lights in every key. It works with Keylight over USB or Bluetooth, and light support is in the works.</p><p class="kb-aff-offer" data-partykeys-offer>Black Friday deal: code MMDMAGDY takes 5% off.</p><div class="kb-aff-action"><button type="button" class="mini-btn" data-partykeys-open>See PartyKeys</button><p class="kb-aff-note">Affiliate link: Keylight's developer earns a small commission. PartyKeys sent a keyboard so Keylight can support it.</p></div></div>
+          </div>
         </div>
         <div class="settings-card" id="setSound">
           <h3 tabindex="-1">Sound</h3>
-          <label class="setting">Instrument <select id="instrument"></select></label>
-          <div class="setting-row"><span>Piano recordings</span><span id="sampleStatus" role="status">Bundled recordings, ready to load</span></div>
-          <label class="setting">Master volume <span class="range-wrap"><input id="volume" type="range" min="0" max="100" value="80"><output class="range-out" for="volume" data-for="volume" data-unit="pct">80%</output></span></label>
-          <label class="setting">Audio output <select id="audioOutput"></select></label>
-          <div class="setting-row"><span>Sound delay</span><span id="audioLatency">—</span></div>
-          <label class="setting">Play the other hand for me <input id="accompanyToggle" type="checkbox"></label>
-          <p class="cam-help">In a song for two hands, Keylight plays the part you are not practising.</p>
-          <label class="setting">Generated band <input id="bandToggle" type="checkbox"></label>
-          <p class="cam-help">Adds bass and drums made from the song’s chords while you play.</p>
-          <label class="setting">Backing volume <span class="range-wrap"><input id="backingVolume" type="range" min="0" max="100" value="70"><output class="range-out" for="backingVolume" data-for="backingVolume" data-unit="pct">70%</output></span></label>
-          <div class="setting-row"><span>Backing track (no piano part)</span><span><span id="backingState">none</span>
-            <label class="mini-btn">Attach<input id="backingFile" type="file" accept="audio/*" hidden></label></span></div>
-          <div class="setting-row"><span>Full recording (used by Watch)</span><span><span id="fullState">none</span>
-            <label class="mini-btn">Attach<input id="fullMixFile" type="file" accept="audio/*" hidden></label></span></div>
-          <label class="setting"><span class="setting-text">Record my takes<small id="recordTakesNote">Saves each run in the player as a video with Keylight’s sound to Movies › Keylight, for making videos.</small></span>
-            <input id="recordTakes" type="checkbox"></label>
+          <div class="kl-group">
+            <label class="setting">Instrument <select id="instrument"></select></label>
+            <div class="setting-row"><span>Piano recordings</span><span id="sampleStatus" role="status">Bundled recordings, ready to load</span></div>
+            <label class="setting">Master volume <span class="range-wrap"><input id="volume" type="range" min="0" max="100" value="80"><output class="range-out" for="volume" data-for="volume" data-unit="pct">80%</output></span></label>
+            <label class="setting">Audio output <select id="audioOutput"></select></label>
+            <div class="setting-row"><span>Sound delay</span><span id="audioLatency">Not set</span></div>
+          </div>
         </div>
-        <div class="settings-card" id="setDisplay">
-          <h3 tabindex="-1">Display</h3>
-          <label class="setting"><span class="setting-text">Visual effects<small>Lite keeps the colours and drops the background blur, soft shadows and slow drift, so phones and older tablets stay smooth. Full is for computers.</small></span>
-            <select id="fxMode"><option value="full">Full</option><option value="lite">Lite</option></select></label>
+        <div class="settings-card hidden" id="setTV">
+          <h3 tabindex="-1">TV</h3>
+          <div id="tvPremiumNotice" class="kl-group hidden">
+            <p class="cam-help">TV mode is part of Keylight Premium. Unlock it on your iPhone or iPad.</p>
+            <div class="setting-row"><button id="tvSettingsUnlock" class="mini-btn" type="button">Unlock TV mode</button></div>
+          </div>
+          <div id="tvSettingsControls" class="kl-group">
+            <label class="setting" data-kw="tv airplay cable hdmi connection">TV connection
+              <select id="tvSetup"><option value="airplay">Screen Mirroring</option><option value="cable">I'm using a cable (HDMI)</option></select>
+            </label>
+            <div class="setting-row" data-kw="tv apple airplay picture delay latency lag ms"><span>TV picture delay</span><span><span id="tvDelayValue">160 ms</span> <button class="mini-btn" id="tvDelayDown" type="button" aria-label="Less delay, 10 milliseconds">−10</button> <button class="mini-btn" id="tvDelayUp" type="button" aria-label="More delay, 10 milliseconds">+10</button></span></div>
+            <div class="setting-row" data-kw="sync calibrate tv dot tap timing"><span>Sync with TV</span><span><button class="mini-btn" id="tvSync" type="button" disabled>Sync with TV</button></span></div>
+            <p class="cam-help" id="tvSyncHint">Connect a TV first</p>
+            <p class="cam-help">If your TV has Game Mode, try it to reduce picture delay.</p>
+            <div class="setting-row" data-kw="sound speaker audio airplay route apple tv iphone ipad"><span>Piano sound</span><span class="kl-seg" role="group" aria-label="Piano sound"><button type="button" data-tv-sound="tv" aria-pressed="false">TV</button><button type="button" data-tv-sound="phone" id="tvSoundPhone" aria-pressed="false">This iPhone</button><button type="button" data-tv-sound="muted" aria-pressed="false">Muted</button></span></div>
+            <p class="cam-help" id="tvSoundStatus" role="status"></p>
+            <label class="setting" data-kw="notes draw show phone battery">Show notes on phone too <input id="tvPhoneNotes" type="checkbox"></label>
+            <div class="setting-row" data-kw="connect airplay screen mirroring control center apple tv"><span>How to connect</span></div>
+            <p class="cam-help">Open Control Center, tap Screen Mirroring and choose your Apple TV.</p>
+          </div>
+        </div>
+        <div class="settings-card hidden" id="setLights">
+          <h3 tabindex="-1">Keyboard lights</h3>
+          <div class="kl-group">
+            <label class="setting">Brightness <span class="range-wrap"><input id="brightness" type="range" min="30" max="255" value="255"><output class="range-out" for="brightness" data-for="brightness" data-unit="pct255">100%</output></span></label>
+            <label class="setting" id="kbdModeRow">Light style
+              <select id="kbdMode">
+                <option value="Piano">Piano: white</option>
+                <option value="Pro">Pro: hand colours</option>
+                <option value="Stage">Stage: a colour per note</option>
+                <option value="User">User: your own colour</option>
+              </select>
+            </label>
+            <label class="setting" id="userColorRow">Your colour <input id="userColor" type="color" value="#a78bfa"></label>
+            <label class="setting hidden" id="partyColorRow" data-kw="lights colour hand colours full colour one colour keys to play">Lights colour
+              <select id="partyColor"><option value="rgb">Same as the screen</option><option value="one">One colour</option><option value="hands">Hand colours (try it)</option></select>
+            </label>
+            <p class="cam-help hidden" id="partyDetail" role="status"></p>
+            <label class="setting" id="waitStyleRow" data-kw="wait mode breathe steady key to play">Key to play (Wait mode)
+              <select id="waitStyle"><option value="breathe">Breathe</option><option value="steady">Steady</option></select>
+            </label>
+            <label class="setting" id="nextStyleRow" data-kw="next notes upcoming glow pulse build-up off">Next notes
+              <select id="nextStyle"><option value="glow">Glow</option><option value="pulse">Slow pulse</option><option value="buildup">Build-up</option><option value="off">Off</option></select>
+            </label>
+            <p class="cam-help" id="lightStyleHint">Only on keyboards Keylight lights in full colour.</p>
+            <div class="setting-row"><span id="lightsLabel">Key lights</span><span><span id="daemonState">checking…</span><button class="mini-btn hidden" id="daemonRetry">Try again</button></span></div>
+            <div class="setting-row hidden" id="batteryRow"><span>Keyboard battery</span><span id="kbBattery"></span></div>
+            <div class="setting-row"><span>Lights stuck or missing?</span><span><button class="mini-btn" id="testLights" title="A light runs across every key and back, then any light left on goes off">Test lights</button></span></div>
+          </div>
+        </div>
+        <div class="settings-card" id="setPlaying">
+          <h3 tabindex="-1">Playing</h3>
+          <div class="kl-group">
+            <label class="setting" data-kw="metronome click beat tempo count in">Count-in
+              <select id="selCountIn"><option value="0">Off</option><option value="2">2 beats</option><option value="4" selected>4 beats</option></select>
+            </label>
+            <label class="setting">Play the other hand for me <input id="accompanyToggle" type="checkbox"></label>
+            <p class="cam-help">In a song for two hands, Keylight plays the part you are not practising.</p>
+            <label class="setting">Backing volume <span class="range-wrap"><input id="backingVolume" type="range" min="0" max="100" value="70"><output class="range-out" for="backingVolume" data-for="backingVolume" data-unit="pct">70%</output></span></label>
+            <div class="setting-row" id="backingRow"><span>Backing track (no piano part)</span><span><span id="backingState">none</span>
+              <label class="mini-btn">Attach<input id="backingFile" type="file" accept="audio/*" hidden></label></span></div>
+            <div class="setting-row" id="fullMixRow"><span>Full recording (used by Watch)</span><span><span id="fullState">none</span>
+              <label class="mini-btn">Attach<input id="fullMixFile" type="file" accept="audio/*" hidden></label></span></div>
+            <label class="setting" id="recordTakesRow"><span class="setting-text">Record my takes<small id="recordTakesNote">Saves each run in the player as a video with Keylight’s sound to Movies › Keylight, for making videos.</small></span>
+              <input id="recordTakes" type="checkbox"></label>
+          </div>
         </div>
         <div class="settings-card" id="setPractice">
-          <h3 tabindex="-1">Practice</h3>
-          <label class="setting"><span class="setting-text">Daily goal<small>Minutes of playing a day. Resting is fine, nothing is lost.</small></span>
-            <select id="goalMin"><option value="5">5 min</option><option value="10">10 min</option><option value="15">15 min</option><option value="20">20 min</option><option value="30">30 min</option></select>
-          </label>
-          <label class="setting">Count-in
-            <select id="selCountIn"><option value="0">Off</option><option value="2">2 beats</option><option value="4" selected>4 beats</option></select>
-          </label>
-          <label class="setting">Wait mode
-            <select id="waitMode">
-              <option value="pauseAndSnap">Stop on the note</option>
-              <option value="pauseAndPlay">Stop just before it</option>
-            </select>
-          </label>
-          <label class="setting">Pitch-bend range
-            <select id="bendRange">
-              <option value="2">±2 semitones</option>
-              <option value="12">±12 semitones</option>
-            </select>
-          </label>
+          <h3 tabindex="-1">Practice goal</h3>
+          <div class="kl-group">
+            <label class="setting"><span class="setting-text">Daily goal<small>Minutes of playing a day. Resting is fine, nothing is lost.</small></span>
+              <select id="goalMin"><option value="5">5 min</option><option value="10">10 min</option><option value="15">15 min</option><option value="20">20 min</option><option value="30">30 min</option></select>
+            </label>
+            <label class="setting" id="experienceRow" data-kw="level experience beginner brand new already play know a little"><span class="setting-text">Your level<small>Sets finger numbers, speed and hand placement to suit you.</small></span>
+              <select id="experienceSel"><option value="">Not set</option><option value="new">Brand new</option><option value="some">Know a little</option><option value="experienced">I already play</option></select>
+            </label>
+            <label class="setting" id="handGuideRow" data-kw="hand placement fingers position place your hands guide"><span class="setting-text">Hand placement<small>Before a song, the keys light one finger at a time so your hand starts in the right place. Auto turns itself off once you play well.</small></span>
+              <select id="handGuideSel"><option value="auto">Auto</option><option value="always">Always</option><option value="off">Off</option></select>
+            </label>
+            <div class="setting hidden" id="reminderRow" data-kw="reminder notification daily practice time remind">
+              <span class="setting-text">Daily reminder<small>A gentle nudge at a time you pick. Skipped on days you have already practised.</small><small id="reminderNote" class="hidden" role="status"></small><button type="button" class="mini-btn hidden" id="reminderPermission">Turn on daily reminder</button></span>
+              <span class="reminder-controls">
+                <select id="reminderMode" aria-label="Daily reminder"><option value="off">Off</option><option value="on">On</option></select>
+                <input id="reminderTime" class="hidden" type="time" value="19:00" aria-label="Reminder time">
+              </span>
+            </div>
+          </div>
         </div>
-        <div class="settings-card" id="setExternal">
-          <h3 tabindex="-1">External instruments &amp; gestures</h3>
-          <label class="setting">Instrument MIDI output <select id="instrumentOutput"><option value="">Off</option></select></label>
-          <p id="instrumentOutputStatus" class="cam-help" role="status">Off. Keyboard lighting uses its own connection.</p>
-          <button class="mini-btn" id="midiPanic">Silence external instrument</button>
-          <label class="setting">Gesture MIDI input <select id="gestureInput"><option value="">Off</option></select></label>
-          <p id="gestureStatus" class="cam-help" role="status">Off or disconnected</p>
-          <p class="cam-help">Airwave expression MIDI needs host software that generates its gestures. It carries hand-level expression only; finger tracking is the separate experimental Airwave card below.</p>
+        <div class="settings-card" id="setDisplay">
+          <h3 tabindex="-1">Appearance and accessibility</h3>
+          <div class="kl-group">
+            <label class="setting"><span class="setting-text">Visual effects<small id="fxHint">Lite keeps the colours and drops the background blur, soft shadows and slow drift, so phones and older tablets stay smooth. Full is for computers.</small></span>
+              <select id="fxMode"><option value="full">Full</option><option value="lite">Lite</option></select></label>
+            <label class="setting" id="textScaleRow" data-kw="text size bigger larger font accessibility">Text size <span class="range-wrap"><input id="textScale" type="range" min="90" max="140" step="5" value="100"><output class="range-out" for="textScale" data-unit="pct">100%</output></span></label>
+            <label class="setting" id="reduceMotionRow" data-kw="reduce motion animation accessibility">Reduce motion
+              <select id="reduceMotion"><option value="system">Follow system</option><option value="on">On</option></select></label>
+            <label class="setting hidden" id="hapticsRow" data-kw="haptics vibration feedback taps"><span class="setting-text">Vibration feedback<small>A small tap when you choose, answer or finish. Never while notes fall.</small></span> <input id="hapticsToggle" type="checkbox" checked></label>
+          </div>
         </div>
         <div class="settings-card cam-card" id="setCamera">
           <h3 tabindex="-1">Hand tracking <span class="beta">beta</span></h3>
@@ -404,14 +559,17 @@
           <div class="setting-row"><span>Status</span><span id="camStatus">Off</span></div>
         </div>
         <div class="settings-card" id="setProgress">
-          <h3 tabindex="-1">Progress</h3>
-          <div class="setting-row"><span>Played today</span><span id="playedToday">0 min</span></div>
-          <div id="backupControls" class="backup-controls"></div>
-          <div class="danger-zone" role="group" aria-labelledby="dangerTitle">
-            <p id="dangerTitle">Start over</p>
-            <div class="progress-actions">
-              <button class="ghost danger" id="resetProgress">Reset local progress</button>
-              <button class="ghost danger" id="resetSettings">Reset settings</button>
+          <h3 tabindex="-1">Data and backup</h3>
+          <div class="kl-group">
+            <p id="settingsStorageNotice" class="cam-help hidden" role="status"></p>
+            <div class="setting-row"><span>Played today</span><span id="playedToday">0 min</span></div>
+            <div id="backupControls" class="backup-controls"></div>
+            <div class="danger-zone" role="group" aria-labelledby="dangerTitle">
+              <p id="dangerTitle">Start over</p>
+              <div class="progress-actions">
+                <button class="ghost danger" id="resetProgress">Reset local progress</button>
+                <button class="ghost danger" id="resetSettings">Reset settings</button>
+              </div>
             </div>
           </div>
         </div>
@@ -420,13 +578,71 @@
           <p>Free and open source, with no account required. Optional contributions help fund development and device testing.</p>
           <button class="ghost" data-support>Support options</button>
         </div>
+        <div class="settings-card hidden" id="setHelp">
+          <h3 tabindex="-1">Help</h3>
+          <div class="kl-group" id="setHelpRows">
+            <button class="kl-row" id="replayTour" type="button"><span>Quick tour</span></button>
+            <button class="kl-row hidden" id="openBetaNotice" type="button"><span>Keylight beta</span></button>
+            <a class="kl-row" id="openHelpPage" href="https://keylightpiano.app/iphone" target="_blank" rel="noopener"><span>Help for iPhone and iPad</span></a>
+            <a class="kl-row" id="contactSupport" href="mailto:support@keylightpiano.app"><span class="setting-text">Contact support<small>support@keylightpiano.app</small></span></a>
+          </div>
+        </div>
+        <div class="settings-card hidden" id="setPremium">
+          <h3 tabindex="-1">Keylight Premium</h3>
+          <div class="kl-group">
+            <div class="setting-row"><span>Purchase status</span><span id="premiumStatus"></span></div>
+            <button class="kl-row hidden" id="premiumUpgrade" type="button">See plans</button>
+            <button class="kl-row hidden" id="premiumManage" type="button">Manage subscription</button>
+            <button class="kl-row hidden" id="premiumRestore" type="button">Restore purchases</button>
+            <p class="cam-help premium-message" id="premiumMessage" role="status"></p>
+          </div>
+        </div>
         <div class="settings-card about-card" id="setAbout">
           <h3 tabindex="-1">About Keylight</h3>
-          <p class="cam-help" id="aboutLine">Free, open-source piano learning with falling notes and glowing keys.</p>
-          <div class="about-actions">
-            <button class="ghost" id="openAbout" type="button">About and credits</button>
-            <button class="ghost" id="openShortcuts" type="button">Keyboard shortcuts <kbd>?</kbd></button>
+          <div class="kl-group">
+            <p class="cam-help" id="aboutLine">Free, open-source piano learning with falling notes and glowing keys.</p>
+            <div class="about-actions">
+              <button class="ghost" id="openAbout" type="button">About and credits</button>
+              <button class="ghost" id="replayTourAbout" type="button">Quick tour</button>
+              <button class="ghost" id="openShortcuts" type="button">Keyboard shortcuts <kbd>?</kbd></button>
+            </div>
           </div>
+        </div>
+        <details class="settings-card kl-adv" id="setAdvanced">
+          <summary><span>Advanced</span><small id="advancedSummary">Pitch bend, MIDI output, problem reports</small></summary>
+          <div class="kl-group" id="setExternal">
+            <label class="setting">Wait mode
+              <select id="waitMode">
+                <option value="pauseAndSnap">Stop on the note</option>
+                <option value="pauseAndPlay">Stop just before it</option>
+              </select>
+            </label>
+            <label class="setting">Generated band <input id="bandToggle" type="checkbox"></label>
+            <p class="cam-help">Adds bass and drums made from the song’s chords while you play.</p>
+            <label class="setting">Pitch-bend range
+              <select id="bendRange">
+                <option value="2">±2 semitones</option>
+                <option value="12">±12 semitones</option>
+              </select>
+            </label>
+            <label class="setting">Pressure (press into a key) <input id="exprToggle" type="checkbox"></label>
+            <label class="setting">Pitch bend (rock a key) <input id="glideToggle" type="checkbox"></label>
+            <label class="setting hidden" id="exactRow">Exact colours <span class="beta">experimental</span> <input id="exactColors" type="checkbox"></label>
+            <p class="cam-help hidden" id="exactHint">Lights each key in its true colour on Windows. Experimental: if the keys stop lighting, turn it off.</p>
+            <label class="setting">Instrument MIDI output <select id="instrumentOutput"><option value="">Off</option></select></label>
+            <p id="instrumentOutputStatus" class="cam-help" role="status">Off. Keyboard lighting uses its own connection.</p>
+            <div class="setting-row"><span>Silence an external instrument</span><button class="mini-btn" id="midiPanic">Silence</button></div>
+            <label class="setting" id="gestureRow">Gesture MIDI input <select id="gestureInput"><option value="">Off</option></select></label>
+            <p id="gestureStatus" class="cam-help" role="status">Off or disconnected</p>
+            <p class="cam-help" id="airwaveNote">Airwave expression MIDI needs host software that generates its gestures. It carries hand-level expression only; finger tracking is the separate experimental Airwave card below.</p>
+            <button class="kl-row" id="openDiagnostics" type="button"><span>Report a problem</span></button>
+            <p class="cam-help hidden" id="betaReportHint">Send it to support@keylightpiano.app.</p>
+          </div>
+        </details>
+        <div class="settings-card device-card" id="setDevice">
+          <h3 tabindex="-1">Support my device</h3>
+          <p class="cam-help">Is your keyboard missing, unlit or only half working? Keylight can put together a report of what it sees, so we can add support in a later release. You read it first, and nothing is sent unless you send it.</p>
+          <div class="about-actions"><button class="ghost" id="openDeviceSupport" type="button" data-device-support>Support my device</button></div>
         </div>
         <div class="settings-group" id="setExperimental">
           <h3 tabindex="-1">Experimental</h3>
@@ -448,6 +664,10 @@
         </div>
         <details class="settings-card diag-fold" id="setDiagnostics">
           <summary><span>Diagnostics</span><small>For troubleshooting</small></summary>
+          <div class="setting-row"><span>Keyboard input</span><span id="diagPort">Nothing connected</span></div>
+          <div class="setting-row"><span>Last key</span><span id="diagNote">Press a key</span></div>
+          <div class="setting-row"><span>Last control</span><span id="diagCtl">None yet</span></div>
+          <div class="setting-row"><span>Messages received</span><span id="diagCount">0</span></div>
           <div class="setting-row"><span>Voices</span><span id="voiceCount">0</span></div>
           <div class="setting-row"><span>Expression</span><span id="mpeState">waiting for bend/pressure…</span></div>
         </details>
@@ -456,17 +676,28 @@
 
     <!-- ================= PLAYER ================= -->
     <section id="screen-play" class="screen hidden">
+      <div class="play-hint hidden" id="playHint" role="status"><span id="playHintText"></span><button type="button" class="play-hint-reset" id="playHintReset">Reset</button><button type="button" class="play-hint-x" id="playHintDismiss" aria-label="Dismiss"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-close"/></svg></button></div>
       <div class="sheet-strip hidden" id="sheetStrip" aria-label="Sheet music"><div class="sheet-music" id="sheetMusic"></div><i class="sheet-head" aria-hidden="true"></i></div>
       <div class="canvas-wrap">
         <canvas id="stage"></canvas>
         <div class="sheet-missing hidden" id="sheetMissing" role="status"><p>This song has no sheet music, so Sheet only has nothing to show.</p><button class="ghost" id="sheetMissingBack" type="button">Switch back to Cascade</button></div>
-        <div class="score-float" id="scoreHud">—</div>
+        <div class="score-float" id="scoreHud"></div>
+        <div class="hand-intro" id="handIntro" aria-hidden="true"><span class="hi hi-left" id="hiLeft"><i></i>Left hand <em>blue</em></span><span class="hi hi-right" id="hiRight"><i></i>Right hand <em>orange</em></span></div>
+        <div class="arm-pill hidden" id="armPill" role="status"><span id="armPillText"></span></div>
+        <div class="tv-stage hidden" id="tvStage" role="status">
+          <p class="tv-stage-head">Showing on your TV</p>
+          <p class="tv-stage-song" id="tvStageSong"></p>
+          <p class="tv-stage-live" id="tvStageLive"></p>
+        </div>
         <div class="cam-pip hidden" id="camPip"><canvas id="camPipCanvas"></canvas><span class="cam-tag" id="camPipTag">Hands</span></div>
         <div class="lyrics hidden" id="lyrics"><div class="ly-now" id="lyNow"></div><div class="ly-next" id="lyNext"></div></div>
         <button class="rec-pill hidden" id="recPill" title="Recording this take. Click to stop and save it" aria-label="Recording. Stop and save the take"><i aria-hidden="true"></i>REC <span id="recTime">0:00</span></button>
       </div>
       <div class="player-bottom">
-        <button id="btnPlay" class="play-btn" title="Play / pause (space)"><svg><use href="#i-play"/></svg></button>
+        <i class="hud-line" id="hudLine" aria-hidden="true"><b id="hudLineFill"></b></i>
+        <button id="tvRestart" class="tv-extra" type="button" aria-label="Restart the song"><svg><use href="#i-restart"/></svg><span>Restart</span></button>
+        <button id="btnPlay" class="play-btn" title="Play / pause (space)" aria-label="Play or pause"><svg><use href="#i-play"/></svg></button>
+        <button id="tvBack5" class="tv-extra" type="button" aria-label="Back 5 seconds"><svg><use href="#i-back"/></svg><span>Back 5 s</span></button>
         <span id="timeLabel" class="time">0:00 / 0:00</span>
         <output id="customSpeed" class="time" hidden></output>
         <div class="progress" id="progress" role="slider" tabindex="0" aria-label="Song position" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" title="Click to seek">
@@ -474,21 +705,37 @@
           <div class="loop-region" id="loopRegion"></div>
           <div class="loop-marker start" id="loopMarkerA"></div>
           <div class="loop-marker end" id="loopMarkerB"></div>
+          <div class="hud-ticks" id="hudTicks" aria-hidden="true"></div>
           <div class="playhead" id="playhead"></div>
         </div>
-        <button class="ghost" id="editSong" disabled title="Only for songs you added" aria-describedby="editSongHint">Correct notes</button>
+        <button class="ghost" id="editSong" disabled title="Edit the notes of this song. Only for songs you added" aria-describedby="editSongHint">Edit notes</button>
         <span class="sr-only" id="editSongHint">Only for songs you added</span>
         <p class="coach-feedback" id="coachFeedback" role="status" hidden></p>
+        <div class="tv-tools" id="tvTools">
+          <button id="tvHands" class="tv-extra" type="button" aria-pressed="false">Hands: Both</button>
+          <button id="tvWait" class="tv-extra" type="button" aria-pressed="false">Wait</button>
+          <button id="tvLoop" class="tv-extra" type="button" aria-pressed="false">Loop</button>
+          <div class="tv-delay-tools" role="group" aria-label="TV picture delay">
+            <button id="tvSyncPill" class="tv-extra tv-sync-pill" type="button" aria-expanded="false" aria-controls="tvSyncPanel">Sync <span id="tvSyncPillMs">160 ms</span></button>
+            <span class="tv-sync-panel" id="tvSyncPanel" hidden>
+              <button id="tvRemoteDelayDown" class="tv-extra" type="button" aria-label="Less TV delay, 10 milliseconds">−10</button>
+              <output id="tvRemoteDelay" aria-label="TV picture delay">160 ms</output>
+              <button id="tvRemoteDelayUp" class="tv-extra" type="button" aria-label="More TV delay, 10 milliseconds">+10</button>
+            </span>
+          </div>
+        </div>
       </div>
+      <div class="hud-scrim" id="hudScrim" hidden></div>
     </section>
   </main>
 
-  <nav id="nav">
-    <button data-screen="home" class="on"><svg><use href="#i-home"/></svg><span>Home</span></button>
-    <button data-screen="course"><svg><use href="#i-course"/></svg><span>Course</span></button>
-    <button data-screen="practice"><svg><use href="#i-practice"/></svg><span>Practice</span></button>
-    <button data-screen="search"><svg><use href="#i-search"/></svg><span>Search</span></button>
-    <button data-screen="settings"><svg><use href="#i-gear"/></svg><span>Settings</span></button>
+  <nav id="nav" aria-label="Main">
+    <div class="nav-brand" id="navBrand" aria-hidden="true"><svg viewBox="0 0 28 28"><rect x="2" y="4" width="7" height="20" rx="2" fill="currentColor"/><rect x="10.5" y="4" width="7" height="20" rx="2" fill="#7cf0c6"/><rect x="19" y="4" width="7" height="20" rx="2" fill="currentColor"/></svg><b>Keylight</b></div>
+    <button data-screen="home" class="on"><svg><use href="#i-home"/></svg><svg class="ios-tab-icon" aria-hidden="true"><use href="#i-home-ios"/><use class="ios-tab-fill" href="#i-home-fill"/></svg><span>Home</span></button>
+    <button data-screen="course"><svg><use href="#i-course"/></svg><svg class="ios-tab-icon" aria-hidden="true"><use href="#i-course-ios"/><use class="ios-tab-fill" href="#i-course-fill"/></svg><span>Course</span></button>
+    <button data-screen="practice"><svg><use href="#i-practice"/></svg><svg class="ios-tab-icon" aria-hidden="true"><use href="#i-practice-ios"/><use class="ios-tab-fill" href="#i-practice-fill"/></svg><span>Practice</span></button>
+    <button data-screen="search"><svg><use href="#i-note"/></svg><svg class="ios-tab-icon" aria-hidden="true"><use href="#i-note-ios"/><use class="ios-tab-fill" href="#i-note-fill"/></svg><span>Songs</span></button>
+    <button data-screen="settings"><svg><use href="#i-gear"/></svg><svg class="ios-tab-icon" aria-hidden="true"><use href="#i-gear-ios"/><use class="ios-tab-fill" href="#i-gear-fill"/></svg><span>Settings</span></button>
   </nav>
 
   <div class="toast" id="status" role="status" aria-live="polite"></div>
@@ -500,10 +747,15 @@
     <div class="results-kicker" id="resKicker">SONG COMPLETE</div>
     <h1 class="results-head" id="resHead">Great job!</h1>
     <div class="results-stars" id="resStars"></div>
+    <p class="results-skip" id="resSkip" aria-hidden="true">Tap to skip</p>
+    <button class="sr-only results-skip-btn" id="resSkipBtn" type="button">Skip animation</button>
+    <span class="sr-only" id="resLive" role="status" aria-live="polite"></span>
     <div class="results-ring">
       <svg viewBox="0 0 120 120"><defs><linearGradient id="ringGrad" gradientUnits="userSpaceOnUse" x1="120" y1="0" x2="0" y2="120"><stop offset="0" class="ring-stop-a"/><stop offset="1" class="ring-stop-b"/></linearGradient></defs><circle class="ring-bg" cx="60" cy="60" r="52"/><circle class="ring-fg" id="resRing" cx="60" cy="60" r="52"/></svg>
       <div class="ring-label"><div class="results-big" id="resBig">0%</div><div class="results-sub" id="resSub">0 notes hit</div></div>
     </div>
+    <p class="results-lead" id="resLead"></p>
+    <div class="results-best hidden" id="resBest" role="status"></div>
     <div class="results-acc" id="resAcc"></div>
     <div class="results-cards">
       <div class="rcard k-perfect"><b id="resPerfect">0</b><span>Perfect</span></div>
@@ -514,37 +766,105 @@
       <div class="rcard k-streak"><b id="resStreak">0</b><span>Best streak</span></div>
     </div>
     <div class="results-hands" id="resHands"></div>
+    <button class="link results-details" id="resDetails" type="button" aria-expanded="false">Details</button>
     <div class="celebrate" id="celebrate"></div>
     <div class="results-actions">
       <button id="resAgain" class="primary">Try again</button>
       <button id="resWatch" class="ghost hidden">Watch again</button>
       <button id="resPractice" class="ghost">Practice</button>
       <button id="resNext" class="ghost hidden">Next song</button>
-      <button id="resClose" class="link">Close</button>
+      <button id="resClose" class="link" aria-label="Close"><span class="res-close-txt">Close</span><svg class="res-close-x" aria-hidden="true"><use href="#i-close"/></svg></button>
     </div>
   </div>
 </div>
 
+<!-- ================= TV: SYNC WITH THE TV ================= -->
+<div id="tvCalib" class="tv-calib hidden" role="dialog" aria-modal="true" aria-labelledby="tvCalibTitle">
+  <div class="tv-calib-head"><h2 id="tvCalibTitle">Sync with TV</h2><button id="tvCalibClose" class="link" type="button">Cancel</button></div>
+  <p class="tv-calib-copy" id="tvCalibCopy">Tap the screen each time the dot on the TV reaches the line.</p>
+  <div class="tv-calib-dots" id="tvCalibDots" aria-hidden="true"></div>
+  <button id="tvCalibTap" class="tv-calib-tap" type="button">Tap</button>
+  <p class="tv-calib-result" id="tvCalibResult" role="status"></p>
+  <div class="tv-calib-actions"><button id="tvCalibDone" class="primary hidden" type="button">Done</button></div>
+</div>
+<div id="tvPulse" class="tv-pulse" aria-hidden="true"></div>
+
 <!-- ================= ADD A SONG ================= -->
 <div id="importSheet" class="hidden">
-  <div class="sheet">
-    <button class="iconbtn sheet-close" id="importClose" title="Close" aria-label="Close"><svg><use href="#i-close"/></svg></button>
-    <h2>Add a song</h2>
-    <p class="sheet-sub" id="importPrivacy">A recording becomes notes on this Mac, and the file is never uploaded. MIDI and MusicXML files are read as written. Only add music you have the right to use. With the lookup on, cover art comes from iTunes and lyrics from LRCLIB.</p>
-    <label class="dropzone" id="dropZone">
-      <input id="importFile" type="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.flac,.ogg,.aif,.aiff,.mid,.midi,.xml,.musicxml,.mxl" hidden>
-      <div class="dz-icon"><svg><use href="#i-plus"/></svg></div>
-      <div class="dz-title">Drop a song here</div>
-      <div class="dz-sub">MP3 · M4A · WAV · FLAC · MIDI · MusicXML</div>
-      <span class="ghost dz-btn">Choose a file</span>
-    </label>
-    <div class="sheet-opts">
-      <label class="setting">Simplify a recording to melody + bass <input type="checkbox" id="impSimplify" checked></label>
-      <label class="setting">Find cover art and lyrics online <input type="checkbox" id="impLookup" checked></label>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="importTitle">
+    <div class="kl-dlg-head">
+      <h2 id="importTitle">Add a song</h2>
+      <button class="iconbtn sheet-close" id="importClose" title="Close" aria-label="Close"><svg><use href="#i-close"/></svg></button>
     </div>
+    <div id="impSources">
+      <div class="imp-kinds" id="impKinds">
+        <label class="dropzone imp-source" id="dropZone">
+          <input id="importFile" type="file" aria-label="Choose a file" accept="audio/*,video/mp4,video/quicktime,.mp3,.m4a,.aac,.wav,.flac,.ogg,.webm,.aif,.aiff,.mp4,.m4v,.mov,.mid,.midi,.kar,.xml,.musicxml,.mxl">
+          <span class="dz-icon imp-source-icon"><svg aria-hidden="true"><use href="#i-import-file"/></svg></span>
+          <span class="imp-source-copy">
+            <span class="dz-title">Drop a song here</span>
+            <span class="primary dz-btn">Choose a file</span>
+            <span class="dz-sub">MP3 · M4A · WAV · FLAC · MP4 · MIDI · MusicXML</span>
+            <span class="imp-source-detail imp-mobile">Audio, MIDI or MusicXML</span>
+          </span>
+        </label>
+        <button type="button" class="imp-source" id="impChooseIOS" hidden>
+          <span class="imp-source-icon"><svg aria-hidden="true"><use href="#i-import-file"/></svg></span>
+          <span class="imp-source-copy">Choose a file<span class="imp-source-detail">Audio, video, MIDI or MusicXML</span></span>
+        </button>
+        <button type="button" class="imp-source" id="impRecord">
+          <span class="imp-source-icon"><svg aria-hidden="true"><use href="#i-import-mic"/></svg></span>
+          <span class="imp-source-copy">
+            <span class="imp-desktop">Record with the microphone</span>
+            <span class="imp-mobile">Record</span>
+            <span class="imp-source-detail imp-mobile">Play or sing a tune</span>
+          </span>
+        </button>
+        <button type="button" class="imp-source" id="impShare" hidden aria-controls="impShareHelp">
+          <span class="imp-source-icon"><svg aria-hidden="true"><use href="#i-import-share"/></svg></span>
+          <span class="imp-source-copy">Share from another app<span class="imp-source-detail">Bring in a recording or video</span></span>
+        </button>
+      </div>
+      <h3 class="imp-option-title">Options</h3>
+      <div class="sheet-opts">
+        <label class="setting"><span id="impSimplifyLabel">Simplify to melody and bass</span> <input type="checkbox" id="impSimplify" checked></label>
+        <label class="setting">Find cover art and lyrics online <input type="checkbox" id="impLookup" checked></label>
+      </div>
+      <p class="sheet-sub" id="importPrivacy">Keylight works out the notes on this device. Keylight does not upload the file. MIDI and MusicXML play note for note.</p>
+      <p class="sheet-sub" id="impRights">Only add music you have the right to use.</p>
+    </div>
+    <section id="impShareHelp" hidden aria-labelledby="impShareHeading">
+      <h3 id="impShareHeading" tabindex="-1">Share from another app</h3>
+      <p id="impShareText">Open a recording in Voice Memos or Files, tap Share, then choose Keylight. For a video in Photos, choose Save to Files first, then share it from Files.</p>
+      <button type="button" class="ghost" id="impShareBack">Back</button>
+    </section>
+    <section id="impRecorder" hidden aria-label="Record with the microphone">
+      <button type="button" id="impRecordStart" aria-label="Start recording"><span aria-hidden="true"></span></button>
+      <span id="impRecordTime" aria-label="Elapsed time">00:00</span>
+      <meter id="impRecordLevel" min="0" max="1" value="0" aria-label="Microphone level"></meter>
+      <p id="impRecordStatus" role="status"></p>
+      <p id="impRecordTip">Works best close to the microphone in a quiet room.</p>
+      <div class="imp-record-actions">
+        <button type="button" class="ghost" id="impRecordCancel">Cancel</button>
+        <button type="button" class="primary" id="impRecordStop" hidden>Stop</button>
+        <button type="button" class="primary" id="impRecordUse" hidden>Use recording</button>
+        <button type="button" class="primary" id="impRecordSettings" hidden>Open Settings</button>
+      </div>
+    </section>
+    <section id="impRecordingKind" hidden aria-labelledby="impRecordingKindHeading">
+      <h3 id="impRecordingKindHeading" tabindex="-1">What did you record?</h3>
+      <button type="button" class="imp-source" id="impFullRecording">
+        <span>Full song<span class="imp-source-detail">Make a piano cover</span></span>
+      </button>
+      <button type="button" class="imp-source" id="impSoloRecording">Solo piano or humming</button>
+      <button type="button" class="ghost" id="impRecordingKindBack">Back</button>
+    </section>
     <div class="imp-progress hidden" id="impProgress">
-      <div class="imp-stage" id="impStage">Reading the file</div>
-      <div class="imp-bar"><i id="impBar"></i></div>
+      <div class="imp-busy"><span class="imp-spin" aria-hidden="true"></span><b id="impBusyTitle">Turning your song into notes</b></div>
+      <div class="imp-stage" id="impStage" role="status" aria-live="polite">Reading the file</div>
+      <div class="imp-bar" role="progressbar" aria-label="Progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="impBar"></i></div>
+      <p class="imp-wait" id="impWait">Long recordings can take a minute or two. You can keep this window open.</p>
+      <button type="button" class="ghost" id="impCancel" hidden>Cancel</button>
     </div>
     <div class="imp-result hidden" id="impResult">
       <div class="imp-cover" id="impCover"></div>
@@ -552,6 +872,14 @@
         <input id="impTitle" class="imp-input" placeholder="Title" aria-label="Title">
         <input id="impArtist" class="imp-input" placeholder="Artist" aria-label="Artist">
         <div class="imp-meta" id="impMeta"></div>
+        <label class="imp-difficulty" id="impDifficultyRow" hidden>Piano cover difficulty
+          <select class="imp-input" id="impDifficulty">
+            <option value="easy">Easy</option>
+            <option value="medium">Medium</option>
+            <option value="full">Full</option>
+          </select>
+        </label>
+        <p class="imp-notice hidden" id="impNotice" role="note"></p>
         <div class="imp-actions">
           <button class="primary" id="impPlay"><svg><use href="#i-play"/></svg>Play now</button>
           <button class="ghost" id="impAnother">Add another</button>
@@ -565,70 +893,108 @@
 <!-- player: note view picker, anchored to #btnView (items are built from VIEW_INFO in app.js) -->
 <div id="viewMenu" class="popover hidden" role="menu" aria-label="Note view"></div>
 
-<!-- first-run setup (app.js openSetup): sound, keyboard range, key lights, then Lesson 1.
-     The step text and checks are filled in by renderSetup from what the app sees live. -->
-<div id="onboarding" class="hidden" data-step="sound" role="dialog" aria-modal="true" aria-labelledby="obStepTitle">
+<!-- first-run setup and the Connect screen (app.js openSetup / openConnect, setup-flow.js): welcome, how you play,
+     connect (with the sound check), ready. Back on every step after the welcome; the text is filled in by renderSetup. -->
+<div id="onboarding" class="hidden" data-step="welcome" role="dialog" aria-modal="true" aria-labelledby="obStepTitle">
   <div class="ob-stage" aria-hidden="true">
+    <div class="ob-rain"><i class="l"></i><i class="r"></i><i class="l"></i><i class="r"></i><i class="r"></i><i class="l"></i></div>
     <div class="ob-keys" id="obKeys"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-    <div class="ob-blocks"><span class="b1"></span><span class="b2"></span><span class="b3"></span></div>
   </div>
+  <header class="ob-bar">
+    <button class="ob-back" id="obBack" type="button" aria-label="Back"><svg aria-hidden="true"><use href="#i-back"/></svg><span>Back</span></button>
+    <ol class="ob-steps" id="obSteps" aria-hidden="true"><li data-for="pick"></li><li data-for="connect"></li><li data-for="level"></li><li data-for="ready"></li></ol>
+    <button class="iconbtn ob-close hidden" id="obClose" type="button" title="Close" aria-label="Close setup"><svg><use href="#i-close"/></svg></button>
+  </header>
   <div class="ob-side">
-    <div class="ob-kicker">WELCOME TO KEYLIGHT</div>
-    <h1 class="ob-title">Let’s set up your keyboard</h1>
-    <p class="ob-copy">Three quick checks, then your first lesson.</p>
     <section class="ob-card">
-      <ol class="ob-steps" id="obSteps">
-        <li><button data-step="0"><i>1</i>Sound</button></li>
-        <li><button data-step="1"><i>2</i>Keyboard</button></li>
-        <li><button data-step="2"><i>3</i>Lights</button></li>
-        <li><button data-step="3"><i>4</i>Ready</button></li>
-      </ol>
-      <h2 class="ob-step-title" id="obStepTitle" tabindex="-1"></h2>
-      <p class="ob-step-copy" id="obStepCopy"></p>
-      <div class="ob-check" id="obCheck" data-state="wait" role="status">
-        <span class="ob-mark"><svg><use href="#i-check"/></svg></span>
-        <span class="ob-check-text" id="obCheckText"></span>
-        <span class="ob-answer hidden" id="obAnswer"><button class="mini-btn yes" id="obLightsYes">Yes</button><button class="mini-btn" id="obLightsNo">No</button></span>
+      <div class="ob-head">
+        <div class="ob-kicker">KEYLIGHT</div>
+        <h1 class="ob-step-title" id="obStepTitle" tabindex="-1">Learn piano with light.</h1>
+        <p class="ob-step-copy" id="obStepCopy">Follow falling notes on a lit keyboard, any MIDI keyboard, or your screen.</p>
       </div>
-      <label class="ob-port hidden" id="obPortRow"><span>Keyboard</span><select id="obKbPort"></select></label>
-      <div class="ob-panel" data-panel="sound">
-        <label class="ob-volume"><span>Volume</span><input id="obVolume" type="range" min="0" max="100" value="80"><output class="range-out" for="obVolume" data-unit="pct">80%</output></label>
-        <button class="mini-btn" id="obTestNote">Play a test note</button>
-        <p class="ob-note hidden" id="obLatency"></p>
-      </div>
-      <div class="ob-panel" data-panel="keyboard">
-        <button class="mini-btn" type="button" id="obSupportDevice" data-device-support>Keyboard not listed? Support my device</button>
-        <p class="ob-hint" id="obOctaveHint">Later, in the player, − and + at the top right move your keys an octave down or up. Z and X do the same.</p>
-      </div>
-      <div class="ob-panel" data-panel="lights">
-        <button class="mini-btn hidden" id="obLightsAgain">Show the lights again</button>
-        <button class="mini-btn hidden" id="obSwapLights" title="For when the light starts on your right-hand keyboard">Lights on the wrong keyboard? Swap</button>
-        <div class="ob-install hidden" id="obInstall">
-          <p id="obInstallIntro">Your keys can light up and follow the music. Optional — takes about 2 minutes.</p>
-          <details>
-            <summary id="obInstallSummary">Show install steps</summary>
-            <p>To install it you need Homebrew (brew.sh). Paste these two lines into Terminal, then quit and reopen Keylight:</p>
-            <!-- the README's "Install" commands; each flag stays on one line with its value -->
-            <pre class="ob-code" id="obCode">brew install uv python@3.13
+      <div class="ob-body">
+        <div class="ob-check hidden" id="obCheck" data-state="wait" role="status">
+          <span class="ob-mark"><svg><use href="#i-check"/></svg></span>
+          <span class="ob-check-text" id="obCheckText"></span>
+        </div>
+        <div class="ob-panel" data-panel="pick">
+          <div class="kb-pick" id="obPick" role="radiogroup" aria-label="How you will play"></div>
+          <div class="kb-affiliate" id="obPartyKeys" data-partykeys><b class="kb-aff-title">Need a keyboard?</b><p class="kb-aff-body">PartyKeys makes a 36-key keyboard with lights in every key. It works with Keylight over USB or Bluetooth, and light support is in the works.</p><p class="kb-aff-offer" data-partykeys-offer>Black Friday deal: code MMDMAGDY takes 5% off.</p><div class="kb-aff-action"><button type="button" class="mini-btn" data-partykeys-open>See PartyKeys</button><p class="kb-aff-note">Affiliate link: Keylight's developer earns a small commission. PartyKeys sent a keyboard so Keylight can support it.</p></div></div>
+        </div>
+        <div class="ob-panel" data-panel="connect">
+          <div class="ob-search" id="obSearch" role="status"><span class="ob-pulse" aria-hidden="true"><i></i></span><span><b>Looking for keyboards…</b><small>Keep it close and switched on.</small></span></div>
+          <ul class="ob-devices" id="obDevices" aria-label="Keyboards nearby"></ul>
+          <div class="ob-live hidden" id="obLive">
+            <div class="ob-note-chip" id="obNoteChip" aria-live="polite"><small>You played</small><b id="obNoteName">–</b></div>
+            <label class="ob-volume"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4z"/></svg><span class="sr-only">Volume</span><input id="obVolume" type="range" min="0" max="100" value="80" aria-label="Volume"><output class="range-out" for="obVolume" data-unit="pct">80%</output></label>
+            <button class="mini-btn" id="obTestNote" type="button">Play a note</button>
+          </div>
+          <div class="ob-side-pick hidden" id="obPairSide" role="status"><b>Which one is on the left?</b><span>Press any key on the left keyboard.</span></div>
+          <p class="ob-hint hidden" id="obLightsHint">Keys not lighting? Turn it off and on. <button class="ob-link" id="obLightsAgain" type="button">Show the lights again</button></p>
+          <button class="ob-link hidden" id="obSwapLights" type="button" title="For when the light starts on your right-hand keyboard">Lights on the wrong keyboard? Swap</button>
+          <div class="ob-range hidden" id="obRangeBox"><button class="ob-link" id="obRange" type="button">Set key range</button><span id="obRangeText"></span></div>
+          <p class="ob-note hidden" id="obLatency"></p>
+          <label class="ob-port hidden" id="obPortRow"><span>Keyboard</span><select id="obKbPort"></select></label>
+          <details class="ob-trouble" id="obTrouble">
+            <summary>Having trouble?</summary>
+            <ul class="ob-tips">
+              <li id="obTipBt">Check that Bluetooth is on in Settings.</li>
+              <li>Turn the keyboard off and on again, then wait a few seconds.</li>
+              <li id="obTipTwo">Two keyboards? Snap them together and switch both on.</li>
+            </ul>
+            <div class="ob-trouble-actions">
+              <button class="mini-btn" id="obApplePair" type="button">Use Apple's Bluetooth list</button>
+              <a class="mini-btn" id="obNotListed" href="mailto:support@keylightpiano.app">Keyboard not listed?</a>
+            </div>
+            <div class="ob-install hidden" id="obInstall">
+              <p id="obInstallIntro">Your keys can light up and follow the music. Optional. Takes about 2 minutes.</p>
+              <details>
+                <summary id="obInstallSummary">Show install steps</summary>
+                <p>To install it you need Homebrew (brew.sh). Paste these two lines into Terminal, then quit and reopen Keylight:</p>
+                <!-- the README's "Install" commands; each flag stays on one line with its value -->
+                <pre class="ob-code" id="obCode">brew install uv python@3.13
 <span>uv tool install</span> <span>--python /opt/homebrew/bin/python3.13</span> <span>--from "git+https://github.com/hyperb1iss/blocksd@v0.6.0"</span> <span>blocksd</span></pre>
-            <button class="mini-btn" id="obCopy">Copy</button>
+                <button class="mini-btn" id="obCopy">Copy</button>
+              </details>
+            </div>
           </details>
         </div>
-      </div>
-      <div class="ob-panel" data-panel="ready">
-        <ul class="ob-summary" id="obSummary"></ul>
-        <p class="ob-hint">Keylight is free. You can support development later in Settings.</p>
+        <div class="ob-panel" data-panel="level">
+          <div class="kb-pick" id="obLevel" role="radiogroup" aria-label="How much piano you have played"></div>
+          <div class="ob-goal" id="obGoal" role="radiogroup" aria-labelledby="obGoalLabel"><span id="obGoalLabel">Daily goal <small>(optional)</small></span><span class="ob-goal-chips"><button type="button" role="radio" data-goal="5" aria-checked="false">5 min</button><button type="button" role="radio" data-goal="10" aria-checked="false">10 min</button><button type="button" role="radio" data-goal="15" aria-checked="false">15 min</button></span></div>
+        </div>
+        <div class="ob-panel" data-panel="ready">
+          <ul class="ob-summary" id="obSummary"></ul>
+        </div>
       </div>
       <div class="ob-actions">
-        <button id="obNext" class="primary">Continue</button>
-        <button id="obSkip" class="ghost">Skip</button>
+        <button id="obMidiRetry" class="ghost hidden" type="button">Retry connection</button>
+        <button id="obNext" class="primary" type="button">Get started</button>
+        <button id="obAlt" class="ghost hidden" type="button">Find my level</button>
+        <button id="obSkip" class="ob-link ob-skip" type="button">Play on screen</button>
       </div>
     </section>
   </div>
-  <button class="iconbtn ob-close hidden" id="obClose" title="Close setup" aria-label="Close setup"><svg><use href="#i-close"/></svg></button>
   <!-- initMidi still writes the port it picked here; the setup shows its own live status -->
   <span id="obDevice" hidden></span>
 </div>
+<dialog id="premiumDialog" class="support-dialog premium-dialog" aria-labelledby="premiumTitle">
+  <header>
+    <h2 id="premiumTitle">Keylight Premium</h2>
+    <form method="dialog"><button class="iconbtn" aria-label="Close" autofocus><svg><use href="#i-close"/></svg></button></form>
+  </header>
+  <p>Unlock every course level, the full song library, song import and transcription, and TV mode.</p>
+  <fieldset id="premiumPlans" aria-label="Purchase plans" hidden></fieldset>
+  <div id="premiumBilling" class="premium-billing" hidden></div>
+  <p id="premiumSheetMessage" class="premium-message" role="status"></p>
+  <button class="primary" id="premiumBuy" type="button" hidden>Subscribe</button>
+  <button class="ghost" id="premiumRetry" type="button" hidden>Try again</button>
+  <footer>
+    <button class="link" id="premiumSheetRestore" type="button">Restore purchases</button>
+    <a id="premiumTerms" href="https://keylightpiano.app/terms">Terms of Use</a>
+    <a id="premiumPrivacy" href="https://keylightpiano.app/privacy">Privacy Policy</a>
+  </footer>
+</dialog>
 <dialog id="diagnosticsDialog" class="support-dialog diagnostics-dialog" aria-labelledby="diagnosticsTitle">
   <div class="diagnostics-heading">
     <h2 id="diagnosticsTitle" tabindex="-1" autofocus>Connection report</h2>
@@ -660,13 +1026,13 @@
   </ol>
   <div class="ds-body">
     <section data-ds-panel="detect">
-      <p>Keylight lists the MIDI ports your computer shows, asks each one who it is with the standard identity question, and reads the USB description of your keyboard. Serial numbers and where the cable is plugged in are never read.</p>
+      <p id="dsDetectIntro">Keylight lists the MIDI ports your computer shows, asks each one who it is with the standard identity question, and reads the USB description of your keyboard. Serial numbers and where the cable is plugged in are never read.</p>
       <div class="ds-toolbar"><button class="mini-btn" type="button" id="dsDetectBtn">Look for my keyboard</button><span id="dsDetectState" role="status">Not looked yet</span></div>
       <ul class="ds-ports" id="dsPorts"></ul>
       <p class="ds-muted" id="dsNoPorts" hidden>No MIDI ports found. Check the keyboard is plugged in and switched on, then look again.</p>
       <h3 class="ds-sub">Identity</h3>
       <div id="dsIdentity"></div>
-      <h3 class="ds-sub">USB</h3>
+      <h3 class="ds-sub" id="dsUsbHead">USB</h3>
       <div id="dsUsb"></div>
     </section>
     <section data-ds-panel="test" hidden>
@@ -675,7 +1041,7 @@
         <h3>Press a few keys</h3>
         <p class="ds-muted" id="dsCaptureState">Optional. Takes 10 seconds. Only counts and ranges are kept, never the notes you play.</p>
         <div class="ds-toolbar"><button class="mini-btn" type="button" id="dsCaptureBtn">Start</button><span id="dsCaptureLive" aria-live="polite"></span></div>
-        <p class="ds-muted">If you have a hand-tracking sensor, also move a hand above it for the whole 10 seconds.</p>
+        <p class="ds-muted" id="dsSensorHint">If you have a hand-tracking sensor, also move a hand above it for the whole 10 seconds.</p>
         <div class="ds-bar" id="dsCaptureBar" aria-hidden="true"><i></i></div>
         <div class="ds-result" id="dsCaptureResult"></div>
       </div>
@@ -713,16 +1079,19 @@
       <p>This is the exact report. Nothing else is added when you copy or save it.</p>
       <pre id="dsPreview" tabindex="0" aria-label="Report text"></pre>
       <p class="ds-muted" id="dsSize" role="status"></p>
-      <p class="ds-muted">Unticking a USB device removes its USB line only. The names of your MIDI ports are part of this report, and this is where you check them before anything is shared.</p>
+      <p class="ds-muted" id="dsUsbReviewNote">Unticking a USB device removes its USB line only. The names of your MIDI ports are part of this report, and this is where you check them before anything is shared.</p>
     </section>
     <section data-ds-panel="send" hidden>
       <p>Pick one. Keylight sends nothing itself: only what you paste or attach leaves your computer.</p>
       <div class="ds-send">
+        <button class="primary" type="button" id="dsEmail" hidden>Email to support</button>
+        <button class="ghost" type="button" id="dsShare" hidden>Share report</button>
         <button class="primary" type="button" id="dsCopy">Copy report</button>
         <button class="ghost" type="button" id="dsSave">Save as file</button>
         <button class="ghost" type="button" id="dsIssue">Open a GitHub issue</button>
       </div>
-      <p class="ds-muted">Open a GitHub issue opens your browser on a new issue with only the device name, system and a few summary lines filled in. Paste the copied report or attach the saved file there. You need a free GitHub account to post.</p>
+      <p class="ds-muted" id="dsIssueNote">Open a GitHub issue opens your browser on a new issue with only the device name, system and a few summary lines filled in. Paste the copied report or attach the saved file there. You need a free GitHub account to post.</p>
+      <p class="ds-muted" id="dsSendNoteIos" hidden>Email to support opens your mail app with only the device name, system and a few summary lines filled in. Share report opens the share sheet so you can attach the full report to that mail, or save it where you like.</p>
       <p id="dsSendState" role="status"></p>
     </section>
   </div>
@@ -733,7 +1102,10 @@
   </div>
 </dialog>
 <dialog id="supportDialog" class="support-dialog" aria-labelledby="supportTitle" aria-describedby="supportDescription">
-  <h2 id="supportTitle">Keep Keylight growing</h2>
+  <div class="kl-dlg-head">
+    <h2 id="supportTitle">Keep Keylight growing</h2>
+    <form method="dialog"><button class="iconbtn" aria-label="Close" title="Close"><svg><use href="#i-close"/></svg></button></form>
+  </div>
   <p id="supportDescription">Keylight is free and open source. Every feature is available without paying, and the app works offline without an account.</p>
   <p>Keylight is made by one person in spare time. Building it costs real money: the tools used to write and test it, and keyboards to add support for. If it has helped you, a tip on Ko-fi, once or monthly, keeps that going.</p>
   <p>Keylight stays free on Mac, Windows and Android. The iPhone and iPad version will be a paid app on the App Store, which covers Apple's yearly developer fee.</p>
@@ -743,6 +1115,11 @@
     <form method="dialog"><button class="primary" autofocus>Continue for free</button></form>
     <a href="https://ko-fi.com/scizers" target="_blank" rel="noopener noreferrer">Choose an amount on Ko-fi</a>
   </div>
+</dialog>
+<dialog id="betaNotice" class="support-dialog" aria-labelledby="betaNoticeTitle" aria-describedby="betaNoticeText">
+  <h2 id="betaNoticeTitle">Keylight beta</h2>
+  <p id="betaNoticeText"></p>
+  <div class="support-actions"><form method="dialog"><button class="primary" autofocus>Got it</button></form></div>
 </dialog>
 <dialog id="confirmDialog" class="support-dialog confirm-dialog" aria-labelledby="confirmTitle" aria-describedby="confirmText">
   <h2 id="confirmTitle" tabindex="-1"></h2>
@@ -755,7 +1132,7 @@
 <dialog id="shortcutsDialog" class="support-dialog info-dialog" aria-labelledby="shortcutsTitle">
   <div class="diagnostics-heading">
     <h2 id="shortcutsTitle" tabindex="-1">Keyboard shortcuts</h2>
-    <form method="dialog"><button class="iconbtn" aria-label="Close keyboard shortcuts" title="Close"><svg><use href="#i-close"/></svg></button></form>
+    <form method="dialog"><button class="iconbtn" aria-label="Close keyboard shortcuts" title="Close" autofocus><svg><use href="#i-close"/></svg></button></form>
   </div>
   <div class="sc-grid">
     <section aria-labelledby="scAny"><h3 id="scAny">Anywhere</h3>
@@ -789,27 +1166,39 @@
       </dl></section>
   </div>
   <div class="support-actions">
-    <form method="dialog"><button class="primary" autofocus>Close</button></form>
+    <form method="dialog"><button class="primary">Close</button></form>
     <button class="ghost" id="shortcutsAbout" type="button">About Keylight</button>
   </div>
 </dialog>
-<dialog id="aboutDialog" class="support-dialog info-dialog" aria-labelledby="aboutTitle">
+<dialog id="aboutDialog" class="support-dialog info-dialog about-sheet" aria-labelledby="aboutTitle">
   <div class="diagnostics-heading">
     <h2 id="aboutTitle" tabindex="-1">Keylight <span class="about-version" id="aboutVersion"></span></h2>
-    <form method="dialog"><button class="iconbtn" aria-label="Close About" title="Close"><svg><use href="#i-close"/></svg></button></form>
+    <form method="dialog"><button class="iconbtn" aria-label="Close About" title="Close" autofocus><svg><use href="#i-close"/></svg></button></form>
   </div>
   <p class="about-mission">Free, open-source piano learning with falling notes and glowing keys. It works offline, needs no account and collects nothing.</p>
-  <dl class="about-list">
-    <div><dt>Project</dt><dd><span class="about-url">https://github.com/scizerss/keylight-piano</span></dd></div>
-    <div><dt>Licence</dt><dd>GPL 3.0 or later. Keylight is an independent project and is not affiliated with any keyboard maker.</dd></div>
+  <dl class="about-list kl-group">
+    <div id="aboutProjectRow"><dt>Project</dt><dd><a class="about-url" id="aboutProject" href="https://github.com/scizerss/keylight-piano" target="_blank" rel="noopener noreferrer">github.com/scizerss/keylight-piano</a></dd></div>
+    <div><dt>Licence</dt><dd id="aboutLicence">GPL 3.0 or later. Keylight is an independent project and is not affiliated with any keyboard maker.</dd></div>
     <div><dt>Music credits</dt><dd id="aboutMusic"></dd></div>
-    <div><dt>Acknowledgements</dt><dd><a href="https://github.com/demixme/GRAB" target="_blank" rel="noopener noreferrer">GRAB (github.com/demixme/GRAB)</a>, the open config tool for ROLI devices, whose published research on the Airwave sensor helped this app.</dd></div>
-    <div><dt>Third-party notices</dt><dd>Keylight includes open-source software and recordings: Basic Pitch and TensorFlow.js (Apache 2.0), MediaPipe (Apache 2.0), music-metadata (MIT), OpenSheetMusicDisplay (BSD 3-Clause), the Outfit font (SIL OFL 1.1) and the Salamander Grand Piano recordings (CC BY 3.0). The full texts are in THIRD_PARTY_NOTICES.md and the LICENSES folder.</dd></div>
+    <div><dt>Acknowledgements</dt><dd id="aboutAck"><a href="https://github.com/demixme/GRAB" target="_blank" rel="noopener noreferrer">GRAB (github.com/demixme/GRAB)</a>, the open config tool for ROLI devices, whose published research on the Airwave sensor helped this app.</dd></div>
+    <div><dt>Third-party notices</dt><dd id="aboutNotices">Keylight includes open-source software and recordings: Basic Pitch and TensorFlow.js (Apache 2.0), MediaPipe (Apache 2.0), music-metadata (MIT), OpenSheetMusicDisplay (BSD 3-Clause), the Outfit font (SIL OFL 1.1) and the Salamander Grand Piano recordings (CC BY 3.0). The full texts are in THIRD_PARTY_NOTICES.md and the LICENSES folder.</dd></div>
   </dl>
-  <div class="support-actions">
-    <form method="dialog"><button class="primary" autofocus>Close</button></form>
-    <button class="ghost" id="aboutShortcuts" type="button">Keyboard shortcuts</button>
+  <div class="kl-group about-actions-group">
+    <button class="kl-row about-row hidden" id="aboutLicences" type="button"><span>Licences and acknowledgements</span><svg aria-hidden="true"><use href="#i-back"/></svg></button>
+    <button class="kl-row about-row" id="aboutSupport" type="button" data-support><span>Support Keylight</span><svg aria-hidden="true"><use href="#i-back"/></svg></button>
+    <button class="kl-row about-row" id="aboutShortcuts" type="button"><span>Keyboard shortcuts</span><svg aria-hidden="true"><use href="#i-back"/></svg></button>
   </div>
+  <div class="support-actions">
+    <form method="dialog"><button class="primary">Done</button></form>
+  </div>
+</dialog>
+<dialog id="noticesDialog" class="support-dialog info-dialog notices-sheet" aria-labelledby="noticesTitle">
+  <div class="diagnostics-heading">
+    <h2 id="noticesTitle" tabindex="-1">Licences</h2>
+    <form method="dialog"><button class="iconbtn" aria-label="Close licences" title="Close"><svg><use href="#i-close"/></svg></button></form>
+  </div>
+  <div class="notices-body" id="noticesBody" tabindex="0" role="region" aria-label="Licence texts"><p class="notices-wait">Loading…</p></div>
+  <div class="support-actions"><form method="dialog"><button class="primary">Done</button></form></div>
 </dialog>
 <script type="module" src="support.js"></script>
 <script type="module" src="motion.js"></script>

@@ -9,6 +9,7 @@
 // lumi.guided.* keys.
 import { KEY, HAND_NAME, readPrefs, songKey, buildCourse, stepsFor, stepLabel, evaluateRun, weakBars, spanLabel } from './guided-course.js'
 import { el, createGuidedView, paintGuidedSteps } from './guided-view.js'
+import { dot } from './studio-copy.js'
 export { RATES, PASS, readPrefs, songKey, barGrid, barAt, spanLabel, buildCourse, stepsFor, stepLabel, evaluateRun, weakBars } from './guided-course.js'
 
 export function mountGuided({ getPlayer, getSong, store, beginStep, notice = () => {}, hideResults = null, onExit = () => {}, doc = globalThis.document }) {
@@ -80,7 +81,7 @@ export function mountGuided({ getPlayer, getSong, store, beginStep, notice = () 
       : guided && last.earned && !last.passed ? 'Try again' : guided && last.passed ? 'Next step' : anyProgress ? 'Continue' : 'Start'
     lead.textContent = !course ? 'Load a song with notes to practise it here.'
       : !cur ? 'None of this song’s notes are on your keys for ' + HAND_NAME[prefs.hand].toLowerCase() + '. Choose other hands below.'
-      : cur.section.label + ' · step ' + (cur.steps.findIndex((x) => x.id === cur.step.id) + 1) + ' of ' + cur.steps.length + ': ' + stepLabel(cur.step)
+      : cur.section.label + dot() + 'step ' + (cur.steps.findIndex((x) => x.id === cur.step.id) + 1) + ' of ' + cur.steps.length + ': ' + stepLabel(cur.step)
     note.textContent = !course ? '' : course.grid.estimated
       ? 'This song has no written bars, so the phrases are estimated from its tempo.'
       : 'Phrases follow the bars of the score.'
@@ -127,7 +128,7 @@ export function mountGuided({ getPlayer, getSong, store, beginStep, notice = () 
       b.disabled = !steps.length
       const status = !steps.length ? 'No notes for these hands' : done === steps.length ? 'Done' : done + ' of ' + steps.length + ' steps'
       const sore = s.key === 'all' ? 0 : Object.keys(weak).filter((k) => { const t = course.grid.starts[k]; return t >= s.from - 1e-4 && (s.to == null || t < s.to - 1e-4) }).length
-      b.append(el(doc, 'span', 'guided-phrase-name', s.label), el(doc, 'span', 'guided-phrase-status', status + (sore ? ' · ' + sore + (sore === 1 ? ' weak bar' : ' weak bars') : '')))
+      b.append(el(doc, 'span', 'guided-phrase-name', s.label), el(doc, 'span', 'guided-phrase-status', status + (sore ? dot() + sore + (sore === 1 ? ' weak bar' : ' weak bars') : '')))
       b.addEventListener('click', () => { selected = i; store.set(sectionKey(), s.key); last = null; render() })
       row.appendChild(b)
       phraseList.appendChild(row)

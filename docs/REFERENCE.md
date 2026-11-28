@@ -98,33 +98,18 @@ Full videos with sound: [app tour (65 s)](https://github.com/scizerss/keylight-p
 
 ## Install
 
-Development builds also provide a `.dmg`: open it, drag Keylight to Applications, and eject it.
-The app is ad-hoc signed, not notarised; follow the included instructions if macOS blocks it.
-Building an installer never updates your installed copy automatically. Build targets and
-signing limitations are in [docs/INSTALLERS.md](INSTALLERS.md).
+The release DMG is signed and notarized, and requires Apple silicon and macOS 13 or later.
+On an Intel Mac, [build the app locally](#build-from-source) and unzip the resulting archive
+from `dist/`. For Windows, see [Install on Windows](#install-on-windows).
 
-The release downloads are for Apple silicon on macOS 13 or newer. On an Intel Mac,
-[build the app locally](#build-from-source) and unzip the resulting archive from `dist/`.
-For Windows, see [Install on Windows](#install-on-windows).
-
-1. Download `Keylight-<version>-mac.zip` from the
-   [Releases page](https://github.com/scizerss/keylight-piano/releases) and double-click it. You get a
-   `Keylight-<version>` folder with `Keylight.app` and a copy of these steps.
-2. Keylight is not notarised by Apple, so macOS refuses to open it until the download
-   quarantine is cleared. In Terminal:
-
-   ```sh
-   xattr -dr com.apple.quarantine ~/Downloads/Keylight-<version>/Keylight.app
-   ```
-
-   (Unzipped somewhere else? Type `xattr -dr com.apple.quarantine `, drag `Keylight.app`
-   onto the Terminal window and press Return.)
-3. Move `Keylight.app` to Applications.
-4. Nothing to install for the key lights: the Mac app carries its own light service
-   ([blocksd](https://github.com/hyperb1iss/blocksd)) and Keylight starts and restarts it. If
-   you built Keylight from source or its light service could not start, see
+1. Download the Mac DMG from the [Releases page](https://github.com/scizerss/keylight-piano/releases).
+2. Open the DMG, drag Keylight to Applications and eject the disk image.
+3. Plug in your keyboard, switch it on and open Keylight. The release app starts the bundled
+   [blocksd](https://github.com/hyperb1iss/blocksd) service for ROLI Piano M and LUMI key lights.
+   If you built from source or the bundled service could not start, see
    [Advanced: installing blocksd by hand](#advanced-installing-blocksd-by-hand).
-5. Plug the keyboard in over USB, switch it on, and open Keylight.
+
+Local build targets and signing details are in [docs/INSTALLERS.md](INSTALLERS.md).
 
 - The camera permission is only asked when you start hand tracking (Settings → Hand
   tracking).

@@ -23,6 +23,26 @@ async function main() {
   // Chromium hands over standard-scheme URLs in lower case; anything else is refused
   for (const url of ['keylight://APP/x','keylight://app.evil/', 'keylight://evil/', 'keylight://user@app/', 'keylight://app:1/', 'http://127.0.0.1:47821/index.html',
     'http://app/', 'file:///app/index.html', 'blob:keylight://app/1234', 'null', '', null, undefined, 42]) eq(scheme.isAppUrl(url), false, String(url))
+  // ---- the permissions the page may use (both Electron handlers share permissionAllowed) ----
+  const app = 'keylight://app/index.html'
+  const ask = (permission, origin, details, opts) => scheme.permissionAllowed(permission, origin, details, opts)
+  for (const permission of ['midi', 'midiSysex', 'clipboard-sanitized-write', 'speaker-selection']) eq(ask(permission, app, { isMainFrame: true }), true, permission)
+  for (const permission of ['geolocation', 'notifications', 'fullscreen', 'openExternal', 'clipboard-read', 'display-capture', 'hid', 'serial', 'usb', 'pointerLock', 'unknown', undefined]) eq(ask(permission, app, {}), false, 'refused ' + permission)
+  eq(ask('midi', 'http://127.0.0.1:47821/index.html', {}), false, 'another origin')
+  eq(ask('midi', '', {}), false, 'an empty address is never the app')
+  eq(ask('midi', undefined, {}), false, 'a missing address is never the app')
+  eq(ask('midi', app, { isMainFrame: false }), false, 'a subframe')
+  eq(ask('media', app, { mediaTypes: ['audio'] }), true, 'microphone request')
+  eq(ask('media', app, { mediaTypes: ['video'] }), true, 'camera request')
+  eq(ask('media', app, { mediaTypes: ['audio', 'video'] }), false, 'camera and microphone together')
+  eq(ask('media', app, { mediaTypes: [] }), false, 'no media type')
+  eq(ask('media', app, {}), false, 'unknown media type')
+  eq(ask('media', 'keylight://app.evil/', { mediaTypes: ['audio'] }), false, 'microphone for another origin')
+  eq(ask('media', app, { mediaType: 'audio' }, { check: true }), true, 'microphone check')
+  eq(ask('media', app, { mediaType: 'unknown' }, { check: true }), true, 'device listing check')
+  eq(ask('media', app, { mediaType: 'screen' }, { check: true }), false, 'screen check')
+  eq(ask('geolocation', app, {}, { check: true }), false, 'geolocation check')
+  eq(scheme.ALLOWED_PERMISSIONS.has('audio-capture'), false, 'no legacy names')
   eq(scheme.PRIVILEGES.bypassCSP, undefined, 'never bypasses CSP')
   eq(scheme.PRIVILEGES.allowServiceWorkers, undefined, 'no service workers')
   eq(scheme.PRIVILEGES.corsEnabled, undefined, 'other origins cannot read it')
@@ -69,6 +89,35 @@ async function main() {
   eq([head.status, await head.text()], [200, ''], 'HEAD has no body')
   eq((await handle({ method: 'POST', url: 'keylight://app/app.js' })).status, 405, 'POST refused')
   eq((await handle({ method: 'GET', url: 'keylight://app/../secret.txt' })).status, 404, 'handler refuses traversal')
+  // piano cover models: three named files from their own folder, nothing else
+  const models = path.join(tmp, 'models')
+  fs.mkdirSync(models)
+  fs.writeFileSync(path.join(models, 'manifest.json'), '{"files":{}}')
+  fs.writeFileSync(path.join(models, 'encoder.onnx'), 'enc')
+  fs.writeFileSync(path.join(models, 'other.onnx'), 'no')
+  const serve = scheme.createAppHandler({ root, Readable, modelRoot: models })
+  const manifest = await serve({ method: 'GET', url: 'keylight://app/cover-models/manifest.json' })
+  eq([manifest.status, manifest.headers.get('content-type'), await manifest.text()], [200, 'application/json', '{"files":{}}'], 'model manifest is served')
+  eq(await (await serve({ method: 'GET', url: 'keylight://app/cover-models/encoder.onnx' })).text(), 'enc', 'model file is served')
+  // cross-origin isolation comes from the page's own response headers (workers and models included), not a browser-wide switch
+  for (const [label, response] of [['page file', await handle({ method: 'GET', url: 'keylight://app/app.js' })], ['model file', await serve({ method: 'GET', url: 'keylight://app/cover-models/encoder.onnx' })], ['404', await handle({ method: 'GET', url: 'keylight://app/nope.js' })], ['405', await handle({ method: 'POST', url: 'keylight://app/app.js' })]]) {
+    eq([response.headers.get('cross-origin-opener-policy'), response.headers.get('cross-origin-embedder-policy')], ['same-origin', 'credentialless'], label + ' carries COOP and COEP')
+  }
+  assert.ok(!/SharedArrayBuffer/.test(fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8').replace(/\/\/.*$/gm, '')), 'main.js has no SharedArrayBuffer command-line switch'); n++
+  for (const p of ['/cover-models/other.onnx', '/cover-models/decoder.onnx', '/cover-models/', '/cover-models/..%2fsecret.txt', '/cover-models/%2e%2e/secret.txt', '/cover-models/manifest.json/x']) {
+    assert.ok((await serve({ method: 'GET', url: 'keylight://app' + p })).status !== 200, p + ' must not be served'); n++
+  }
+  eq((await handle({ method: 'GET', url: 'keylight://app/cover-models/manifest.json' })).status, 404, 'no model folder, no models')
+  eq((await serve({ method: 'GET', url: 'keylight://evil/cover-models/manifest.json' })).status, 403, 'other host gets no models')
+  if (linked) {
+    fs.symlinkSync(path.join(tmp, 'secret.txt'), path.join(models, 'decoder.onnx'))
+    eq((await serve({ method: 'GET', url: 'keylight://app/cover-models/decoder.onnx' })).status, 404, 'a model symlink out of the folder is refused')
+    // an alias inside the folder is refused too: manifest.json must not answer for another name
+    fs.rmSync(path.join(models, 'decoder.onnx'))
+    fs.symlinkSync(path.join(models, 'encoder.onnx'), path.join(models, 'decoder.onnx'))
+    eq((await serve({ method: 'GET', url: 'keylight://app/cover-models/decoder.onnx' })).status, 404, 'a model symlink to another file in the folder is refused')
+    eq(await (await serve({ method: 'GET', url: 'keylight://app/cover-models/encoder.onnx' })).text(), 'enc', 'the real file still serves')
+  }
   fs.rmSync(tmp, { recursive: true, force: true })
 
   // ---- the marker ----

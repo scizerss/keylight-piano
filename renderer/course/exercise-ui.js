@@ -18,6 +18,10 @@ import {
 } from './exercise-logic.js'
 import { passText } from './runners.js'
 import { TOUCH } from '../platform.js'
+import { haptic } from '../haptics.js'
+import { caps, dot, starSlots, starsShown, up } from '../studio-copy.js'
+// an overlay (setup/connect, a dialog) is open over the exercise: its keys belong to the overlay
+const blocked = () => !!(document.getElementById('app')?.inert || document.querySelector('dialog[open]'))
 
 const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
 const NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B']
@@ -57,15 +61,19 @@ export function padSvg([lo, hi], { names = true } = {}) {
   for (const p of whites) {
     const x = idx.get(p) * W
     out += `<rect class="dk-w ex-key" data-p="${p}" x="${x + 1}" y="1" width="${W - 2}" height="${H - 2}" rx="5"/>`
+    out += `<rect class="dk-glow dk-gw" x="${x + 1}" y="1" width="${W - 2}" height="${H - 2}" rx="5" pointer-events="none"/>`   // the light of a lit key (iPhone/iPad, ios.css)
     if (names) out += `<text class="dk-name ex-kname" x="${x + W / 2}" y="${H - 10}" text-anchor="middle" pointer-events="none">${NAMES[pc(p)]}</text>`
   }
   for (let p = lo; p <= hi; p++) {
     if (isWhite(p)) continue
     const prev = idx.get(p - 1)
     if (prev === undefined) continue
-    out += `<rect class="dk-b ex-key" data-p="${p}" x="${(prev + 1) * W - BW / 2}" y="1" width="${BW}" height="${BH}" rx="4"/>`
+    const bx = (prev + 1) * W - BW / 2
+    out += `<rect class="dk-b ex-key" data-p="${p}" x="${bx}" y="1" width="${BW}" height="${BH}" rx="4"/>`
+    out += `<rect class="dk-bface" x="${bx + 2.5}" y="2.5" width="${BW - 5}" height="${BH - 9}" rx="2.5" pointer-events="none"/>`   // the bevelled face of an ebony key
+    out += `<rect class="dk-glow dk-gb" x="${bx}" y="1" width="${BW}" height="${BH}" rx="4" pointer-events="none"/>`
   }
-  return `<svg class="ex-padsvg" viewBox="0 0 ${whites.length * W} ${H}" style="max-width:${Math.max(300, whites.length * 62)}px" role="group" aria-label="Keyboard from ${NAMES[pc(lo)]} to ${NAMES[pc(hi)]}">${out}</svg>`
+  return `<svg class="ex-padsvg" viewBox="0 0 ${whites.length * W} ${H}" style="--wk:${whites.length};max-width:${Math.max(300, whites.length * 62)}px" role="group" aria-label="Keyboard from ${NAMES[pc(lo)]} to ${NAMES[pc(hi)]}">${out}</svg>`
 }
 
 /* ============================== the mount ============================== */
@@ -104,9 +112,10 @@ export function mountExercise(root, { item, deps, host }) {
       <button class="cr-back" data-ex="back">${ic('back', 'cr-back-ic')}<span>${esc(host.title || 'Back')}</span></button>
       <section class="ex-card" aria-labelledby="ex-title">
         <header class="ex-head">
-          <div><div class="kicker">${KIND[0]}<span class="cr-dot"></span>AIM FOR ${esc(passText(item)).toUpperCase()}</div>
+          <div><div class="kicker">${caps(KIND[0])}<span class="cr-dot"></span>${up('aim for ')}${esc(up(passText(item)))}</div>
           <h2 class="ex-title" id="ex-title" tabindex="-1">${esc(item.title)}</h2></div>
           <div class="ex-chips" data-ex="chips"></div>
+          <progress class="ex-prog hidden" aria-label="Exercise progress" max="1" value="0"></progress>
         </header>
         <div class="ex-stage" data-ex="stage">${stage}</div>
         ${extra}
@@ -114,13 +123,48 @@ export function mountExercise(root, { item, deps, host }) {
       </section></div>`
   }
   const chips = (list) => { const c = q('[data-ex="chips"]'); if (c) c.innerHTML = list.map((t) => `<span class="ex-chip">${t}</span>`).join('') }
+  const progress = (value, max) => {
+    const bar = q('.ex-prog')
+    if (!bar || !root.ownerDocument?.documentElement.classList.contains('ios')) return
+    bar.max = max
+    bar.value = value
+    bar.classList.remove('hidden')
+  }
   const setKey = (p, cls, onOff = true) => { const k = root.querySelector(`.ex-key[data-p="${p}"]`); if (k) k.classList.toggle(cls, onOff) }
   const clearKeys = (...cls) => root.querySelectorAll('.ex-key').forEach((k) => k.classList.remove(...(cls.length ? cls : ['lit', 'ok', 'bad', 'down'])))
 
+  /* ----- on a phone the keys are at least 44px wide, so the pad can be wider than the screen and scrolls sideways (a swipe
+     on the strip under the keys; the keys themselves only play). It opens scrolled so the notes of this exercise are in view. ----- */
+  function showNotes(pitches) {
+    requestAnimationFrame(() => {
+      const pad = alive && q('.ex-pad')
+      if (!pad) return
+      const scrolls = pad.scrollWidth > pad.clientWidth + 1
+      pad.classList.toggle('scrolls', scrolls)
+      if (!scrolls) return
+      const keys = pitches.map((p) => root.querySelector(`.ex-key[data-p="${p}"]`)).filter(Boolean)
+      if (!keys.length) return
+      const box = pad.getBoundingClientRect()
+      const rects = keys.map((k) => k.getBoundingClientRect())
+      const lo = Math.min(...rects.map((r) => r.left)) - box.left + pad.scrollLeft
+      const hi = Math.max(...rects.map((r) => r.right)) - box.left + pad.scrollLeft
+      const view = pad.clientWidth
+      if (hi - lo <= view) { pad.scrollLeft = Math.max(0, (lo + hi - view) / 2); return }
+      const first = rects[0]                       // too wide to show them all: the first note to play sits in the middle
+      pad.scrollLeft = Math.max(0, (first.left + first.right) / 2 - box.left + pad.scrollLeft - view / 2)
+    })
+  }
+
   /* ----- the pad takes the mouse, touch and computer keys; MIDI arrives through input() ----- */
-  function wirePad(range) {
+  function wirePad(range, targets = []) {
     const pad = q('.ex-pad')
     if (!pad) return
+    if (root.ownerDocument?.documentElement.classList.contains('ios')) {
+      const hint = q('.ex-hint')
+      if (hint) hint.textContent = hint.textContent.replace('keys above', 'keys below')
+      pad.parentElement.append(q('[data-ex="acts"]'), pad)
+    }
+    showNotes(targets)
     const held = new Map()
     const down = (e) => {
       const k = e.target.closest && e.target.closest('.ex-key')
@@ -145,6 +189,7 @@ export function mountExercise(root, { item, deps, host }) {
     const base = range[0]
     const typed = new Map()
     on(document, 'keydown', (e) => {
+      if (blocked()) return
       if (e.repeat || e.metaKey || e.ctrlKey || e.altKey || !(e.code in KEY_SEMIS)) return
       if (e.target && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return
       const p = base + KEY_SEMIS[e.code]
@@ -171,17 +216,18 @@ export function mountExercise(root, { item, deps, host }) {
     lastResult = { accuracy, stars, ...result }
     const next = host.next(result.passed)
     const st = stars ?? starsFor(accuracy)
-    const starRow = Array.from({ length: 5 }, (_, i) => `<svg class="ex-star${i < st ? ' on' : ''}" viewBox="0 0 24 24" aria-hidden="true">${SVG.star}</svg>`).join('')
+    const starRow = Array.from({ length: starSlots() }, (_, i) => `<svg class="ex-star${i < starsShown(st) ? ' on' : ''}" viewBox="0 0 24 24" aria-hidden="true">${SVG.star}</svg>`).join('')
     const need = item.passAt || {}
     const runOk = accuracy >= (need.accuracy ?? (need.stars ? 0 : 0.8)) && (!need.stars || st >= need.stars)
     const verdict = runOk ? 'Item passed' : result.passed ? 'Not this time: your earlier pass still counts' : `Not there yet: aim for ${passText(item)}`
+    q('.ex-prog')?.classList.add('hidden')
     const stage = q('[data-ex="stage"]')
     stage.innerHTML = `<div class="ex-result ${runOk ? 'ok' : 'miss'}" tabindex="-1" data-ex="result">
       <div class="ex-rscore"><b>${pct(accuracy)}</b><i>%</i></div>
       <div class="ex-rbody">
         <div class="ex-rhead">${esc(headline || verdict)}</div>
-        <div class="ex-stars" role="img" aria-label="${st} of 5 stars">${starRow}</div>
-        <div class="ex-rverdict">${esc(headline ? verdict : '')}${result.lessonDone ? `${headline ? ' · ' : ''}Lesson complete` : ''}${result.exam ? ` · Exam ${Math.round(result.exam.percent)}%` : ''}</div>
+        <div class="ex-stars" role="img" aria-label="${starsShown(st)} of ${starSlots()} stars">${starRow}</div>
+        <div class="ex-rverdict">${esc(headline ? verdict : '')}${result.lessonDone ? `${headline ? dot() : ''}Lesson complete` : ''}${result.exam ? `${dot()}Exam ${Math.round(result.exam.percent)}%` : ''}</div>
         ${lines.length ? `<ul class="ex-rlines">${lines.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>` : ''}
       </div></div>
       <div class="ex-acts">
@@ -210,7 +256,7 @@ export function mountExercise(root, { item, deps, host }) {
       <div class="ex-pad" data-ex="pad">${padSvg(range)}</div>
       <p class="ex-hint">${TOUCH ? 'Play it on your keyboard or tap the keys above.' : 'Play it on your keyboard, the keys above, or the computer keys A S D F G H J.'}</p>
       <div class="ex-acts" data-ex="acts"></div>`)
-    wirePad(range)
+    wirePad(range, full.map((n) => n.p))
     const msg = (t, cls = '') => { const m = q('[data-ex="msg"]'); if (m) { m.textContent = t; m.className = 'ex-status ' + cls } }
     const phrase = () => rounds[st.round]
     const slots = () => {
@@ -221,7 +267,10 @@ export function mountExercise(root, { item, deps, host }) {
         return `<span class="ex-slot${p === undefined ? '' : ok ? ' ok' : ' bad'}">${p === undefined ? '' : noteName(p)}</span>`
       }).join('')
     }
-    const head = () => chips([`Round ${st.round + 1} of ${rounds.length}`, `Try ${st.attempts.length + 1} of ${ECHO_TRIES}`])
+    const head = () => {
+      chips([`Round ${st.round + 1} of ${rounds.length}`, `Try ${st.attempts.length + 1} of ${ECHO_TRIES}`])
+      progress(st.round + 1, rounds.length)
+    }
     const acts = (html) => { q('[data-ex="acts"]').innerHTML = html }
     const hearBtn = `<button class="ghost" data-ex="hear">${ic('replay', 'ex-bic')}Hear again</button>`
 
@@ -450,7 +499,20 @@ export function mountExercise(root, { item, deps, host }) {
       // keep the judged track on screen above the result card
       finish({ accuracy: j.accuracy, seconds: Math.round(totalBeats * beatMs / 1000 + plan.countInBeats * beatMs / 1000), lines })
       const s2 = q('[data-ex="stage"]')
-      s2.insertBefore(keep, s2.firstChild); if (sr) s2.insertBefore(sr, keep.nextSibling)
+      s2.prepend(keep)
+      if (sr) keep.after(sr)
+      if (TOUCH) {
+        const timing = (kind, label) => {
+          const count = c[kind]
+          if (!count) return `${label} 0`
+          const total = timed.reduce((ms, tap) => ms + (tap.kind === kind ? Math.abs(tap.dt) : 0), 0)
+          return `${label} ${count} (avg ${Math.round(total / count)} ms)`
+        }
+        const summary = root.ownerDocument.createElement('p')
+        summary.className = 'rx-summary'
+        summary.textContent = [`On time ${c.perfect + c.good}`, timing('early', 'Early'), timing('late', 'Late')].join(dot())
+        keep.after(summary)
+      }
     }
     // the same finish when a run is cut short by a test or by Stop
     const record = (t) => {
@@ -514,6 +576,7 @@ export function mountExercise(root, { item, deps, host }) {
       const qn = set[st.i]
       st.answered = false
       chips([`Question ${st.i + 1} of ${set.length}`, dots()])
+      progress(st.i + 1, set.length)
       q('[data-ex="prompt"]').textContent = qn.prompt
       q('[data-ex="opts"]').innerHTML = qn.options.map((o, k) => `<button class="cr-opt" data-ex="pick" data-id="${esc(o.id)}"><span class="cr-opt-l">${letters[k]}</span><span class="cr-opt-t">${esc(o.label)}</span></button>`).join('')
       q('[data-ex="fb"]').innerHTML = ''
@@ -527,6 +590,7 @@ export function mountExercise(root, { item, deps, host }) {
       const qn = set[st.i]
       const right = id === qn.answer
       st.picks[st.i] = right
+      haptic(right ? 'soft' : 'warning')
       if (right) st.right++
       q('[data-ex="opts"]').querySelectorAll('.cr-opt').forEach((b) => {
         const mine = b.dataset.id === id, correct = b.dataset.id === qn.answer
@@ -586,7 +650,7 @@ export function mountExercise(root, { item, deps, host }) {
       <div class="ex-pad" data-ex="pad">${padSvg(range)}</div>
       <p class="ex-hint">Any octave counts. ${TOUCH ? 'Play on your keyboard or tap the keys above.' : 'Play on your keyboard, the keys above, or the computer keys A S D F G H J.'}</p>
       <div class="ex-acts" data-ex="acts"></div>`)
-    wirePad(range)
+    wirePad(range, [...line.notes])
     const msg = (t, cls = '') => { const m = q('[data-ex="msg"]'); if (m) { m.textContent = t; m.className = 'ex-status ' + cls } }
     const total = line.notes.length
     const mark = () => {
@@ -595,7 +659,8 @@ export function mountExercise(root, { item, deps, host }) {
         g.classList.toggle('ok', k < st.i && st.mistakes[k] === 0)
         g.classList.toggle('retry', k < st.i && st.mistakes[k] > 0)
       })
-      chips([`Note ${Math.min(st.i + 1, total)} of ${total}`, `${line.key.known ? esc(params.key) : 'C'} · ${params.hand}`])
+      chips([`Note ${Math.min(st.i + 1, total)} of ${total}`, `${line.key.known ? esc(params.key) : 'C'}${dot()}${params.hand}`])
+      progress(Math.min(st.i + 1, total), total)
     }
     mark()
     say(`A line of ${total} notes in ${params.key}. Play note 1.`)
@@ -607,6 +672,7 @@ export function mountExercise(root, { item, deps, host }) {
         clearKeys('ok', 'bad')
         if (pc(pitch) === pc(need)) {
           setKey(pitch, 'ok')
+          haptic('soft')
           if (st.mistakes[st.i] === 0) st.firstTry++
           st.i++
           if (st.i >= total) return end(t)
@@ -614,6 +680,7 @@ export function mountExercise(root, { item, deps, host }) {
         } else {
           st.mistakes[st.i]++; st.wrong++
           setKey(pitch, 'bad')
+          haptic('warning')
           const el = root.querySelectorAll('.sg-n')[st.i]
           if (el) { el.classList.remove('shake'); void el.getBoundingClientRect(); el.classList.add('shake') }
           msg(st.mistakes[st.i] >= 2 ? `That was ${noteName(pitch)}. Look for ${noteName(need)}` : `That was ${noteName(pitch)}: try again`, 'no')
@@ -648,7 +715,7 @@ export function mountExercise(root, { item, deps, host }) {
     else if (type === 'rhythm') startRhythm()
     else if (type === 'ear') startEar()
     else if (type === 'sight') startSight()
-    on(document, 'keydown', (e) => { if (run && run.key) run.key(e) }, true)
+    on(document, 'keydown', (e) => { if (!blocked() && run && run.key) run.key(e) }, true)
     root.querySelector('[data-ex="back"]').onclick = () => { api.destroy(); host.back() }
     const t = q('.ex-title'); if (t && !q('[data-ex="go"],[data-ex="acts"] .primary')) t.focus({ preventScroll: true })
   }

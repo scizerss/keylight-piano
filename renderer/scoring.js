@@ -75,7 +75,7 @@ export function markWrong(score, notes) {
   for (const e of score.expected) if (e.state === 'pending' && notes.includes(e.note)) e.wrong++
 }
 
-export function tickMisses(score, t) {
+export function tickMisses(score, t = Infinity) {
   const missedNow = []
   for (const e of score.expected) {
     if (e.state !== 'pending' || e.start + WINDOWS.edge >= t) continue

@@ -176,9 +176,10 @@ export class SheetStrip {
 
   fit() {
     if (!this.score || !this.baseHeight || !this.osmd) return
-    const room = this.box.clientHeight - 18
+    const sheetOnly = this.box.classList.contains('sheet-only')
+    const room = sheetOnly ? this.box.clientHeight - 28 : this.music.clientHeight - 4
     if (!(room > 0)) return
-    const zoom = Math.min(this.box.classList.contains('sheet-only') ? 2.5 : MAX_ZOOM, room / this.baseHeight)
+    const zoom = Math.min(sheetOnly ? 2.5 : MAX_ZOOM, room / this.baseHeight)
     if (Math.abs(zoom - this.osmd.zoom) < 0.001) return
     this.clearHighlights()
     this.osmd.Zoom = zoom

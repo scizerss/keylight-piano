@@ -9,7 +9,7 @@
 // --query adds to the page's query, e.g. platform=win runs it with the Windows page on a Mac.
 // The page must also report the platform it took (SELFTEST platform isWin=...): the one
 // --expect-platform names, else the one --query forces, else this system's (win on
-// Windows, mac elsewhere); and Web MIDI with sysex must open (SELFTEST midi access ok).
+// Windows, mac elsewhere); and Web MIDI with sysex must open or report an unavailable Linux backend.
 const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
@@ -68,10 +68,11 @@ child.on('exit', (code, signal) => {
   const took = plat && (/isWin=true\b/.test(plat) ? 'win' : /isWin=false\b/.test(plat) ? 'mac' : null)
   const platformOk = took === expectPlatform
   const midiOk = results.some((l) => /^SELFTEST midi access ok\b/.test(l))
+  const midiSkipped = process.platform === 'linux' && results.some((l) => l.startsWith('SELFTEST midi access SKIP Linux MIDI backend unavailable:'))
   console.log(`self-test: platform ${took ? 'is ' + took : 'not reported'}, expected ${expectPlatform}: ${platformOk ? 'ok' : 'WRONG'}; ` +
-    `Web MIDI ${midiOk ? 'opened' : 'did NOT open'}`)
+    `Web MIDI ${midiOk ? 'opened' : midiSkipped ? 'skipped (backend unavailable)' : 'did NOT open'}`)
   console.log(`self-test: ${results.length} SELFTEST lines, ${fails.length} FAIL, ${done ? 'done' : 'NOT done'}; app exit ${code === null ? signal : code} after ${secs} s`)
   if (!text) console.log('self-test: no app.log was written' + (stderr ? '; stderr:\n' + stderr : ''))
   if (!keepProfile) fs.rmSync(profile, { recursive: true, force: true })
-  process.exit(done && fails.length === 0 && platformOk && midiOk && code === 0 ? 0 : 1)
+  process.exit(done && fails.length === 0 && platformOk && (midiOk || midiSkipped) && code === 0 ? 0 : 1)
 })

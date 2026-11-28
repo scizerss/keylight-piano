@@ -1,12 +1,13 @@
-import { IS_IOS } from './platform.js'
+import { IS_NATIVE_HOST } from './platform.js'
 import { parseState, recordLaunch, recordShown, shouldOfferSupport, snooze, neverAgain, serialise } from './support-reminder.js'
 
-// The iPhone and iPad app does not ask for tips: Apple restricts apps that send people to outside payment pages, so the
-// support buttons are removed and the dialog and reminder card never open there (the other platforms are unchanged).
-if (IS_IOS) {
-  for (const el of document.querySelectorAll('[data-support], .support-card')) el.remove()
+// Support contributions and reminders are desktop features.
+if (IS_NATIVE_HOST) {
+  for (const el of document.querySelectorAll('[data-support], .support-card, #supportReminder, #obSupportHint')) el.remove()
+  document.getElementById('supportDialog')?.remove()   // it holds the Ko-fi link
 }
-const dialog = document.getElementById('supportDialog')
+// On mobile, a detached stand-in keeps the listeners below harmless.
+const dialog = document.getElementById('supportDialog') || document.createElement('dialog')
 const card = document.getElementById('supportReminder')
 const seenKey = 'lumi.supportOfferSeen'
 const stateKey = 'lumi.support'
@@ -50,7 +51,7 @@ function hideCard() {
 }
 
 function openSupport() {
-  if (IS_IOS) return
+  if (IS_NATIVE_HOST) return
   if (dialog.open) return
   rememberOffer()
   saveState(recordShown(loadState(), Date.now()))
@@ -68,14 +69,13 @@ dialog.addEventListener('click', (event) => {
 })
 
 window.addEventListener('keylight:first-run-complete', () => {
-  if (IS_IOS) return
+  if (IS_NATIVE_HOST) return
   if (read(seenKey) === '1') return
   openSupport()
 })
 
 // One launch is counted per app start. A first launch only stores the starting state.
-{
-  const raw = read(stateKey)
+if (!IS_NATIVE_HOST) {
   const state = loadState()
   saveState(recordLaunch(state))   // every start counts, the first one too
 }
@@ -90,17 +90,17 @@ function calmOk() {
 }
 
 window.addEventListener('keylight:calm-moment', () => {
-  if (IS_IOS) return
+  if (IS_NATIVE_HOST) return
   if (!calmOk() || !card.classList.contains('hidden')) return
   if (shouldOfferSupport(loadState(), Date.now(), 'calm')) card.classList.remove('hidden')
 })
 
-card.querySelector('[data-reminder="support"]').addEventListener('click', openSupport)
-card.querySelector('[data-reminder="later"]').addEventListener('click', () => {
+card?.querySelector('[data-reminder="support"]').addEventListener('click', openSupport)
+card?.querySelector('[data-reminder="later"]').addEventListener('click', () => {
   saveState(snooze(loadState(), Date.now()))
   hideCard()
 })
-card.querySelector('[data-reminder="never"]').addEventListener('click', () => {
+card?.querySelector('[data-reminder="never"]').addEventListener('click', () => {
   saveState(neverAgain(loadState()))
   hideCard()
 })

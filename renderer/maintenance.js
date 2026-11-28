@@ -75,13 +75,17 @@ const blobMeta = (b) => ({ size: b.size, type: b.type || '', name: b instanceof 
 
 function storageKeys() {
   const keys = []
-  for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k !== null) keys.push(k) }
+  try {
+    for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k !== null) keys.push(k) }
+  } catch (cause) { throw new Error('Could not list local settings', { cause }) }
   return keys
 }
 
 async function exportAll() {
   const storage = {}
-  for (const k of storageKeys()) storage[k] = localStorage.getItem(k)
+  try {
+    for (const k of storageKeys()) storage[k] = localStorage.getItem(k)
+  } catch (cause) { throw new Error('Could not export local settings', { cause }) }
   await call('export:storage', storage)
   let records = 0
   for (const info of await indexedDB.databases()) {

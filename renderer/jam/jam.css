@@ -14,19 +14,19 @@
 .jam input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border: 0; border-radius: 50%; }
 
 .jam-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; min-width: 0; max-width: 100%; }
-.jam-title { font-family: var(--serif); font-weight: 500; font-size: 28px; letter-spacing: -.01em; margin: 0; flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.jam-title { font-family: var(--serif); font-weight: 500; font-size: var(--fs-display); letter-spacing: -.01em; margin: 0; flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .jam-head-actions { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; max-width: 100%; }
 .jam-h2 { font-family: var(--serif); font-weight: 500; font-size: 20px; margin: 0 0 8px; }
-.jam-status { margin: 0; min-height: 20px; color: var(--muted); font-size: 14px; }
+.jam-status { margin: 0; min-height: 20px; color: var(--muted); font-size: var(--fs-sub); }
 .jam-problem { margin: 0; padding: 10px 14px; border-radius: var(--radius-sm); border: 1px solid rgba(255, 122, 134, 0.5); background: rgba(255, 122, 134, 0.08); }
-.jam-help { margin: 8px 0 0; color: var(--faint); font-size: 13px; line-height: 1.45; }
+.jam-help { margin: 8px 0 0; color: var(--faint); font-size: calc(var(--fs-caption) * 1.04); line-height: 1.45; }
 
 .jam .jam-btn, .jam .jam-mini, .jam .jam-step, .jam .jam-trackname, .jam .jam-play {
-  height: 44px; min-width: 44px; padding: 0 16px; font-size: 14px;
+  height: 44px; min-width: 44px; padding: 0 16px; font-size: var(--fs-sub);
 }
-.jam .jam-mini { padding: 0 8px; font-size: 13px; flex: 1 1 0; }
+.jam .jam-mini { padding: 0 8px; font-size: calc(var(--fs-caption) * 1.04); flex: 1 1 0; }
 .jam .jam-step { padding: 0; font-size: 20px; min-width: 44px; }
-.jam .jam-play { min-width: 110px; font-size: 16px; }
+.jam .jam-play { min-width: 110px; font-size: var(--fs-body); }
 .jam button:disabled { opacity: .4; cursor: default; }
 .jam .jam-toggle.on, .jam .jam-mini.live { background: var(--accent-soft); border-color: var(--accent-line); color: var(--mint); }
 .jam .jam-mini.live { background: rgba(255, 122, 134, 0.16); border-color: rgba(255, 122, 134, 0.7); color: #ffc2c7; }
@@ -57,10 +57,10 @@ body[data-screen="jam"] .jam-back { display: none; }
 .jam-num { width: 76px; text-align: center; font-variant-numeric: tabular-nums; }
 .jam-select { max-width: 100%; min-width: 44px; }
 .jam-field { display: flex; align-items: center; gap: 8px; min-height: 44px; min-width: 0; max-width: 100%; }
-.jam-field-name { color: var(--muted); font-size: 13px; min-width: 3.2em; }
+.jam-field-name { color: var(--muted); font-size: calc(var(--fs-caption) * 1.04); min-width: 3.2em; }
 .jam-range { flex: 1 1 110px; width: 100%; max-width: 100%; min-width: 0; height: 44px; min-height: 44px; accent-color: var(--accent); }
-.jam-out { min-width: 3em; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; }
-.jam-readout { margin-left: auto; font-family: var(--serif); font-size: 20px; font-variant-numeric: tabular-nums; color: var(--mint); min-width: 9.5em; max-width: 100%; text-align: right; }
+.jam-out { min-width: 3em; font-variant-numeric: tabular-nums; color: var(--muted); font-size: calc(var(--fs-caption) * 1.04); }
+.jam-readout { margin-left: auto; font-family: var(--font-round); font-weight: 600; font-size: calc(var(--fs-title) * .9); font-variant-numeric: tabular-nums; color: var(--mint); min-width: 9.5em; max-width: 100%; text-align: right; }
 
 /* key, scale, effects */
 .jam-music { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; min-width: 0; max-width: 100%; }
@@ -90,7 +90,7 @@ body[data-screen="jam"] .jam-back { display: none; }
   min-height: 52px; border-radius: var(--radius-sm); border: 1px solid var(--pane-line); background: rgba(255, 255, 255, 0.04);
   display: flex; align-items: center; gap: 10px; padding: 6px 12px; text-align: left;
 }
-.jam-slot-n { font-family: var(--serif); font-size: 20px; width: 1.2em; }
+.jam-slot-n { font-family: var(--font-round); font-weight: 600; font-size: calc(var(--fs-title) * .9); width: 1.2em; }
 .jam-slot-s { font-size: 13px; color: var(--muted); }
 .jam-slot-tap.sel { border-color: var(--outline); }
 .jam-slot-tap[data-state="empty"] { border-style: dashed; }
@@ -162,3 +162,160 @@ body[data-screen="jam"] .jam-back { display: none; }
 @media (prefers-reduced-motion: reduce) {
   .jam *, .jam *::before, .jam *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }
+
+/* ============================ Stage 4 layout =============================
+   Phone: one column, the keyboard docks above the tab bar so it is always under the thumbs and 15 keys
+   scroll sideways inside it. Landscape phone: two columns. iPad / Mac: two columns with the keyboard full width. */
+.jam { gap: var(--s3); padding: 0 var(--gutter) var(--s6); }
+.jam-card { background: var(--surface); border: 0; box-shadow: var(--e1), inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: var(--s4); }
+.jam-h2 { font-family: var(--font); font-weight: 650; font-size: var(--fs-caption); letter-spacing: .06em; text-transform: uppercase; color: var(--faint); margin: 0 0 var(--s3); }
+.jam-head { justify-content: flex-end; }
+.jam-head-actions { flex-wrap: nowrap; gap: var(--s2); }
+.jam .jam-btn { border-radius: var(--r-pill); }
+.jam-status:empty { display: none; }
+
+/* transport: a big Play, the tempo as a dial, swing and metronome underneath */
+.jam-transport { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--s3); align-items: center; }
+.jam-transport > .jam-play { grid-column: 1 / -1; height: 60px; font-size: 19px; border-radius: var(--r-pill); }
+.jam-transport > .jam-tempo { grid-column: 1 / -1; justify-content: space-between; flex-wrap: nowrap; gap: var(--s2); }
+.jam-tempo .jam-num { flex: 1 1 auto; width: auto; min-width: 0; height: 56px; font-family: var(--font-round); font-weight: 600; font-size: 32px; letter-spacing: -.02em; background: var(--surface-2); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); }
+.jam .jam-tempo .jam-step { width: 56px; height: 56px; border-radius: 50%; padding: 0; font-size: 26px; }
+.jam .jam-tempo .jam-btn { height: 56px; border-radius: var(--r-pill); }
+.jam-transport > .jam-field { grid-column: 1 / -1; }
+.jam-transport > .jam-toggle { grid-column: 1; width: 100%; }
+.jam-readout { grid-column: 2; margin: 0; min-width: 0; text-align: right; font-family: var(--font-round); font-size: var(--fs-headline); color: var(--accent); }
+.jam .jam-play.playing { background: var(--surface-3); color: var(--text); box-shadow: inset 0 0 0 1px var(--line-strong); }
+
+.jam-num, .jam-select { background: var(--surface-2); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-sm); color: var(--text); }
+.jam-select { font-size: var(--fs-body); }
+
+/* key, scale, effects: two columns, label above the control */
+.jam-music { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s2) var(--s4); align-items: center; }
+.jam-music > .jam-field { flex-direction: column; align-items: stretch; gap: 2px; }
+.jam-music > .jam-field .jam-select { width: 100%; }
+.jam-music > .jam-field-name, .jam-music .jam-field-name { min-width: 0; }
+.jam-music > .jam-seg { grid-column: 1 / -1; justify-self: stretch; display: flex; border-radius: var(--r-sm); background: var(--surface-2); border: 0; padding: 3px; }
+.jam-seg label { flex: 1 1 0; }
+.jam-seg span { width: 100%; border-radius: 10px; }
+.jam-seg input:checked + span { background: var(--surface-3); box-shadow: 0 0 0 1px var(--line-strong); font-weight: 650; }
+.jam-music > .jam-field:nth-last-child(-n+2) { grid-column: 1 / -1; flex-direction: row; align-items: center; }
+.jam-check input { accent-color: var(--accent); }
+
+/* tracks */
+.jam-track { background: var(--surface-2); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: var(--s3); }
+.jam-track.sel { box-shadow: inset 0 0 0 1.5px var(--accent-line); }
+.jam .jam-trackname { border-radius: var(--r-pill); }
+.jam-slot-tap { background: var(--surface); border-radius: var(--r-sm); min-height: 56px; }
+.jam-slot-tap[data-state="has"] { background: var(--surface-3); }
+
+/* drum pads: big and square-ish */
+.jam-pad { min-height: 64px; background: var(--surface-2); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); }
+.jam-pad.down { background: var(--accent-soft); box-shadow: inset 0 0 0 1.5px var(--accent-line); }
+.jam-cell { border: 0; background: var(--surface-2); }
+.jam-cell.beat { background: var(--surface-3); }
+.jam-cell.on { background: var(--accent); }
+.jam-grid-name { background: var(--surface); }
+
+/* keyboard: wider keys, scrolls inside its own box */
+.jam-kb { height: 176px; min-width: calc(var(--whites) * 60px); }
+.jam-key.white { border-radius: 0 0 var(--r-xs) var(--r-xs); }
+.jam-kbscroll { scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.jam-kbscroll::-webkit-scrollbar { display: none; }
+.jam-kbhead .jam-head-actions .jam-btn { height: 40px; padding: 0 var(--s3); font-size: 13px; min-height: 44px; }
+.jam-kbhead .jam-h2 { margin: 0; }
+
+/* recording state: the whole transport turns red-edged and a dot pulses, so it cannot be missed */
+.jam:has(.jam-slot-tap[data-state="recording"]) .jam-transport { box-shadow: inset 0 0 0 1.5px rgba(255, 122, 133, 0.85); }
+.jam:has(.jam-slot-tap[data-state="recording"]) .jam-readout::before,
+.jam:has(.jam-slot-tap[data-state="armed"]) .jam-readout::before { content: "\25CF  "; color: var(--bad); animation: jamRec 1s ease-in-out infinite; }
+.jam:has(.jam-slot-tap[data-state="armed"]):not(:has(.jam-slot-tap[data-state="recording"])) .jam-readout::before { color: var(--star); }
+.jam-slot-tap[data-state="recording"] { animation: jamRecSlot 1.1s ease-in-out infinite; }
+@keyframes jamRec { 50% { opacity: .25; } }
+@keyframes jamRecSlot { 50% { background: rgba(255, 122, 133, 0.28); } }
+@media (prefers-reduced-motion: reduce) { .jam-readout::before, .jam-slot-tap[data-state="recording"] { animation: none !important; } }
+
+/* phone: keyboard docked above the tab bar */
+@media (max-width: 699px) and (orientation: portrait) {
+  /* the keyboard is part of the page (it used to float over the Tracks and Metronome rows): it sits right under the transport */
+  .jam > * { order: 5; }
+  .jam > .jam-head, .jam > .jam-status, .jam > .jam-confirm, .jam > .jam-problem { order: 0; }
+  .jam > .jam-transport { order: 1; }
+  .jam > .jam-card[aria-label="Keyboard"] { order: 2; }
+  .jam-card[aria-label="Keyboard"] { position: static; padding: var(--s2) var(--s4) var(--s3); }
+  .jam-card[aria-label="Keyboard"] .jam-help, .jam-card[aria-label="Keyboard"] .jam-h2 { display: none; }
+  .jam-card[aria-label="Keyboard"] .jam-kbhead { justify-content: flex-end; margin-bottom: var(--s2); }
+  /* white keys 44px wide (the touch minimum), black keys 60% of that; about an octave shows at once and the rest scrolls sideways.
+     The keys only play: the strip under them scrolls (a rail marks it) */
+  .jam-kb { height: 140px; min-width: calc(var(--whites) * 44px); }
+  .jam-key.black { width: calc(60% / var(--whites)); min-width: 0; }
+  .jam-key.black::before { left: 50%; right: auto; width: 44px; margin-left: -22px; }   /* a 44px touch area centred on the 26px key (the white keys keep their lower part) */
+  .jam-kbscroll {
+    scroll-snap-type: x proximity; padding-bottom: 26px; touch-action: pan-x;
+    background: linear-gradient(var(--line-strong), var(--line-strong)) no-repeat center bottom 10px / 40px 4px;
+  }
+  .jam-key.white { scroll-snap-align: start; }
+}
+
+/* landscape phone: controls left, tracks and pads right; keyboard docked along the bottom */
+@media (max-height: 600px) and (orientation: landscape) {
+  .jam { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; gap: var(--s3); padding-bottom: calc(var(--sab) + var(--s3)); }
+  .jam > .jam-head, .jam > .jam-status, .jam > .jam-confirm, .jam > .jam-problem { grid-column: 1 / -1; }
+  .jam > .jam-card[aria-label="Keyboard"] { grid-column: 1 / -1; position: sticky; bottom: 0; z-index: 4; padding: var(--s2) var(--s4); box-shadow: var(--e3); }
+  .jam-card[aria-label="Keyboard"] .jam-help, .jam-card[aria-label="Keyboard"] .jam-h2 { display: none; }
+  .jam-card[aria-label="Keyboard"] .jam-kbhead { justify-content: flex-end; margin-bottom: var(--s1); }
+  .jam-kb { height: 92px; }
+  .jam > .jam-card[aria-label="Tracks"], .jam > .jam-card[aria-label="Drum pattern"] { grid-column: 2; }
+  .jam > .jam-transport { grid-column: 1; }
+  .jam > .jam-music { grid-column: 1; }
+  .jam-transport > .jam-play { height: 52px; }
+  .jam-tempo .jam-num, .jam .jam-tempo .jam-step, .jam .jam-tempo .jam-btn { height: 48px; }
+  .jam .jam-tempo .jam-step { width: 48px; }
+}
+
+#screen-jam { container-type: inline-size; container-name: jamscr; }
+/* iPad and Mac: two columns, keyboard across the bottom */
+@container jamscr (min-width: 640px) {
+@media (min-height: 601px) {
+  .jam { max-width: 1180px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--s4); align-items: start; padding-inline: 0; }
+  .jam > .jam-head, .jam > .jam-status, .jam > .jam-confirm, .jam > .jam-problem, .jam > .jam-card[aria-label="Keyboard"], .jam > .jam-card[aria-label="Drum pattern"] { grid-column: 1 / -1; }
+  .jam > .jam-transport, .jam > .jam-music { grid-column: 1; }
+  .jam > .jam-card[aria-label="Tracks"] { grid-column: 2; grid-row: 2 / span 2; }
+  .jam-kb { height: 220px; min-width: calc(var(--whites) * 44px); }   /* the whole range fits a tablet: no key cut off at the edge */
+}
+}
+@container jamscr (min-width: 640px) and (max-width: 1019px) {
+@media (min-height: 601px) {
+  .jam { grid-template-columns: minmax(0, 1fr); }
+  .jam > .jam-transport, .jam > .jam-music, .jam > .jam-card[aria-label="Tracks"] { grid-column: 1; grid-row: auto; }
+  .jam-transport { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .jam-transport > .jam-play { grid-column: 1; width: 160px; }
+  .jam-transport > .jam-tempo { grid-column: 2; }
+  .jam-transport > .jam-field { grid-column: 1 / 3; }
+  .jam-transport > .jam-toggle { grid-column: 3; width: auto; }
+  .jam-readout { grid-column: 3; }
+  .jam-music { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .jam-music > .jam-seg { grid-column: span 2; }
+  .jam-music > .jam-field:nth-last-child(-n+2) { grid-column: span 2; }
+}
+}
+@media (min-width: 640px) { .jam-slots { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+/* the sticky phone keyboard: room after the last key, so scrolling to the end never cuts it at the card's edge */
+@media (max-width: 699px) { .jam-kbscroll { padding-inline-end: var(--s4); scroll-padding-inline-end: var(--s4); } }
+
+
+/* Scale lock and Snap to scale: switches like the rest of the app */
+.jam-check { justify-content: space-between; gap: 12px; color: var(--text); font-size: var(--fs-body, 15px); }
+.jam-check input[type="checkbox"] {
+  -webkit-appearance: none; appearance: none; position: relative; flex: none; order: 2; margin: 0; cursor: pointer;
+  width: 51px; height: 31px; min-height: 0; border: 0; border-radius: 999px; background: var(--surface-3); box-shadow: inset 0 0 0 1px var(--line-strong);
+  transition: background-color var(--d-base, .2s) var(--ease-out, ease);
+}
+.jam-check input[type="checkbox"]::before {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff; box-shadow: 0 2px 6px rgba(0, 0, 0, .4);
+  transition: transform var(--d-base, .2s) var(--ease-out, ease);
+}
+.jam-check input[type="checkbox"]:checked { background: var(--accent); box-shadow: none; }
+.jam-check input[type="checkbox"]:checked::before { transform: translateX(20px); }
+.jam-check input[type="checkbox"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .jam-check input[type="checkbox"], .jam-check input[type="checkbox"]::before { transition: none; } }

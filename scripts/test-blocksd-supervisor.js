@@ -93,7 +93,8 @@ test('port race: a port taken between choosing and binding is retried with a new
 })
 
 test('start gives up when no attempt comes up, and says why', async () => {
-  const h = make({ env: { FAKE_BLOCKSD_EXIT_MS: '10' }, options: { startAttempts: 2 } })
+  // dies before it listens: a 10 ms crash timer raced the readiness probe and sometimes lost (flaky)
+  const h = make({ env: { FAKE_BLOCKSD_DIE_AT_START: '1' }, options: { startAttempts: 2 } })
   const r = await h.sup.start()
   assert.equal(r.mode, 'failed'); assert.equal(h.sup.state, 'failed')
   assert.equal(h.spawns.length, 2)
@@ -290,7 +291,7 @@ test('an unrelated process whose arguments merely mention our executable is neve
   try {
     assert.ok(await until(() => processInfo(bystander.pid)))
     // a record that would match everything except the token, which the process does not carry
-    fs.writeFileSync(path.join(dir, 'blocksd.pid'), JSON.stringify({ pid: bystander.pid, exe: process.execPath, started: startedOf(bystander.pid), token: 'ABCDEF0123456789' }))
+    fs.writeFileSync(path.join(dir, 'blocksd.pid'), JSON.stringify({ pid: bystander.pid, exe: process.execPath, started: startedOf(bystander.pid), token: 'ABCDEF0123456789' })) // gitleaks:allow (synthetic test token)
     const h = make({ opts: { configDir: dir, pidFile: path.join(dir, 'blocksd.pid') } })
     await h.sup.start(); await h.sup.stop()
     assert.ok(alive(bystander.pid))
@@ -353,7 +354,7 @@ test('the watchdog asks for the daemon port on every check', () => {
 const macArch = process.arch === 'x64' ? 'x86_64' : process.arch
 const BUILT = path.join(__dirname, '..', 'native', 'build', `darwin-${macArch}`, 'blocksd', 'blocksd')
 test('the real daemon exits when its parent is killed (stdin pipe / parent watch)', async () => {
-  if (process.platform !== 'darwin' || !fs.existsSync(BUILT)) { console.log('     (skipped: the macOS daemon is not built, scripts/build-blocksd.sh)'); return }
+  if (process.platform !== 'darwin' || !fs.existsSync(BUILT)) { console.log('     (skipped: the daemon is not built, scripts/build-blocksd.sh)'); return }
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'keylight-orphan-'))
   const port = await freePort()
   fs.writeFileSync(path.join(dir, 'c.toml'), configText(port))

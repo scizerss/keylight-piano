@@ -1,4 +1,5 @@
 import { HANDS, HAND_NAME, RATES, stepLabel } from './guided-course.js'
+import { dot } from './studio-copy.js'
 
 export function el(doc, tag, cls, text) {
   const element = doc.createElement(tag)
@@ -72,7 +73,7 @@ export function paintGuidedSteps(doc, view, state) {
   for (const step of cur.steps) {
     const status = progress[step.id]?.passed ? 'Done' : step.id === cur.step.id ? 'Next' : 'Later'
     const row = el(doc, 'li', 'guided-step is-' + status.toLowerCase())
-    const best = progress[step.id]?.best != null ? ' · best ' + Math.round(progress[step.id].best * 100) + '%' : ''
+    const best = progress[step.id]?.best != null ? dot() + 'best ' + Math.round(progress[step.id].best * 100) + '%' : ''
     row.append(el(doc, 'span', 'guided-step-name', stepLabel(step)), el(doc, 'span', 'guided-step-state', status + best))
     view.list.appendChild(row)
   }

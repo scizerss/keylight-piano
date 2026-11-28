@@ -1,6 +1,6 @@
 // Web Audio: expressive MPE instrument engine, metronome click, backing player
 import { Voice, INSTRUMENTS, prepareInstrument } from './instruments.js'
-import { loadPiano, pianoStatus, loadHarmonium, harmoniumStatus, loadSampled, sampleStatus } from './sampler.js'
+import { loadPiano, pianoStatus } from './sampler.js'
 import { createFx } from './jam/fx.js'
 import { playDrum } from './jam/drums.js'
 
@@ -19,6 +19,9 @@ let backingGain = null
 let hush = null               // silent sink for the warm-up notes
 let limiter = null            // the last node before the speakers: takes are recorded from it
 let volume = 0.8
+let outputMuteGain = null
+let outputMuted = false
+let microphoneMuted = false
 let backingSource = null
 let backingBuffer = null      // accompaniment (piano muted)
 let fullBuffer = null         // full mix (piano included)
@@ -87,7 +90,8 @@ export function initAudio() {
   setAirExpression(airExpression)
   master = out.recordings
   limiter = out.output
-  limiter.connect(ctx.destination)
+  outputMuteGain = new GainNode(ctx, { gain: outputMuted || microphoneMuted ? 0 : 1 })
+  limiter.connect(outputMuteGain).connect(ctx.destination)
   backingGain = new GainNode(ctx, { gain: 0.7 })
   backingGain.connect(master)
   warm(instrument)
@@ -113,11 +117,6 @@ export function setAirExpression(value = null) {
 }
 export function loadSampledPiano() { return loadPiano(initAudio()) }
 export const sampledPianoStatus = () => pianoStatus(ctx)
-export function loadSampledHarmonium() { return loadHarmonium(initAudio()) }
-export const sampledHarmoniumStatus = () => harmoniumStatus(ctx)
-export function loadSampledInstrument(id = 'sampled-piano') { return loadSampled(initAudio(), id) }
-export const sampledInstrumentStatus = (id = 'sampled-piano') => sampleStatus(ctx, id)
-const isSampled = (id) => id === 'sampled-piano' || id === 'harmonium'
 export function setVolume(v) {
   volume = Math.max(0, Math.min(1, v))
   if (!ctx) return
@@ -125,6 +124,21 @@ export function setVolume(v) {
   const t = ctx.currentTime
   synthIn.gain.setTargetAtTime(busGain(volume), t, 0.015)
   master.gain.setTargetAtTime(volume / LIMIT_RANGE, t, 0.015)
+}
+
+// Mute the speakers for TV mode while the audio clock and take recording keep running.
+export function setOutputMuted(muted) {
+  outputMuted = muted
+  if (outputMuteGain) outputMuteGain.gain.setTargetAtTime(outputMuted || microphoneMuted ? 0 : 1, ctx.currentTime, 0.015)
+}
+
+export function muteForMicrophone(muted) {
+  microphoneMuted = muted
+  if (outputMuteGain) {
+    outputMuteGain.gain.cancelScheduledValues(ctx.currentTime)
+    if (muted) outputMuteGain.gain.setValueAtTime(0, ctx.currentTime)
+    else setOutputMuted(outputMuted)
+  }
 }
 
 let instrument = 'grand'
@@ -141,15 +155,15 @@ function warm(id) {
     for (const type of ['sine', 'square', 'triangle']) new OscillatorNode(ctx, { type })
   }
   prepareInstrument(ctx, id)
-  if (isSampled(id) && sampleStatus(ctx, id).state !== 'ready') return
+  if (id === 'sampled-piano' && pianoStatus(ctx).state !== 'ready') return
   for (const pitch of [36, 60, 84]) new Voice(ctx, hush, pitch, 1, id, bendRangeSemis).release(0.02)
 }
 
 const vkey = (channel, pitch) => channel + ':' + pitch
 export function setInstrument(id) {
   if (!INSTRUMENTS.some((i) => i.id === id)) return false
-  // Never silently substitute a synthesised sound under a sampled instrument label.
-  if (isSampled(id) && sampleStatus(ctx, id).state !== 'ready') return false
+  // Never silently substitute a synthesised sound under a sampled-piano label.
+  if (id === 'sampled-piano' && pianoStatus(ctx).state !== 'ready') return false
   instrument = id
   stopAll()
   if (ctx) warm(id)
@@ -277,7 +291,7 @@ export function cancelClicks() {
 }
 
 // ---------- take recording ----------
-// A copy of exactly what the speakers get (after the volume and the limiter) as a
+// A copy of the mastered signal (before the speaker mute) as a
 // stereo MediaStream, for the take recorder (recorder.js). It is made only when a take
 // starts and taken apart by release() when the take ends, so nothing extra runs while
 // nothing is recorded. The AudioContext is made once and never re-created, and a new
@@ -334,30 +348,40 @@ export async function listOutputs() {
 // device returns. Resolves true when that device is playing, false when the default
 // plays instead.
 let preferredSink = ''
+let sinkChanges = Promise.resolve()
 export async function setOutput(deviceId = '') {
   preferredSink = deviceId || ''
   initAudio()
   return applySink()
 }
-async function applySink() {
+function applySink() {
+  const preferred = preferredSink
+  const change = sinkChanges.then(() => applyPreferredSink(preferred))
+  sinkChanges = change.catch(() => {})
+  return change
+}
+async function applyPreferredSink(preferred) {
+  if (preferred !== preferredSink) return false
   if (!ctx || !ctx.setSinkId) return false
-  let target = preferredSink
+  let target = preferred
   if (target && !(await listOutputs()).some((o) => o.id === target)) target = ''
+  if (preferred !== preferredSink) return false
   if ((ctx.sinkId || '') !== target) {
     try {
       await ctx.setSinkId(target)
     } catch (e) {
+      if (preferred !== preferredSink) return false
       console.log('AUDIO output not available (' + e.message + '), using the default')
       target = ''
       try { await ctx.setSinkId('') } catch (_e) {}
     }
     console.log('AUDIO output=' + (target ? 'device' : 'default') + ' base=' + (ctx.baseLatency * 1000).toFixed(1) + 'ms')
   }
-  return target === preferredSink
+  return preferred === preferredSink && (ctx.sinkId || '') === preferred
 }
 function watchOutputs() {
   const md = navigator.mediaDevices
-  if (md && md.addEventListener) md.addEventListener('devicechange', () => { if (preferredSink) applySink() })
+  if (md && md.addEventListener) md.addEventListener('devicechange', () => { if (preferredSink) void applySink().catch(() => {}) })
 }
 
 // Count the dropouts a listener could hear: each second's new dropouts count when a note
@@ -390,13 +414,27 @@ function watchDropouts() {
 // ---------- backing track ----------
 // User-supplied audio; playbackRate = practice speed (pitch follows the rate, which is
 // acceptable for 75 % / 100 % practice).
+let backingGeneration = 0
+const backingRequests = { backing: 0, full: 0 }
+export function invalidateBackingLoads() { backingGeneration++ }
 export async function loadBackingFile(file, kind = 'backing') {
   initAudio()
-  const buf = await file.arrayBuffer()
-  const decoded = await ctx.decodeAudioData(buf)
-  if (kind === 'full') fullBuffer = decoded
-  else backingBuffer = decoded
-  return decoded.duration
+  const stem = kind === 'full' ? 'full' : 'backing'
+  const generation = backingGeneration
+  const request = ++backingRequests[stem]
+  const current = () => generation === backingGeneration && request === backingRequests[stem]
+  try {
+    const buf = await file.arrayBuffer()
+    if (!current()) return null
+    const decoded = await ctx.decodeAudioData(buf)
+    if (!current()) return null
+    if (stem === 'full') fullBuffer = decoded
+    else backingBuffer = decoded
+    return decoded.duration
+  } catch (error) {
+    if (!current()) return null
+    throw error
+  }
 }
 export const hasBacking = () => !!(backingBuffer || fullBuffer)
 export const backingDuration = () => (backingBuffer || fullBuffer) ? (backingBuffer || fullBuffer).duration : 0
@@ -467,6 +505,7 @@ export function nudgeRecording(t) { if (rec) rec.el.currentTime = Math.max(0, t)
 
 // Forget attached audio (a new song brings its own, or none).
 export function clearBacking() {
+  invalidateBackingLoads()
   stopBacking()
   backingBuffer = null
   fullBuffer = null
@@ -674,7 +713,7 @@ export function createTrack({ kind = 'notes', instrument: startInstrument = 'lea
     slide(h, v) { if (live(h)) h.voice.setSlide(v) },
     setInstrument(id) {
       if (!INSTRUMENTS.some((i) => i.id === id)) return false
-      if (isSampled(id) && sampleStatus(ctx, id).state !== 'ready') return false
+      if (id === 'sampled-piano' && pianoStatus(ctx).state !== 'ready') return false
       current = id
       prepareInstrument(ctx, id)
       return true

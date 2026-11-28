@@ -19,7 +19,8 @@ const sweepImages = () => { for (const i of document.querySelectorAll('img.c-img
 
 // which side a screen enters from: forward tabs slide in from the right, Back from the left
 const ORDER = ['home', 'course', 'practice', 'search', 'settings']
-const setSx = (px) => root.style.setProperty('--sx', px + 'px')
+const IOS = () => root.classList.contains('ios')   // the app's screens arrive through ios-motion.js: no --sx slide, nothing stacked (read late: ?platform=ios adds the class after this file loads)
+const setSx = (px) => { if (!IOS()) root.style.setProperty('--sx', px + 'px') }
 if (nav) nav.addEventListener('click', (e) => {
   const b = e.target.closest && e.target.closest('button[data-screen]')
   if (!b) return
@@ -68,7 +69,7 @@ function reveal(screen) {
   const host = sel && document.getElementById('screen-' + screen)
   if (!host) return
   for (const el of host.querySelectorAll('.rv')) untag(el)
-  if (calm() || document.hidden) return
+  if (calm() || document.hidden || root.classList.contains('ios')) return   // the app does not stagger screens in (Illuminated Studio)
   let i = 0
   for (const el of host.querySelectorAll(sel)) {
     if (i >= 10) break

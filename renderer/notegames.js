@@ -1,6 +1,5 @@
 // Note games: a question on the screen, a key to find on the keyboard, one minute a round.
-// Answers count in any octave, since the keys may sit anywhere and a 24-key row can't reach
-// every note as written.
+// Most answers count in any octave. "Every" mode asks for each matching key in the visible row.
 
 export const NOTE_GAMES = [
   { id: 'find-the-key', name: 'Find the Key', sub: 'A note name appears: play it', kind: 'name' },
@@ -8,7 +7,7 @@ export const NOTE_GAMES = [
   { id: 'read-bass', name: 'Read the Bass', sub: 'Left-hand notes on the staff', kind: 'staff', clef: 'bass' }
 ]
 
-const NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B']
+export const NOTE_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B']
 const WHITE = [0, 2, 4, 5, 7, 9, 11]
 const RANGE = { treble: [60, 81], bass: [40, 60] }   // middle C to high A, low E to middle C
 export const ROUND_SECONDS = 60
@@ -16,21 +15,30 @@ export const HINT_AFTER_SECONDS = 5
 
 export const pitchClass = (p) => ((p % 12) + 12) % 12
 
-// The next question, never the note just asked. rand: returns 0..1, for the self-test.
+// Avoid repeating the last note when there is another to ask. rand: returns 0..1, for tests.
 export function nextQuestion(game, last = null, rand = Math.random) {
   let pool
-  if (game.kind === 'name') pool = NAMES.map((_, i) => 60 + i)
+  if (game.kind === 'name') {
+    pool = NOTE_NAMES.map((_, i) => 60 + i).filter((p) => !game.names || game.names.includes(NOTE_NAMES[pitchClass(p)]))
+  }
   else {
     const [lo, hi] = RANGE[game.clef]
     pool = []
     for (let p = lo; p <= hi; p++) if (WHITE.includes(pitchClass(p))) pool.push(p)
   }
   const fresh = pool.filter((p) => !last || pitchClass(p) !== pitchClass(last.pitch))
-  const pitch = fresh[Math.floor(rand() * fresh.length) % fresh.length]
-  return { pitch, name: NAMES[pitchClass(pitch)] }
+  const choices = fresh.length ? fresh : pool
+  const pitch = choices[Math.floor(rand() * choices.length) % choices.length]
+  return { pitch, name: NOTE_NAMES[pitchClass(pitch)] }
 }
 
 export const isRight = (q, pitch) => pitchClass(pitch) === pitchClass(q.pitch)
+
+export function matchingPitches(q, start, keys) {
+  const matches = []
+  for (let i = 0; i < keys; i++) if (isRight(q, start + i)) matches.push(start + i)
+  return matches
+}
 
 // Right answers in a round, to stars.
 const STAR_AT = [10, 18, 26, 34, 42]

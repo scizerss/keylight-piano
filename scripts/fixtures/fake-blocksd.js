@@ -2,11 +2,13 @@
 // the --config file, answers WebSocket "discover" requests like blocksd does, prints a few log
 // lines, exits on SIGTERM, and exits 1 when it cannot bind its port.
 // FAKE_BLOCKSD_EXIT_MS: exit by itself after that long (a crashing daemon).
+// FAKE_BLOCKSD_DIE_AT_START=1: exit before listening (an attempt that never comes up, with no race).
 // FAKE_BLOCKSD_IGNORE_TERM=1: ignores SIGTERM (a stubborn daemon).
 // FAKE_BLOCKSD_PLAIN=1: accepts TCP but never speaks WebSocket (not a blocksd).
 const crypto = require('node:crypto')
 const fs = require('node:fs')
 const http = require('node:http')
+if (process.env.FAKE_BLOCKSD_DIE_AT_START) process.exit(3)
 const args = process.argv.slice(2)
 const config = fs.readFileSync(args[args.indexOf('--config') + 1], 'utf8')
 const port = Number(/web_port\s*=\s*(\d+)/.exec(config)[1])

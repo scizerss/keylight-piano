@@ -27,7 +27,7 @@ Keylight shows falling notes over a keyboard that looks like yours, lights the n
 
 | Platform | File | Notes |
 |---|---|---|
-| Mac | Disk image (`.dmg`) | Apple silicon, macOS 13 or newer. Open the image and drag Keylight to Applications. The app is ad-hoc signed, not notarised, so macOS refuses to open it until the download quarantine is cleared: the image includes the steps. |
+| Mac | Disk image (`.dmg`) | Apple silicon, macOS 13 or newer. Open the image and drag Keylight to Applications. The 1.1 release is Developer ID signed and notarized. |
 | Windows | Installer (`.exe`) | Windows 10 or 11, 64-bit. **Beta.** The wizard installs for the current user without administrator privileges. Keylight is not code-signed, so the first time Windows may say "Windows protected your PC": click **More info**, then **Run anyway**. |
 | iPhone and iPad | coming soon | Coming to the App Store as a paid app, published by the maintainer. Please do not publish a Keylight app there before it is out; see [BRANDING.md](BRANDING.md). |
 
